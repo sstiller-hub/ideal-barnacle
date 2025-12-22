@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { getWorkoutHistory } from "@/lib/workout-storage"
-import { getPersonalRecords } from "@/lib/pr-storage"
 import { getRoutines } from "@/lib/routine-storage"
 import { getCurrentInProgressSession, saveCurrentSessionId } from "@/lib/autosave-workout-storage"
 import { Play, ChevronLeft, ChevronRight, Calendar, Check, Plus, X, Moon, Pencil } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
-import { getScheduledWorkoutForDate } from "@/lib/schedule-storage" // Import getScheduledWorkoutForDate
-import { setRestDay } from "@/lib/schedule-storage" // Import setRestDay
+import {
+  getScheduledWorkoutForDate,
+  setScheduledWorkout as persistScheduledWorkout,
+  setRestDay,
+} from "@/lib/schedule-storage"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -96,7 +98,6 @@ export default function Home() {
 
   const loadDataForDate = (date: Date) => {
     const history = getWorkoutHistory()
-    const prs = getPersonalRecords()
     const allRoutines = getRoutines()
 
     // Normalize date to midnight for comparison
@@ -143,23 +144,42 @@ export default function Home() {
     setScheduledWorkout(scheduledRoutine)
     setIsRestDay(restDay)
 
+    const prByExerciseName = new Map<
+      string,
+      {
+        name: string
+        weight: number
+        reps: number
+        workoutId?: string
+        workoutName?: string
+        achievedAt?: string
+      }
+    >()
+
+    history.forEach((workout) => {
+      workout.exercises.forEach((exercise) => {
+        const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0)
+        completedSets.forEach((set: any) => {
+          const key = exercise.name.toLowerCase()
+          const existing = prByExerciseName.get(key)
+          if (!existing || set.weight > existing.weight) {
+            prByExerciseName.set(key, {
+              name: exercise.name,
+              weight: set.weight,
+              reps: set.reps,
+              workoutId: workout.id,
+              workoutName: workout.name,
+              achievedAt: workout.date,
+            })
+          }
+        })
+      })
+    })
+
     // Get PRs for exercises in scheduled workout
     const exerciseNames = scheduledRoutine?.exercises.map((e: any) => e.name.toLowerCase()) || []
     const filteredPRs = exerciseNames
-      .map((name: string) => {
-        const pr = prs.find((p) => p.exerciseName.toLowerCase() === name && p.metric === "weight")
-        if (!pr) return null
-
-        const context = pr.contextJson as any
-        return {
-          name: pr.exerciseName,
-          weight: pr.valueNumber || 0,
-          reps: context?.reps || 0,
-          workoutId: context?.workoutId || null,
-          workoutName: context?.workoutName || null,
-          achievedAt: pr.achievedAt || null,
-        }
-      })
+      .map((name: string) => prByExerciseName.get(name) || null)
       .filter(Boolean)
 
     setTodayPRs(filteredPRs as any[])
@@ -192,7 +212,7 @@ export default function Home() {
   }
 
   const handleAddWorkout = (routine: any) => {
-    setScheduledWorkout({
+    persistScheduledWorkout(selectedDate, {
       routineId: routine.id,
       routineName: routine.name,
     })

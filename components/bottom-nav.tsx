@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { Home, Dumbbell, History, Trophy } from "lucide-react"
+import { Home, Dumbbell, History, Trophy, Settings } from "lucide-react"
 
 type BottomNavProps = {
   fixed?: boolean
@@ -16,6 +16,7 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     { href: "/workout", icon: Dumbbell, label: "Workouts" },
     { href: "/history", icon: History, label: "History" },
     { href: "/prs", icon: Trophy, label: "PRs" },
+    { href: "/settings", icon: Settings, label: "Settings" },
   ]
 
   const isActive = (href: string) => {
