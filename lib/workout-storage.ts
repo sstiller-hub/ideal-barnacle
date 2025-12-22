@@ -73,7 +73,22 @@ export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
 export function getWorkoutHistory(): CompletedWorkout[] {
   if (typeof window === "undefined") return []
   const stored = localStorage.getItem(STORAGE_KEY)
-  return stored ? JSON.parse(stored) : []
+  const history = stored ? (JSON.parse(stored) as CompletedWorkout[]) : []
+  let didMigrate = false
+
+  const normalized = history.map((workout) => {
+    if (typeof workout.duration === "number" && workout.duration > 0 && workout.duration < 240) {
+      didMigrate = true
+      return { ...workout, duration: workout.duration * 60 }
+    }
+    return workout
+  })
+
+  if (didMigrate) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+  }
+
+  return normalized
 }
 
 export function deleteWorkout(workoutId: string): void {

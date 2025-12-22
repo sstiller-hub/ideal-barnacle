@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -8,9 +8,9 @@ import type { WorkoutRoutine } from "@/lib/routine-storage"
 import { getLatestPerformance, saveWorkout } from "@/lib/workout-storage"
 import {
   getCurrentInProgressSession,
+  type WorkoutSession,
   saveSession,
   saveCurrentSessionId,
-  getSetsForSession,
 } from "@/lib/autosave-workout-storage"
 import BottomNav from "@/components/bottom-nav"
 import { ChevronLeft, Check, Pause, Play } from "lucide-react"
@@ -47,11 +47,13 @@ function extractRestSeconds(notes?: string): number {
 
 export default function WorkoutSessionComponent({ routine }: { routine: WorkoutRoutine }) {
   const router = useRouter()
-  const [session, setSession] = useState<any | null>(null)
+  const [session, setSession] = useState<WorkoutSession | null>(null)
   const [exercises, setExercises] = useState<any[]>([])
   const [elapsedMs, setElapsedMs] = useState(0)
   const [isHydrated, setIsHydrated] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
+  const lastTickRef = useRef<number | null>(null)
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
@@ -59,27 +61,124 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   })
 
   useEffect(() => {
-    const initSession = async () => {
-      const currentSession = await getCurrentInProgressSession()
-      if (currentSession) {
-        setSession(currentSession)
-        // Load exercises from session if they exist
-        if (currentSession.exercises) {
-          setExercises(currentSession.exercises)
+    const buildExercises = (seed?: any[]) => {
+      if (seed && seed.length > 0) return seed
+      return routine.exercises.map((exercise: any) => {
+        const lastPerformance = getLatestPerformance(exercise.name)
+
+        let previousPerformance = {
+          weight: 0,
+          avgReps: 0,
+          progress: "First time",
         }
+
+        if (lastPerformance) {
+          const completedSets = lastPerformance.sets.filter((s: any) => s.completed)
+          if (completedSets.length > 0) {
+            const maxWeight = Math.max(...completedSets.map((s: any) => s.weight))
+            const avgReps = Math.round(
+              completedSets.reduce((acc: any, s: any) => acc + s.reps, 0) / completedSets.length
+            )
+            previousPerformance = {
+              weight: maxWeight,
+              avgReps,
+              progress: "View history →",
+            }
+          }
+        }
+
+        const targetSets = exercise.targetSets ?? 3
+        const targetReps = exercise.targetReps ?? "8-10"
+        const restTime = extractRestSeconds(exercise.notes)
+
+        return {
+          id: exercise.id,
+          name: exercise.name,
+          targetSets,
+          targetReps,
+          targetWeight: exercise.targetWeight,
+          restTime,
+          completed: false,
+          sets: Array.from({ length: targetSets }, () => ({
+            reps: 0,
+            weight: 0,
+            completed: false,
+          })),
+          previousPerformance,
+        }
+      })
+    }
+
+    const initSession = async () => {
+      const currentSession = getCurrentInProgressSession()
+      if (currentSession) {
+        const normalizedStatus =
+          (currentSession as any).status === "active"
+            ? "in_progress"
+            : currentSession.status
+
+        const normalizedSession: WorkoutSession = {
+          ...currentSession,
+          id: currentSession.id || (currentSession as any).sessionId || Date.now().toString(),
+          status: normalizedStatus,
+          activeDurationSeconds:
+            currentSession.activeDurationSeconds ??
+            Math.max(
+              0,
+              Math.floor(
+                (Date.now() - new Date(currentSession.startedAt).getTime()) / 1000
+              )
+            ),
+        }
+
+        saveCurrentSessionId(normalizedSession.id)
+
+        const now = Date.now()
+        const lastActiveAt = normalizedSession.lastActiveAt
+          ? new Date(normalizedSession.lastActiveAt).getTime()
+          : null
+        const additionalSeconds =
+          normalizedSession.status === "in_progress" && lastActiveAt
+            ? Math.floor((now - lastActiveAt) / 1000)
+            : 0
+
+        const updatedSession: WorkoutSession = {
+          ...normalizedSession,
+          activeDurationSeconds: Math.max(
+            0,
+            (normalizedSession.activeDurationSeconds || 0) + additionalSeconds
+          ),
+          lastActiveAt:
+            normalizedSession.status === "in_progress" ? new Date().toISOString() : null,
+        }
+
+        setSession(updatedSession)
+        setExercises(buildExercises(updatedSession.exercises))
+        setRestState(updatedSession.restTimer)
+        setElapsedMs((updatedSession.activeDurationSeconds || 0) * 1000)
+        await saveSession(updatedSession)
         setIsHydrated(true)
       } else {
         const newSessionId = Date.now().toString()
-        saveCurrentSessionId(newSessionId)
-        const newSession = {
-          sessionId: newSessionId,
+        const newExercises = buildExercises()
+        const newSession: WorkoutSession = {
+          id: newSessionId,
           routineId: routine.id,
-          status: "active",
+          routineName: routine.name,
+          status: "in_progress",
           startedAt: new Date().toISOString(),
+          activeDurationSeconds: 0,
           currentExerciseIndex: 0,
-          exercises: [], // Initialize exercises array
+          exercises: newExercises,
+          restTimer: undefined,
+          lastActiveAt: new Date().toISOString(),
         }
+
+        saveCurrentSessionId(newSessionId)
         setSession(newSession)
+        setExercises(newExercises)
+        setRestState(undefined)
+        setElapsedMs(0)
         await saveSession(newSession)
         setIsHydrated(true)
       }
@@ -91,29 +190,45 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   useEffect(() => {
     if (!isHydrated) return
 
-    if (!session?.sessionId) {
+    if (!session?.id) {
       // startSession(routine.id, routine.name)
     } else if (session.routineId !== routine.id) {
       // User is trying to start different workout - should handle via confirmation
       console.warn("[v0] Different routine detected, session mismatch")
     }
-  }, [isHydrated, session?.sessionId, session?.routineId, routine.id, routine.name])
+  }, [isHydrated, session?.id, session?.routineId, routine.id, routine.name])
 
   useEffect(() => {
-    if (session?.status !== "active") {
+    if (session?.status !== "in_progress") {
+      lastTickRef.current = null
       return
     }
 
-    const startTime = new Date(session.startedAt).getTime()
+    lastTickRef.current = Date.now()
 
     const interval = setInterval(() => {
       const now = Date.now()
-      const elapsed = now - startTime
-      setElapsedMs(elapsed)
-    }, 100)
+      const lastTick = lastTickRef.current ?? now
+      const deltaSeconds = Math.max(0, Math.floor((now - lastTick) / 1000))
+      if (deltaSeconds === 0) return
+
+      lastTickRef.current = now
+      setElapsedMs((prev) => prev + deltaSeconds * 1000)
+
+      setSession((prev) => {
+        if (!prev) return prev
+        const updated = {
+          ...prev,
+          activeDurationSeconds: (prev.activeDurationSeconds || 0) + deltaSeconds,
+          lastActiveAt: new Date().toISOString(),
+        }
+        saveSession(updated)
+        return updated
+      })
+    }, 1000)
 
     return () => clearInterval(interval)
-  }, [session?.status, session?.startedAt])
+  }, [session?.status])
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000)
@@ -121,61 +236,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const secs = totalSeconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
-
-  useEffect(() => {
-    const initialExercises: any[] = routine.exercises.map((exercise: any) => {
-      const lastPerformance = getLatestPerformance(exercise.name)
-
-      let previousPerformance = {
-        weight: 0,
-        avgReps: 0,
-        progress: "First time",
-      }
-
-      if (lastPerformance) {
-        const completedSets = lastPerformance.sets.filter((s: any) => s.completed)
-        if (completedSets.length > 0) {
-          const maxWeight = Math.max(...completedSets.map((s: any) => s.weight))
-          const avgReps = Math.round(completedSets.reduce((acc: any, s: any) => acc + s.reps, 0) / completedSets.length)
-          previousPerformance = {
-            weight: maxWeight,
-            avgReps,
-            progress: "View history →",
-          }
-        }
-      }
-
-      const targetSets = exercise.targetSets ?? 3
-      const targetReps = exercise.targetReps ?? "8-10"
-      const restTime = extractRestSeconds(exercise.notes)
-
-      const sessionSets = getSetsForSession(session?.sessionId || "")
-
-      return {
-        id: exercise.id,
-        name: exercise.name,
-        targetSets,
-        targetReps,
-        targetWeight: exercise.targetWeight,
-        restTime,
-        completed: false,
-        sets:
-          sessionSets.length > 0
-            ? sessionSets.map((s: any) => ({
-                reps: s.reps ?? 0,
-                weight: s.weight ?? 0,
-                completed: s.isCompleted,
-              }))
-            : Array.from({ length: targetSets }, () => ({
-                reps: 0,
-                weight: 0,
-                completed: false,
-              })),
-        previousPerformance,
-      }
-    })
-    setExercises(initialExercises)
-  }, [routine, session?.sessionId])
 
   const currentExerciseIndex = session?.currentExerciseIndex || 0
   const currentExercise = exercises[currentExerciseIndex]
@@ -217,7 +277,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setExercises(newExercises)
 
-    const updatedSession = {
+    const updatedSession: WorkoutSession = {
       ...session,
       exercises: newExercises,
     }
@@ -253,7 +313,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setExercises(newExercises)
 
-    const updatedSession = {
+    const updatedSession: WorkoutSession = {
       ...session,
       exercises: newExercises,
     }
@@ -286,7 +346,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setExercises(newExercises)
 
-    const updatedSession = {
+    const updatedSession: WorkoutSession = {
       ...session,
       exercises: newExercises,
     }
@@ -312,7 +372,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setExercises(newExercises)
 
-    const updatedSession = {
+    const updatedSession: WorkoutSession = {
       ...session,
       exercises: newExercises,
     }
@@ -324,7 +384,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const goToNextExercise = async () => {
     if (currentExerciseIndex < exercises.length - 1) {
       const newIndex = currentExerciseIndex + 1
-      const updatedSession = {
+      const updatedSession: WorkoutSession = {
         ...session,
         currentExerciseIndex: newIndex,
       }
@@ -339,7 +399,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const goToPreviousExercise = async () => {
     if (currentExerciseIndex > 0) {
       const newIndex = currentExerciseIndex - 1
-      const updatedSession = {
+      const updatedSession: WorkoutSession = {
         ...session,
         currentExerciseIndex: newIndex,
       }
@@ -371,13 +431,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return reps + ex.sets.filter((s: any) => s.completed).reduce((sum: number, set: any) => sum + set.reps, 0)
     }, 0)
 
-    const durationMinutes = Math.floor(elapsedMs / 60000)
+    const durationSeconds = Math.floor(elapsedMs / 1000)
 
     const completedWorkout = {
-      id: session?.sessionId!,
+      id: session?.id!,
       name: routine.name,
       date: new Date(session?.startedAt!).toISOString(),
-      duration: durationMinutes,
+      duration: durationSeconds,
       exercises: exercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,
@@ -399,16 +459,29 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     await saveWorkout(completedWorkout)
 
+    if (session) {
+      const completedSession: WorkoutSession = {
+        ...session,
+        status: "completed",
+        endedAt: new Date().toISOString(),
+        restTimer: undefined,
+        lastActiveAt: null,
+        exercises,
+      }
+      await saveSession(completedSession)
+    }
+
     saveCurrentSessionId(null)
     setSession(null)
     router.push(`/workout-summary?id=${completedWorkout.id}`)
   }
 
   const handleExit = async () => {
-    if (session?.status === "active") {
-      const updatedSession = {
+    if (session?.status === "in_progress") {
+      const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
+        lastActiveAt: null,
       }
 
       setSession(updatedSession)
@@ -418,18 +491,20 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }
 
   const togglePause = async () => {
-    if (session?.status === "active") {
-      const updatedSession = {
+    if (session?.status === "in_progress") {
+      const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
+        lastActiveAt: null,
       }
 
       setSession(updatedSession)
       await saveSession(updatedSession)
     } else if (session?.status === "paused") {
-      const updatedSession = {
+      const updatedSession: WorkoutSession = {
         ...session,
-        status: "active",
+        status: "in_progress",
+        lastActiveAt: new Date().toISOString(),
       }
 
       setSession(updatedSession)
@@ -471,7 +546,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             </div>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="h-10 w-10" onClick={togglePause}>
-                {session?.status === "active" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                {session?.status === "in_progress" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </Button>
               <Button variant="ghost" size="icon" className="h-10 w-10 -mr-2" onClick={finishWorkout}>
                 <Check className="h-5 w-5" />
@@ -522,8 +597,21 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
           <ExerciseCard
             exercise={currentExercise}
+            exerciseIndex={currentExerciseIndex}
             editable={true}
             showPlateCalc={showPlateCalc}
+            restState={restState}
+            onRestStateChange={async (nextState) => {
+              setRestState(nextState || undefined)
+              if (session) {
+                const updatedSession: WorkoutSession = {
+                  ...session,
+                  restTimer: nextState || undefined,
+                }
+                setSession(updatedSession)
+                await saveSession(updatedSession)
+              }
+            }}
             onUpdateSet={updateSetData}
             onCompleteSet={completeSet}
             onAddSet={addSetToExercise}

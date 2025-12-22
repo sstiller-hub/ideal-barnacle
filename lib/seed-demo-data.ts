@@ -23,6 +23,10 @@ function createExercise(name: string, sets: WorkoutSet[], targetSets = 3, target
   }
 }
 
+function minutesToSeconds(minutes: number): number {
+  return minutes * 60
+}
+
 export function seedDemoData() {
   console.log("[v0] Starting demo data seed...")
 
@@ -38,7 +42,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_1`,
     name: "Upper Body – Rows, Chest & Arms",
     date: daysAgo(56),
-    duration: 58,
+    duration: minutesToSeconds(58),
     exercises: [
       createExercise("Overhand row (captioned)", [createSet(100, 8), createSet(100, 7)], 2, "6-8"),
       createExercise("Incline dumbbell bench", [createSet(50, 8), createSet(50, 7)], 2, "6-8"),
@@ -55,7 +59,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_2`,
     name: "Upper Body – Chest, Back & Shoulders",
     date: daysAgo(49),
-    duration: 60,
+    duration: minutesToSeconds(60),
     exercises: [
       createExercise("Incline Smith machine bench", [createSet(135, 10), createSet(135, 9)], 2, "8-10"),
       createExercise("Machine chest press", [createSet(180, 8), createSet(180, 7)], 2, "5-8"),
@@ -71,7 +75,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_3`,
     name: "Upper Body – Shoulders, Chest & Arms",
     date: daysAgo(42),
-    duration: 57,
+    duration: minutesToSeconds(57),
     exercises: [
       createExercise("Smith machine shoulder press", [createSet(95, 6), createSet(95, 5), createSet(95, 4)], 3, "4-6"),
       createExercise("Incline machine chest press (captioned)", [createSet(140, 7), createSet(140, 6)], 2, "5-7"),
@@ -93,7 +97,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_4`,
     name: "Lower Body – Quads & Hamstrings (Legs 1)",
     date: daysAgo(35),
-    duration: 55,
+    duration: minutesToSeconds(55),
     exercises: [
       createExercise("Hip adduction", [createSet(100, 15), createSet(100, 14), createSet(100, 13)], 3, "12-15"),
       createExercise("Pendulum squat", [createSet(200, 7), createSet(200, 6)], 2, "5-7"),
@@ -109,7 +113,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_5`,
     name: "Upper Body – Rows, Chest & Arms",
     date: daysAgo(28),
-    duration: 59,
+    duration: minutesToSeconds(59),
     exercises: [
       createExercise("Overhand row (captioned)", [createSet(110, 8), createSet(110, 7)], 2, "6-8"),
       createExercise("Incline dumbbell bench", [createSet(55, 8), createSet(55, 7)], 2, "6-8"),
@@ -125,7 +129,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_6`,
     name: "Upper Body – Shoulders, Chest & Arms",
     date: daysAgo(21),
-    duration: 58,
+    duration: minutesToSeconds(58),
     exercises: [
       createExercise(
         "Smith machine shoulder press",
@@ -146,7 +150,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_7`,
     name: "Lower Body – Glutes & Hamstrings (Legs 2)",
     date: daysAgo(14),
-    duration: 62,
+    duration: minutesToSeconds(62),
     exercises: [
       createExercise("Seated hamstring curl", [createSet(100, 10), createSet(100, 9)], 2, "8-10"),
       createExercise("Belt squat RDL", [createSet(180, 8), createSet(180, 7), createSet(180, 6)], 3, "6-8"),
@@ -162,7 +166,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_8`,
     name: "Upper Body – Shoulders, Chest & Arms",
     date: daysAgo(7),
-    duration: 59,
+    duration: minutesToSeconds(59),
     exercises: [
       createExercise(
         "Smith machine shoulder press",
@@ -189,7 +193,7 @@ export function seedDemoData() {
     id: `w_${Date.now()}_9`,
     name: "Lower Body – Quads & Hamstrings (Legs 1)",
     date: daysAgo(3),
-    duration: 56,
+    duration: minutesToSeconds(56),
     exercises: [
       createExercise("Hip adduction", [createSet(120, 15), createSet(120, 14), createSet(120, 13)], 3, "12-15"),
       createExercise("Pendulum squat", [createSet(230, 7), createSet(230, 6)], 2, "5-7"),

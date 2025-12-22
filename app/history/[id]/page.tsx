@@ -32,7 +32,8 @@ export default function WorkoutDetailPage() {
     })
   }
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
     if (minutes < 60) return `${minutes} minutes`
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60

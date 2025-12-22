@@ -12,7 +12,7 @@ type CompletionCelebrationProps = {
   exercises: Exercise[]
   onRestart: () => void
   workoutName?: string
-  duration?: number // Add duration prop in minutes
+  duration?: number // duration in minutes
 }
 
 export default function CompletionCelebration({
@@ -46,7 +46,7 @@ export default function CompletionCelebration({
           id: Date.now().toString(),
           name: workoutName,
           date: new Date().toISOString(),
-          duration,
+          duration: duration * 60,
           exercises,
           stats: {
             totalSets,
