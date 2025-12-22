@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { getWorkoutHistory } from "@/lib/workout-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
@@ -18,9 +18,39 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/bottom-nav"
 import { Upload, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
+import { signInWithEmail } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
+
+function SignInCard({
+  email,
+  setEmail,
+}: {
+  email: string
+  setEmail: (value: string) => void
+}) {
+  return (
+    <Card className="p-4">
+      <h2 className="font-bold text-base mb-3">Sign in</h2>
+      <div className="flex flex-col gap-3">
+        <input
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@email.com"
+        />
+        <Button onClick={() => signInWithEmail(email)}>Sign in</Button>
+      </div>
+    </Card>
+  )
+}
 
 export default function SettingsPage() {
+  const [email, setEmail] = useState("")
   const [workouts, setWorkouts] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
+  const [syncStatus, setSyncStatus] = useState<string>("")
+  const [isSyncing, setIsSyncing] = useState(false)
   const [backupStatus, setBackupStatus] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const csvFileInputRef = useRef<HTMLInputElement>(null)
@@ -31,6 +61,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
+  }, [])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +133,7 @@ export default function SettingsPage() {
       "autosave_workout_session",
       "workout_achievements",
       "workout_schedule",
-      "exercise_preferences", // Per-exercise plate visualizer preferences
+      "exercise_preferences",
     ]
 
     keysToRemove.forEach((key) => {
@@ -178,6 +220,72 @@ export default function SettingsPage() {
       </div>
 
       <div className="p-4 space-y-4">
+        {user ? (
+          <Card className="p-4">
+            <h2 className="font-bold text-base mb-2">Signed in</h2>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              onClick={async () => {
+                await supabase.auth.signOut()
+              }}
+            >
+              Sign out
+            </Button>
+          </Card>
+        ) : (
+          <SignInCard email={email} setEmail={setEmail} />
+        )}
+
+        <Card className="p-4 border-blue-500">
+          <h2 className="font-bold text-base mb-2">Cloud Sync</h2>
+          <p className="text-sm text-muted-foreground mb-3">
+            Push local workouts to Supabase and pull down changes from other devices.
+          </p>
+
+          {syncStatus && (
+            <p className="text-xs text-muted-foreground mb-2">{syncStatus}</p>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={!user || isSyncing}
+            onClick={async () => {
+              setIsSyncing(true)
+              setSyncStatus("Syncing...")
+              try {
+                const { syncNow, getOutboxCount } = await import("@/lib/supabase-sync")
+                const res = await syncNow({
+                  onProgress: ({ synced, failed, total, pending }) => {
+                    setSyncStatus(
+                      `Syncing ${synced + failed}/${total}... (${pending} left)`
+                    )
+                  },
+                })
+                const pending = getOutboxCount()
+                const message = `${res.push.message}. ${res.pull.message}. Pending: ${pending}`
+                setSyncStatus(message)
+                alert(message)
+                setWorkouts(getWorkoutHistory())
+              } catch (e) {
+                const message = (e as Error).message || "Sync failed"
+                setSyncStatus(message)
+                alert(message)
+                console.error("Sync failed", e)
+              } finally {
+                setIsSyncing(false)
+              }
+            }}
+          >
+            {isSyncing ? "Syncing..." : user ? "Sync now" : "Sign in to sync"}
+          </Button>
+
+          <div className="mt-4 text-xs text-muted-foreground">
+            Local workouts loaded: {Array.isArray(workouts) ? workouts.length : 0}
+          </div>
+        </Card>
+
         <Card className="p-4 border-blue-500">
           <h2 className="font-bold text-base mb-2">Import Historical Data</h2>
           <p className="text-sm text-muted-foreground mb-4">

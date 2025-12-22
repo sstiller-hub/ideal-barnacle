@@ -56,6 +56,17 @@ export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   // Save the PRs
   savePRs(evaluatedPRs)
 
+  // Queue for cross-device sync (best-effort)
+  import("@/lib/supabase-sync")
+    .then(({ enqueueWorkoutForSync, trySyncSoon }) => {
+      enqueueWorkoutForSync(workout)
+      trySyncSoon()
+    })
+    .catch((e) => {
+      // Ignore if supabase sync isn't available in this build
+      console.warn("Sync enqueue failed", e)
+    })
+
   return evaluatedPRs
 }
 
