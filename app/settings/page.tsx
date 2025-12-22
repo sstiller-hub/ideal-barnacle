@@ -455,6 +455,10 @@ export default function SettingsPage() {
             All workout data is stored locally on your device. Your data never leaves your phone.
           </p>
         </Card>
+
+        <div className="text-[10px] text-muted-foreground text-center">
+          Build: {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev"}
+        </div>
       </div>
 
       <BottomNav />
