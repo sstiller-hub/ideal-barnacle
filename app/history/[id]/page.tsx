@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { isSetEligibleForStats } from "@/lib/set-validation"
 
 export default function WorkoutDetailPage() {
   const params = useParams()
@@ -106,9 +107,9 @@ export default function WorkoutDetailPage() {
         {/* Exercises */}
         <div className="space-y-3">
           {workout.exercises.map((exercise, idx) => {
-            const completedSets = exercise.sets.filter((s) => s.completed)
-            const maxWeight = Math.max(...completedSets.map((s) => s.weight), 0)
-            const totalVolume = completedSets.reduce((sum, s) => sum + s.weight * s.reps, 0)
+            const completedSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
+            const maxWeight = Math.max(...completedSets.map((s) => s.weight ?? 0), 0)
+            const totalVolume = completedSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0)
 
             return (
               <Card key={idx} className="p-4">
@@ -138,7 +139,7 @@ export default function WorkoutDetailPage() {
                     </thead>
                     <tbody>
                       {exercise.sets.map((set, setIdx) => {
-                        const isMaxWeight = set.completed && set.weight === maxWeight
+                        const isMaxWeight = set.completed && (set.weight ?? 0) === maxWeight
                         return (
                           <tr
                             key={setIdx}
@@ -146,13 +147,15 @@ export default function WorkoutDetailPage() {
                           >
                             <td className="px-3 py-2 text-foreground">{setIdx + 1}</td>
                             <td className="text-center px-3 py-2 font-medium text-foreground">
-                              {set.completed ? `${set.weight} lbs` : "—"}
+                              {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} lbs` : "—"}
                             </td>
                             <td className="text-center px-3 py-2 font-medium text-foreground">
-                              {set.completed ? set.reps : "—"}
+                              {set.completed && set.reps !== null && set.reps !== undefined ? set.reps : "—"}
                             </td>
                             <td className="text-right px-3 py-2 text-muted-foreground">
-                              {set.completed ? `${(set.weight * set.reps).toLocaleString()} lbs` : "—"}
+                              {set.completed && set.weight !== null && set.reps !== null
+                                ? `${((set.weight ?? 0) * (set.reps ?? 0)).toLocaleString()} lbs`
+                                : "—"}
                             </td>
                           </tr>
                         )

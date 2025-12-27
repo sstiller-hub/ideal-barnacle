@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { getExerciseHistory, calculateExerciseStats } from "@/lib/workout-storage"
+import { isSetEligibleForStats } from "@/lib/set-validation"
 import { useEffect, useState } from "react"
 
 type ExerciseHistoryModalProps = {
@@ -50,8 +51,8 @@ export default function ExerciseHistoryModal({ exerciseName, onClose }: Exercise
                         (w) =>
                           w.exercises
                             .find((e: any) => e.name === exerciseName)
-                            ?.sets.filter((s: any) => s.completed)
-                            .map((s: any) => s.weight) || [0],
+                            ?.sets.filter((s: any) => isSetEligibleForStats(s))
+                            .map((s: any) => s.weight ?? 0) || [0],
                       ),
                     )}{" "}
                     lbs
@@ -62,7 +63,7 @@ export default function ExerciseHistoryModal({ exerciseName, onClose }: Exercise
                   <p className="text-lg font-bold text-foreground">
                     {history.reduce((acc, w) => {
                       const ex = w.exercises.find((e: any) => e.name === exerciseName)
-                      return acc + (ex?.sets.filter((s: any) => s.completed).length || 0)
+                      return acc + (ex?.sets.filter((s: any) => isSetEligibleForStats(s)).length || 0)
                     }, 0)}
                   </p>
                 </div>
@@ -166,9 +167,12 @@ export default function ExerciseHistoryModal({ exerciseName, onClose }: Exercise
                   const exercise = workout.exercises.find((e: any) => e.name === exerciseName)
                   if (!exercise) return null
 
-                  const completedSets = exercise.sets.filter((s: any) => s.completed)
-                  const maxWeight = Math.max(...completedSets.map((s: any) => s.weight))
-                  const totalVolume = completedSets.reduce((acc: number, set: any) => acc + set.weight * set.reps, 0)
+                  const completedSets = exercise.sets.filter((s: any) => isSetEligibleForStats(s))
+                  const maxWeight = completedSets.length > 0 ? Math.max(...completedSets.map((s: any) => s.weight ?? 0)) : 0
+                  const totalVolume = completedSets.reduce(
+                    (acc: number, set: any) => acc + (set.weight ?? 0) * (set.reps ?? 0),
+                    0,
+                  )
                   const date = new Date(workout.date)
 
                   return (
@@ -188,8 +192,8 @@ export default function ExerciseHistoryModal({ exerciseName, onClose }: Exercise
 
                       <div className="space-y-1">
                         {completedSets.map((set: any, idx: number) => {
-                          const volume = set.weight * set.reps
-                          const isMaxWeight = set.weight === maxWeight
+                          const volume = (set.weight ?? 0) * (set.reps ?? 0)
+                          const isMaxWeight = (set.weight ?? 0) === maxWeight
                           return (
                             <div
                               key={idx}

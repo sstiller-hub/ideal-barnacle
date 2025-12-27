@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { saveWorkout, type Exercise } from "@/lib/workout-storage"
+import { isSetEligibleForStats } from "@/lib/set-validation"
 import type { EvaluatedPR } from "@/lib/pr-types"
 import PRBadge from "@/components/pr-badge"
 
@@ -27,12 +28,23 @@ export default function CompletionCelebration({
   const [saving, setSaving] = useState(true)
 
   const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0)
-  const completedSets = exercises.reduce((acc, ex) => acc + ex.sets.filter((s) => s.completed).length, 0)
-  const totalVolume = exercises.reduce(
-    (acc, ex) => acc + ex.sets.reduce((sum, set) => sum + set.weight * set.reps, 0),
+  const completedSets = exercises.reduce(
+    (acc, ex) => acc + ex.sets.filter((s) => isSetEligibleForStats(s)).length,
     0,
   )
-  const totalReps = exercises.reduce((acc, ex) => acc + ex.sets.reduce((sum, set) => sum + set.reps, 0), 0)
+  const totalVolume = exercises.reduce(
+    (acc, ex) =>
+      acc +
+      ex.sets
+        .filter((set) => isSetEligibleForStats(set))
+        .reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0),
+    0,
+  )
+  const totalReps = exercises.reduce(
+    (acc, ex) =>
+      acc + ex.sets.filter((set) => isSetEligibleForStats(set)).reduce((sum, set) => sum + (set.reps ?? 0), 0),
+    0,
+  )
 
   useEffect(() => {
     const timer = setTimeout(() => setShowCelebration(false), 3000)
@@ -143,12 +155,15 @@ export default function CompletionCelebration({
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{exercise.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {exercise.sets.filter((s) => s.completed).length}/{exercise.sets.length} sets
+                    {exercise.sets.filter((s) => isSetEligibleForStats(s)).length}/{exercise.sets.length} sets
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-foreground">
-                    {exercise.sets.reduce((acc, set) => acc + set.weight * set.reps, 0)} lbs
+                    {exercise.sets
+                      .filter((set) => isSetEligibleForStats(set))
+                      .reduce((acc, set) => acc + (set.weight ?? 0) * (set.reps ?? 0), 0)}{" "}
+                    lbs
                   </p>
                   <p className="text-xs text-muted-foreground">volume</p>
                 </div>

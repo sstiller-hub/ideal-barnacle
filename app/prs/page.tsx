@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getWorkoutHistory } from "@/lib/workout-storage"
+import { isSetEligibleForStats } from "@/lib/set-validation"
 import { BottomNav } from "@/components/bottom-nav"
 
 type MaxWeightRecord = {
@@ -25,17 +26,19 @@ export default function PRsPage() {
 
     history.forEach((workout) => {
       workout.exercises.forEach((exercise) => {
-        const completedSets = exercise.sets.filter((s) => s.completed && s.weight > 0)
+        const completedSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
 
         completedSets.forEach((set) => {
           const existing = exerciseMaxMap.get(exercise.name)
 
-          if (!existing || set.weight > existing.maxWeight) {
+          const weight = set.weight ?? 0
+          const reps = set.reps ?? 0
+          if (!existing || weight > existing.maxWeight) {
             exerciseMaxMap.set(exercise.name, {
               exerciseName: exercise.name,
-              maxWeight: set.weight,
+              maxWeight: weight,
               achievedAt: workout.date,
-              reps: set.reps,
+              reps,
               workoutName: workout.name,
             })
           }

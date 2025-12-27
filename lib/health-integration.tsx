@@ -1,6 +1,8 @@
 // Health data integration utilities
 // Prepared for future native iOS HealthKit integration
 
+import { isSetEligibleForStats } from "./set-validation"
+
 export type HealthKitWorkoutType = "traditionalStrengthTraining" | "functionalStrengthTraining" | "cardio" | "hiit"
 
 export interface HealthKitWorkout {
@@ -35,8 +37,8 @@ function calculateWorkoutVolume(workout: any): number {
   for (const exercise of workout.exercises) {
     if (exercise.sets) {
       for (const set of exercise.sets) {
-        if (set.weight && set.reps) {
-          total += set.weight * set.reps
+        if (isSetEligibleForStats(set)) {
+          total += (set.weight ?? 0) * (set.reps ?? 0)
         }
       }
     }

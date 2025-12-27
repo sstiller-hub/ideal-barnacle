@@ -1,5 +1,6 @@
 import type { Exercise } from "@/lib/workout-storage"
 import { getMostRecentSetPerformance } from "@/lib/workout-storage"
+import { isSetEligibleForStats } from "@/lib/set-validation"
 
 export type SetProgression = "progressed" | "matched" | "regressed"
 
@@ -37,10 +38,16 @@ export function getWorkoutProgressionSummary(exercises: Exercise[], sessionId: s
   const biggestWins: Array<{ exerciseName: string; improvement: string }> = []
 
   exercises.forEach((exercise) => {
-    const completedSets = exercise.sets.filter((s) => s.completed && s.reps > 0)
+    const completedSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
 
     completedSets.forEach((set, idx) => {
-      const status = analyzeSetProgression(exercise.name, idx, set.weight, set.reps, sessionId)
+      const status = analyzeSetProgression(
+        exercise.name,
+        idx,
+        set.weight ?? 0,
+        set.reps ?? 0,
+        sessionId,
+      )
 
       if (status === "progressed") progressedSets++
       else if (status === "matched") matchedSets++
@@ -48,8 +55,8 @@ export function getWorkoutProgressionSummary(exercises: Exercise[], sessionId: s
 
       const lastPerf = getMostRecentSetPerformance(exercise.name, idx, sessionId)
       if (lastPerf && status === "progressed") {
-        const weightDiff = set.weight - lastPerf.weight
-        const repsDiff = set.reps - lastPerf.reps
+        const weightDiff = (set.weight ?? 0) - lastPerf.weight
+        const repsDiff = (set.reps ?? 0) - lastPerf.reps
 
         if (weightDiff >= 10 || repsDiff >= 3) {
           let improvement = ""

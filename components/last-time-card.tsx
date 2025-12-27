@@ -49,28 +49,17 @@ export default function LastTimeCard({ lastSetPerformance, currentSet, setIndex 
 
     // Edge case 1: Weight increased, reps decreased
     if (weightIncreased && repsDecreased) {
-      const currentVolume = currentWeight * currentReps
-      const lastVolume = lastWeight * lastReps
-
-      if (currentVolume >= lastVolume) {
-        const deltas = [`+${currentWeight - lastWeight} lb vs last time`]
-        return {
-          status: "progressed" as const,
-          icon: "↑",
-          label: `Last time (Set ${setIndex + 1})`,
-          text: `${lastWeight} lb × ${lastReps} reps`,
-          subtitle: "More weight — you're getting stronger",
-          deltas,
-        }
-      } else {
-        return {
-          status: "neutral" as const,
-          icon: "→",
-          label: `Last time (Set ${setIndex + 1})`,
-          text: `${lastWeight} lb × ${lastReps} reps`,
-          subtitle: "Different path today",
-          deltas: [],
-        }
+      const deltas = [
+        `+${currentWeight - lastWeight} lb vs last time`,
+        `-${lastReps - currentReps} reps`,
+      ]
+      return {
+        status: "progressed" as const,
+        icon: "↑",
+        label: `Last time (Set ${setIndex + 1})`,
+        text: `${lastWeight} lb × ${lastReps} reps`,
+        subtitle: "Heavier weight — strength focus",
+        deltas,
       }
     }
 

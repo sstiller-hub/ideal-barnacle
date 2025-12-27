@@ -1,12 +1,13 @@
 import type { Exercise, WorkoutSet } from "./workout-storage"
 import type { EvaluatedPR, PRMetric } from "./pr-types"
 import { getPRByExerciseAndMetric } from "./pr-storage"
+import { isSetEligibleForStats } from "./set-validation"
 
 // Get the best set from an exercise for a given metric
 function getBestSet(exercise: Exercise, metric: PRMetric): { set: WorkoutSet; setIndex: number; value: number } | null {
   const completedSets = exercise.sets
     .map((set, index) => ({ set, index }))
-    .filter(({ set }) => set.completed && set.weight > 0 && set.reps > 0)
+    .filter(({ set }) => isSetEligibleForStats(set))
 
   if (completedSets.length === 0) return null
 
@@ -17,26 +18,26 @@ function getBestSet(exercise: Exercise, metric: PRMetric): { set: WorkoutSet; se
     case "weight":
       // Find the set with the highest weight
       bestValue = completedSets.reduce((max, current) => {
-        return current.set.weight > max ? current.set.weight : max
+        return (current.set.weight ?? 0) > max ? (current.set.weight ?? 0) : max
       }, 0)
-      bestSet = completedSets.find(({ set }) => set.weight === bestValue)!
+      bestSet = completedSets.find(({ set }) => (set.weight ?? 0) === bestValue)!
       break
 
     case "reps":
       // Find the set with the most reps
       bestValue = completedSets.reduce((max, current) => {
-        return current.set.reps > max ? current.set.reps : max
+        return (current.set.reps ?? 0) > max ? (current.set.reps ?? 0) : max
       }, 0)
-      bestSet = completedSets.find(({ set }) => set.reps === bestValue)!
+      bestSet = completedSets.find(({ set }) => (set.reps ?? 0) === bestValue)!
       break
 
     case "volume":
       // Find the set with the highest volume (weight × reps)
       bestValue = completedSets.reduce((max, current) => {
-        const volume = current.set.weight * current.set.reps
+        const volume = (current.set.weight ?? 0) * (current.set.reps ?? 0)
         return volume > max ? volume : max
       }, 0)
-      bestSet = completedSets.find(({ set }) => set.weight * set.reps === bestValue)!
+      bestSet = completedSets.find(({ set }) => (set.weight ?? 0) * (set.reps ?? 0) === bestValue)!
       break
   }
 
@@ -77,15 +78,15 @@ function evaluateExerciseMetric(
 
   switch (metric) {
     case "weight":
-      valueNumber = set.weight
+      valueNumber = set.weight ?? 0
       unit = "lbs"
       break
     case "reps":
-      valueNumber = set.reps
+      valueNumber = set.reps ?? 0
       unit = "reps"
       break
     case "volume":
-      valueNumber = set.weight * set.reps
+      valueNumber = (set.weight ?? 0) * (set.reps ?? 0)
       unit = "lbs"
       break
   }
@@ -101,8 +102,8 @@ function evaluateExerciseMetric(
       unit,
       achievedAt: workoutDate,
       context: {
-        reps: set.reps,
-        weight: set.weight,
+        reps: set.reps ?? 0,
+        weight: set.weight ?? 0,
         setIndex,
         workoutId,
       },
@@ -117,7 +118,7 @@ export function evaluateWorkoutPRs(workoutId: string, workoutDate: string, exerc
 
   for (const exercise of exercises) {
     // Only check exercises with completed sets
-    const hasCompletedSets = exercise.sets.some((set) => set.completed && set.weight > 0 && set.reps > 0)
+    const hasCompletedSets = exercise.sets.some((set) => isSetEligibleForStats(set))
     if (!hasCompletedSets) continue
 
     // Check each metric

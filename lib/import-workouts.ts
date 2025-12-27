@@ -1,4 +1,5 @@
 import { saveWorkout, type CompletedWorkout, type Exercise, type WorkoutSet } from "./workout-storage"
+import { isSetEligibleForStats } from "./set-validation"
 
 export type CSVRow = {
   Date: string
@@ -41,8 +42,10 @@ function getExistingHashes(): Set<string> {
     history.forEach((workout) => {
       workout.exercises.forEach((exercise) => {
         exercise.sets.forEach((set, idx) => {
-          if (set.completed) {
-            const hash = createSessionHash(workout.date, workout.name, exercise.name, idx + 1, set.reps, set.weight)
+          if (isSetEligibleForStats(set)) {
+            const reps = set.reps ?? 0
+            const weight = set.weight ?? 0
+            const hash = createSessionHash(workout.date, workout.name, exercise.name, idx + 1, reps, weight)
             hashes.add(hash)
           }
         })
@@ -197,13 +200,22 @@ export function importWorkouts(csvText: string): ImportResult {
     // Only create session if there are new sets
     if (hasNewSets && exercises.length > 0) {
       const totalVolume = exercises.reduce((sum, ex) => {
-        return sum + ex.sets.filter((s) => s.completed).reduce((s, set) => s + set.weight * set.reps, 0)
+        return (
+          sum +
+          ex.sets
+            .filter((set) => isSetEligibleForStats(set))
+            .reduce((s, set) => s + (set.weight ?? 0) * (set.reps ?? 0), 0)
+        )
       }, 0)
 
       const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0)
-      const completedSets = exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0)
+      const completedSets = exercises.reduce(
+        (sum, ex) => sum + ex.sets.filter((set) => isSetEligibleForStats(set)).length,
+        0,
+      )
       const totalReps = exercises.reduce(
-        (sum, ex) => sum + ex.sets.filter((s) => s.completed).reduce((s, set) => s + set.reps, 0),
+        (sum, ex) =>
+          sum + ex.sets.filter((set) => isSetEligibleForStats(set)).reduce((s, set) => s + (set.reps ?? 0), 0),
         0,
       )
 

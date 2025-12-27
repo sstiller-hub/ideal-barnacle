@@ -1,6 +1,6 @@
 // Seed script with sample workouts
-
-import { PrismaClient } from "@prisma/client"
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { PrismaClient } = require("@prisma/client") as { PrismaClient: new () => any }
 
 const prisma = new PrismaClient()
 

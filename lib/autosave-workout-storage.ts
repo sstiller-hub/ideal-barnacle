@@ -1,4 +1,4 @@
-export type WorkoutStatus = "in_progress" | "completed"
+export type WorkoutStatus = "in_progress" | "paused" | "completed"
 
 export interface WorkoutSession {
   id: string
@@ -10,6 +10,13 @@ export interface WorkoutSession {
   routineName?: string
   activeDurationSeconds: number
   currentExerciseIndex?: number
+  exercises?: any[]
+  restTimer?: {
+    exerciseIndex: number
+    setIndex: number
+    remainingSeconds: number
+  }
+  lastActiveAt?: string
 }
 
 export interface WorkoutSet {
@@ -21,6 +28,9 @@ export interface WorkoutSet {
   reps: number | null
   rpe?: number | null
   isCompleted: boolean
+  validationFlags?: string[]
+  isOutlier?: boolean
+  isIncomplete?: boolean
 }
 
 const SESSIONS_KEY = "workoutSessions"
@@ -110,7 +120,7 @@ export function getCurrentInProgressSession(): WorkoutSession | null {
   if (!currentId) return null
 
   const session = getSessionById(currentId)
-  if (session && session.status === "in_progress") {
+  if (session && (session.status === "in_progress" || session.status === "paused")) {
     return session
   }
 

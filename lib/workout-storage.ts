@@ -1,7 +1,10 @@
 export type WorkoutSet = {
-  reps: number
-  weight: number
+  reps: number | null
+  weight: number | null
   completed: boolean
+  validationFlags?: string[]
+  isOutlier?: boolean
+  isIncomplete?: boolean
 }
 
 export type Exercise = {
@@ -39,6 +42,7 @@ const STORAGE_KEY = "workout_history"
 import { evaluateWorkoutPRs } from "./pr-evaluation"
 import { savePRs } from "./pr-storage"
 import type { EvaluatedPR } from "./pr-types"
+import { isSetEligibleForStats } from "./set-validation"
 
 export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   if (typeof window === "undefined") {
@@ -119,8 +123,9 @@ export function calculateExerciseStats(exerciseName: string) {
 
   const dataPoints = history.map((workout) => {
     const exercise = workout.exercises.find((ex) => ex.name === exerciseName)!
-    const maxWeight = Math.max(...exercise.sets.filter((s) => s.completed).map((s) => s.weight))
-    const totalVolume = exercise.sets.filter((s) => s.completed).reduce((acc, set) => acc + set.weight * set.reps, 0)
+    const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
+    const maxWeight = validSets.length > 0 ? Math.max(...validSets.map((s) => s.weight ?? 0)) : 0
+    const totalVolume = validSets.reduce((acc, set) => acc + (set.weight ?? 0) * (set.reps ?? 0), 0)
     return {
       date: workout.date,
       maxWeight,
@@ -149,7 +154,7 @@ export function comparePerformance(
     }
   }
 
-  const completedSets = latest.sets.filter((s) => s.completed)
+  const completedSets = latest.sets.filter((s) => isSetEligibleForStats(s))
   if (completedSets.length === 0) {
     return {
       status: "first-time",
@@ -159,27 +164,31 @@ export function comparePerformance(
 
   // Calculate best previous performance (max weight × reps)
   const previousBest = completedSets.reduce((best, set) => {
-    const volume = set.weight * set.reps
-    const bestVolume = best.weight * best.reps
+    const volume = (set.weight ?? 0) * (set.reps ?? 0)
+    const bestVolume = (best.weight ?? 0) * (best.reps ?? 0)
     return volume > bestVolume ? set : best
   }, completedSets[0])
+  const previousBestNormalized = {
+    weight: previousBest.weight ?? 0,
+    reps: previousBest.reps ?? 0,
+  }
 
   const currentVolume = currentWeight * currentReps
-  const previousVolume = previousBest.weight * previousBest.reps
+  const previousVolume = previousBestNormalized.weight * previousBestNormalized.reps
 
-  if (currentWeight > previousBest.weight) {
+  if (currentWeight > previousBestNormalized.weight) {
     return {
       status: "better",
-      message: `+${currentWeight - previousBest.weight} lbs from last time`,
-      previousBest,
+      message: `+${currentWeight - previousBestNormalized.weight} lbs from last time`,
+      previousBest: previousBestNormalized,
     }
   }
 
-  if (currentWeight === previousBest.weight && currentReps > previousBest.reps) {
+  if (currentWeight === previousBestNormalized.weight && currentReps > previousBestNormalized.reps) {
     return {
       status: "better",
-      message: `+${currentReps - previousBest.reps} reps from last time`,
-      previousBest,
+      message: `+${currentReps - previousBestNormalized.reps} reps from last time`,
+      previousBest: previousBestNormalized,
     }
   }
 
@@ -187,7 +196,7 @@ export function comparePerformance(
     return {
       status: "better",
       message: "Higher volume than last time",
-      previousBest,
+      previousBest: previousBestNormalized,
     }
   }
 
@@ -195,14 +204,14 @@ export function comparePerformance(
     return {
       status: "same",
       message: "Same as last time",
-      previousBest,
+      previousBest: previousBestNormalized,
     }
   }
 
   return {
     status: "worse",
     message: "Lower than last time",
-    previousBest,
+    previousBest: previousBestNormalized,
   }
 }
 
@@ -230,13 +239,13 @@ export function getMostRecentExercisePerformance(
     const exercise = workout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)
 
     if (exercise) {
-      const validSets = exercise.sets.filter((s) => s.completed && s.reps > 0)
+      const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
       if (validSets.length === 0) continue
 
       return {
-        totalVolume: validSets.reduce((sum, s) => sum + (s.weight || 0) * s.reps, 0),
-        totalReps: validSets.reduce((sum, s) => sum + s.reps, 0),
-        maxWeight: Math.max(...validSets.map((s) => s.weight || 0)),
+        totalVolume: validSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0),
+        totalReps: validSets.reduce((sum, s) => sum + (s.reps ?? 0), 0),
+        maxWeight: Math.max(...validSets.map((s) => s.weight ?? 0)),
         setCount: validSets.length,
       }
     }
@@ -246,12 +255,12 @@ export function getMostRecentExercisePerformance(
 }
 
 export function computeCurrentPerformance(sets: WorkoutSet[]): PerformanceMetrics {
-  const validSets = sets.filter((s) => s.completed && s.reps > 0)
+  const validSets = sets.filter((s) => isSetEligibleForStats(s))
 
   return {
-    totalVolume: validSets.reduce((sum, s) => sum + (s.weight || 0) * s.reps, 0),
-    totalReps: validSets.reduce((sum, s) => sum + s.reps, 0),
-    maxWeight: validSets.length > 0 ? Math.max(...validSets.map((s) => s.weight || 0)) : 0,
+    totalVolume: validSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0),
+    totalReps: validSets.reduce((sum, s) => sum + (s.reps ?? 0), 0),
+    maxWeight: validSets.length > 0 ? Math.max(...validSets.map((s) => s.weight ?? 0)) : 0,
     setCount: validSets.length,
   }
 }
@@ -270,11 +279,11 @@ export function getMostRecentSetPerformance(
     const exercise = workout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)
 
     if (exercise) {
-      const validSets = exercise.sets.filter((s) => s.completed && s.reps > 0)
+      const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
       if (validSets.length > setIndex) {
         return {
-          weight: validSets[setIndex].weight || 0,
-          reps: validSets[setIndex].reps,
+          weight: validSets[setIndex].weight ?? 0,
+          reps: validSets[setIndex].reps ?? 0,
         }
       }
     }
