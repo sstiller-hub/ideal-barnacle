@@ -28,6 +28,7 @@ export type CompletedWorkout = {
   name: string
   date: string
   duration: number
+  durationUnit?: "seconds" | "minutes"
   exercises: Exercise[]
   stats: {
     totalSets: number
@@ -51,7 +52,7 @@ export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   }
 
   const history = getWorkoutHistory()
-  history.unshift(workout)
+  history.unshift({ ...workout, durationUnit: workout.durationUnit ?? "seconds" })
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
 
   // Evaluate PRs for this workout
@@ -81,9 +82,13 @@ export function getWorkoutHistory(): CompletedWorkout[] {
   let didMigrate = false
 
   const normalized = history.map((workout) => {
-    if (typeof workout.duration === "number" && workout.duration > 0 && workout.duration < 240) {
+    if (
+      workout.durationUnit === "minutes" &&
+      typeof workout.duration === "number" &&
+      workout.duration > 0
+    ) {
       didMigrate = true
-      return { ...workout, duration: workout.duration * 60 }
+      return { ...workout, duration: workout.duration * 60, durationUnit: "seconds" }
     }
     return workout
   })

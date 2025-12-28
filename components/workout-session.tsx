@@ -5,8 +5,17 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
-import { getExerciseHistory, getLatestPerformance, saveWorkout } from "@/lib/workout-storage"
-import { getDefaultSetValues, getSetFlags, isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
+import { getExerciseHistory, getLatestPerformance, getWorkoutHistory, saveWorkout } from "@/lib/workout-storage"
+import {
+  getDefaultSetValues,
+  getSetFlags,
+  isIncomplete,
+  isSetEligibleForStats,
+  isSetIncomplete,
+} from "@/lib/set-validation"
+import { getOrCreateActiveSession, upsertSet } from "@/lib/supabase-session-sync"
+import { supabase } from "@/lib/supabase"
+import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import {
   getCurrentInProgressSession,
   type WorkoutSession,
@@ -26,6 +35,7 @@ type Exercise = {
   restTime: number
   completed: boolean
   sets: {
+    id: string
     reps: number | null
     weight: number | null
     completed: boolean
@@ -57,17 +67,52 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [isHydrated, setIsHydrated] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
-  const lastTickRef = useRef<number | null>(null)
   const [validationTrigger, setValidationTrigger] = useState(0)
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
     return savedPref !== null ? JSON.parse(savedPref) : true
   })
+  const lastSeenSetUpdatedAtRef = useRef<Map<string, string>>(new Map())
+  const lastSeenSessionUpdatedAtRef = useRef<Map<string, string>>(new Map())
+  const [editingSetId, setEditingSetId] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<"reps" | "weight" | null>(null)
+  const editingSetIdRef = useRef<string | null>(null)
+  const editingFieldRef = useRef<"reps" | "weight" | null>(null)
+  const [pendingRemoteUpdates, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
+
+  const generateSetId = () => {
+    const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
+    return c?.randomUUID ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  const getElapsedMs = (targetSession: WorkoutSession | null, now = Date.now()) => {
+    if (!targetSession) return 0
+    const baseMs = (targetSession.activeDurationSeconds || 0) * 1000
+    if (targetSession.status !== "in_progress") return baseMs
+    if (!targetSession.lastActiveAt) return baseMs
+    const lastActiveAtMs = new Date(targetSession.lastActiveAt).getTime()
+    const deltaMs = Math.max(0, now - lastActiveAtMs)
+    return baseMs + deltaMs
+  }
+
+  const commitActiveDuration = (targetSession: WorkoutSession): number => {
+    return Math.floor(getElapsedMs(targetSession) / 1000)
+  }
 
   useEffect(() => {
     const buildExercises = (seed?: any[]) => {
-      if (seed && seed.length > 0) return seed
+      if (seed && seed.length > 0) {
+        return seed.map((exercise: any) => ({
+          ...exercise,
+          sets: Array.isArray(exercise.sets)
+            ? exercise.sets.map((set: any) => ({
+                ...set,
+                id: set.id || generateSetId(),
+              }))
+            : [],
+        }))
+      }
       return routine.exercises.map((exercise: any) => {
         const lastPerformance = getLatestPerformance(exercise.name)
 
@@ -96,11 +141,26 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         const targetReps = exercise.targetReps ?? "8-10"
         const restTime = extractRestSeconds(exercise.notes)
 
-        const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
+        const isWarmup = isWarmupExercise(exercise.name)
+        const normalizeName = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
+        const exerciseHistory = getExerciseHistory(exercise.name)
+        const normalizedHistory =
+          exerciseHistory.length > 0
+            ? exerciseHistory
+            : getWorkoutHistory().filter((workout) =>
+                workout.exercises.some(
+                  (ex: any) => normalizeName(ex.name) === normalizeName(exercise.name)
+                )
+              )
+
+        const historyReps = normalizedHistory.flatMap((workout) =>
           workout.exercises
-            .filter((ex: any) => ex.name === exercise.name)
+            .filter((ex: any) => normalizeName(ex.name) === normalizeName(exercise.name))
             .flatMap((ex: any) =>
-              ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
+              ex.sets
+                .filter((set: any) => isSetEligibleForStats(set))
+                .map((set: any) => set.reps)
+                .filter((reps: any) => typeof reps === "number")
             )
         )
         const defaults = getDefaultSetValues({
@@ -109,12 +169,61 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           targetWeight: exercise.targetWeight,
         })
 
+        const warmupDefaults = (() => {
+          const lastWorkout = normalizedHistory.find((workout) =>
+            workout.exercises.some(
+              (ex: any) => normalizeName(ex.name) === normalizeName(exercise.name)
+            )
+          )
+          if (!lastWorkout) return defaults
+          const lastExercise = lastWorkout.exercises.find(
+            (ex: any) => normalizeName(ex.name) === normalizeName(exercise.name)
+          )
+          if (!lastExercise?.sets) return defaults
+          const firstEligible = lastExercise.sets.find(
+            (set: any) =>
+              isSetEligibleForStats(set) && set.reps !== null && set.reps !== undefined && set.weight !== null && set.weight !== undefined
+          )
+          if (!firstEligible) return defaults
+          return { reps: firstEligible.reps, weight: firstEligible.weight }
+        })()
+
         const defaultFlags = getSetFlags({
           reps: defaults.reps,
           weight: defaults.weight,
           targetReps,
           historyReps,
         })
+
+        const warmupSets: Array<{
+          id: string
+          reps: number | null
+          weight: number | null
+          completed: boolean
+          isOutlier: boolean
+          validationFlags: string[]
+          isIncomplete: boolean
+        }> = []
+        for (let idx = 0; idx < targetSets; idx += 1) {
+          const prev = warmupSets[idx - 1]
+          const reps = prev?.reps ?? warmupDefaults.reps ?? null
+          const weight = prev?.weight ?? warmupDefaults.weight ?? null
+          const warmupFlags = getSetFlags({
+            reps,
+            weight,
+            targetReps,
+            historyReps,
+          }).flags.filter((flag) => flag !== "rep_outlier")
+          warmupSets.push({
+            id: generateSetId(),
+            reps,
+            weight,
+            completed: false,
+            isOutlier: false,
+            validationFlags: warmupFlags,
+            isIncomplete: isIncomplete(warmupFlags),
+          })
+        }
 
         return {
           id: exercise.id,
@@ -124,14 +233,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           targetWeight: exercise.targetWeight,
           restTime,
           completed: false,
-          sets: Array.from({ length: targetSets }, () => ({
-            reps: defaults.reps,
-            weight: defaults.weight,
-            completed: false,
-            isOutlier: defaultFlags.flags.includes("rep_outlier"),
-            validationFlags: defaultFlags.flags,
-            isIncomplete: defaultFlags.isIncomplete,
-          })),
+          sets: isWarmup
+            ? warmupSets
+            : Array.from({ length: targetSets }, () => ({
+                id: generateSetId(),
+                reps: defaults.reps,
+                weight: defaults.weight,
+                completed: false,
+                isOutlier: defaultFlags.flags.includes("rep_outlier"),
+                validationFlags: defaultFlags.flags,
+                isIncomplete: defaultFlags.isIncomplete,
+              })),
           previousPerformance,
         }
       })
@@ -183,7 +295,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setSession(updatedSession)
         setExercises(buildExercises(updatedSession.exercises))
         setRestState(updatedSession.restTimer)
-        setElapsedMs((updatedSession.activeDurationSeconds || 0) * 1000)
+        setElapsedMs(getElapsedMs(updatedSession))
         await saveSession(updatedSession)
         setIsHydrated(true)
       } else {
@@ -206,9 +318,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setSession(newSession)
         setExercises(newExercises)
         setRestState(undefined)
-        setElapsedMs(0)
+        setElapsedMs(getElapsedMs(newSession))
         await saveSession(newSession)
         setIsHydrated(true)
+      }
+
+      const remote = await getOrCreateActiveSession()
+      if (remote) {
+        setSession((prev) => {
+          if (!prev) return prev
+          const updated = { ...prev, remoteSessionId: remote.id }
+          saveSession(updated)
+          return updated
+        })
       }
     }
 
@@ -227,36 +349,23 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }, [isHydrated, session?.id, session?.routineId, routine.id, routine.name])
 
   useEffect(() => {
-    if (session?.status !== "in_progress") {
-      lastTickRef.current = null
+    if (!session) {
+      setElapsedMs(0)
       return
     }
 
-    lastTickRef.current = Date.now()
+    setElapsedMs(getElapsedMs(session))
+
+    if (session.status !== "in_progress") {
+      return
+    }
 
     const interval = setInterval(() => {
-      const now = Date.now()
-      const lastTick = lastTickRef.current ?? now
-      const deltaSeconds = Math.max(0, Math.floor((now - lastTick) / 1000))
-      if (deltaSeconds === 0) return
-
-      lastTickRef.current = now
-      setElapsedMs((prev) => prev + deltaSeconds * 1000)
-
-      setSession((prev) => {
-        if (!prev) return prev
-        const updated = {
-          ...prev,
-          activeDurationSeconds: (prev.activeDurationSeconds || 0) + deltaSeconds,
-          lastActiveAt: new Date().toISOString(),
-        }
-        saveSession(updated)
-        return updated
-      })
+      setElapsedMs(getElapsedMs(session))
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [session?.status])
+  }, [session?.id, session?.status, session?.lastActiveAt, session?.activeDurationSeconds])
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000)
@@ -277,6 +386,127 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       setShowPlateCalc(savedPref !== null ? JSON.parse(savedPref) : true)
     }
   }, [currentExercise?.name])
+
+  useEffect(() => {
+    if (!session?.remoteSessionId) return
+
+    const channel = supabase.channel(`workout-session-${session.remoteSessionId}`)
+
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "workout_sets",
+        filter: `session_id=eq.${session.remoteSessionId}`,
+      },
+      (payload) => {
+        const row = payload.new as any
+        if (!row?.id || !row.updated_at) return
+        const lastSeen = lastSeenSetUpdatedAtRef.current.get(row.id)
+        if (lastSeen && new Date(row.updated_at).getTime() <= new Date(lastSeen).getTime()) {
+          return
+        }
+        lastSeenSetUpdatedAtRef.current.set(row.id, row.updated_at)
+
+        setExercises((prev) => {
+          const next = prev.map((exercise) => {
+            if (exercise.id !== row.exercise_id) return exercise
+            const updatedSets = [...exercise.sets]
+            const existingIndex = updatedSets.findIndex((set: any) => set.id === row.id)
+            const existingSet = existingIndex >= 0 ? updatedSets[existingIndex] : null
+            const incomingReps = row.reps
+            const incomingWeight = row.weight
+            const isEditingSame = editingSetIdRef.current === row.id && editingFieldRef.current
+            let mergedReps = incomingReps
+            let mergedWeight = incomingWeight
+            if (existingSet && isEditingSame) {
+              if (editingFieldRef.current === "reps" && incomingReps !== existingSet.reps) {
+                mergedReps = existingSet.reps
+                setPendingRemoteUpdates((prevPending) => ({ ...prevPending, [row.id]: true }))
+              }
+              if (editingFieldRef.current === "weight" && incomingWeight !== existingSet.weight) {
+                mergedWeight = existingSet.weight
+                setPendingRemoteUpdates((prevPending) => ({ ...prevPending, [row.id]: true }))
+              }
+            }
+
+            const flagsResult = row.validation_flags
+              ? { flags: row.validation_flags, isIncomplete: isIncomplete(row.validation_flags) }
+              : getSetFlags({
+                  reps: mergedReps,
+                  weight: mergedWeight,
+                  targetReps: exercise.targetReps,
+                  historyReps: getExerciseHistory(exercise.name).flatMap((workout) =>
+                    workout.exercises
+                      .filter((ex: any) => ex.name === exercise.name)
+                      .flatMap((ex: any) =>
+                        ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
+                      )
+                  ),
+                })
+
+            const nextSet = {
+              ...(existingSet ?? {}),
+              id: row.id,
+              reps: mergedReps,
+              weight: mergedWeight,
+              completed: row.completed,
+              validationFlags: row.validation_flags ?? flagsResult.flags,
+              isIncomplete: flagsResult.isIncomplete ?? false,
+              isOutlier: (row.validation_flags ?? flagsResult.flags)?.includes?.("rep_outlier"),
+            }
+            if (existingIndex >= 0) {
+              updatedSets[existingIndex] = { ...updatedSets[existingIndex], ...nextSet }
+            } else if (typeof row.set_index === "number" && row.set_index >= 0) {
+              updatedSets.splice(row.set_index, 0, nextSet)
+            } else {
+              updatedSets.push(nextSet)
+            }
+            return { ...exercise, sets: updatedSets }
+          })
+          return next
+        })
+      }
+    )
+
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "workout_sessions",
+        filter: `id=eq.${session.remoteSessionId}`,
+      },
+      (payload) => {
+        const row = payload.new as any
+        if (!row?.id || !row.updated_at) return
+        const lastSeen = lastSeenSessionUpdatedAtRef.current.get(row.id)
+        if (lastSeen && new Date(row.updated_at).getTime() <= new Date(lastSeen).getTime()) {
+          return
+        }
+        lastSeenSessionUpdatedAtRef.current.set(row.id, row.updated_at)
+        setSession((prev) => {
+          if (!prev) return prev
+          if (row.status && row.status !== prev.status) {
+            const updated = {
+              ...prev,
+              status: row.status === "active" ? "in_progress" : row.status,
+            }
+            saveSession(updated)
+            return updated
+          }
+          return prev
+        })
+      }
+    )
+
+    channel.subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [session?.remoteSessionId])
 
   const updateSetData = async (setIndex: number, field: "reps" | "weight", value: number | null) => {
     if (!session) return
@@ -310,12 +540,32 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           historyReps,
         })
 
-        return {
+        const updatedSet = {
           ...newSet,
           isOutlier: flagsResult.flags.includes("rep_outlier"),
           validationFlags: flagsResult.flags,
           isIncomplete: flagsResult.isIncomplete,
         }
+        if (session?.remoteSessionId) {
+          void upsertSet({
+            sessionId: session.remoteSessionId,
+            setId: updatedSet.id,
+            exerciseId: exercise.id,
+            setIndex: idx,
+            reps: updatedSet.reps,
+            weight: updatedSet.weight,
+            completed: updatedSet.completed,
+            validationFlags: updatedSet.validationFlags,
+          }).then(() => {
+            setPendingRemoteUpdates((prev) => {
+              if (!prev[updatedSet.id]) return prev
+              const next = { ...prev }
+              delete next[updatedSet.id]
+              return next
+            })
+          })
+        }
+        return updatedSet
       })
 
       return {
@@ -361,13 +611,33 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           historyReps,
         })
 
-        return {
+        const updatedSet = {
           ...set,
           completed: isCompleted,
           validationFlags: flagsResult.flags,
           isOutlier: flagsResult.flags.includes("rep_outlier"),
           isIncomplete: flagsResult.isIncomplete,
         }
+        if (session?.remoteSessionId) {
+          void upsertSet({
+            sessionId: session.remoteSessionId,
+            setId: updatedSet.id,
+            exerciseId: exercise.id,
+            setIndex: idx,
+            reps: updatedSet.reps,
+            weight: updatedSet.weight,
+            completed: updatedSet.completed,
+            validationFlags: updatedSet.validationFlags,
+          }).then(() => {
+            setPendingRemoteUpdates((prev) => {
+              if (!prev[updatedSet.id]) return prev
+              const next = { ...prev }
+              delete next[updatedSet.id]
+              return next
+            })
+          })
+        }
+        return updatedSet
       })
 
       const allSetsCompleted = newSets.every((set: any) => set.completed)
@@ -414,6 +684,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const newSets = [
       ...exercise.sets,
       {
+        id: generateSetId(),
         reps: defaults.reps,
         weight: defaults.weight,
         completed: false,
@@ -548,7 +819,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       )
     }, 0)
 
-    const durationSeconds = Math.floor(elapsedMs / 1000)
+    const durationSeconds = session ? commitActiveDuration(session) : Math.floor(elapsedMs / 1000)
 
     const completedWorkout = {
       id: session?.id!,
@@ -581,6 +852,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         ...session,
         status: "completed",
         endedAt: new Date().toISOString(),
+        activeDurationSeconds: commitActiveDuration(session),
         restTimer: undefined,
         lastActiveAt: undefined,
         exercises,
@@ -591,7 +863,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     saveCurrentSessionId(null)
     setSession(null)
     setValidationTrigger(0)
-    router.push(`/workout-summary?id=${completedWorkout.id}`)
+    router.push(`/workout-summary?workoutId=${completedWorkout.id}`)
   }
 
   const handleExit = async () => {
@@ -599,6 +871,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
+        activeDurationSeconds: commitActiveDuration(session),
         lastActiveAt: undefined,
       }
 
@@ -613,6 +886,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
+        activeDurationSeconds: commitActiveDuration(session),
         lastActiveAt: undefined,
       }
 
@@ -720,6 +994,23 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             showPlateCalc={showPlateCalc}
             restState={restState}
             validationTrigger={validationTrigger}
+            pendingRemoteUpdates={pendingRemoteUpdates}
+            onSetFieldFocus={(setId, field) => {
+              setEditingSetId(setId)
+              setEditingField(field)
+              editingSetIdRef.current = setId
+              editingFieldRef.current = field
+            }}
+            onSetFieldBlur={(setId, field) => {
+              if (editingSetId === setId && editingField === field) {
+                setEditingSetId(null)
+                setEditingField(null)
+              }
+              if (editingSetIdRef.current === setId && editingFieldRef.current === field) {
+                editingSetIdRef.current = null
+                editingFieldRef.current = null
+              }
+            }}
             onRestStateChange={async (nextState) => {
               setRestState(nextState || undefined)
               if (session) {

@@ -13,6 +13,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogTrigger,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -80,6 +81,7 @@ export default function Home() {
   const [isAddWorkoutOpen, setIsAddWorkoutOpen] = useState(false)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
+  const [showDiscardSessionDialog, setShowDiscardSessionDialog] = useState(false)
   const [routines, setRoutines] = useState<any[]>([])
   const [streak, setStreak] = useState<number>(0)
   const [lastWorkoutMessage, setLastWorkoutMessage] = useState<string>("")
@@ -89,7 +91,19 @@ export default function Home() {
   useEffect(() => {
     setRoutines(getRoutines())
     calculateStreak()
-    setSession(getCurrentInProgressSession())
+    const currentSession = getCurrentInProgressSession()
+    if (currentSession?.startedAt) {
+      const started = new Date(currentSession.startedAt)
+      const today = new Date()
+      started.setHours(0, 0, 0, 0)
+      today.setHours(0, 0, 0, 0)
+      if (started.getTime() !== today.getTime()) {
+        saveCurrentSessionId(null)
+        setSession(null)
+        return
+      }
+    }
+    setSession(currentSession)
   }, [])
 
   useEffect(() => {
@@ -323,6 +337,12 @@ export default function Home() {
     setPendingRoutineId(null)
   }
 
+  const handleDiscardSession = () => {
+    saveCurrentSessionId(null)
+    setSession(null)
+    setShowDiscardSessionDialog(false)
+  }
+
   return (
     <main className="min-h-screen bg-background pb-20">
       <header className="bg-card border-b border-border sticky top-0 z-10">
@@ -407,6 +427,25 @@ export default function Home() {
                       Started {new Date(session.startedAt!).toLocaleTimeString()}
                     </p>
                   </div>
+                  <AlertDialog open={showDiscardSessionDialog} onOpenChange={setShowDiscardSessionDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Discard this workout?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will clear the current in-progress workout and remove the resume prompt.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDiscardSession}>Discard workout</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 <Button
                   onClick={() => router.push(`/workout/session?routineId=${session.routineId}`)}
@@ -479,7 +518,7 @@ export default function Home() {
                 </DialogContent>
               </Dialog>
             </Card>
-          ) : scheduledWorkout ? (
+          ) : !session && scheduledWorkout ? (
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-3">

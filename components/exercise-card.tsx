@@ -32,6 +32,7 @@ type ExerciseCardProps = {
     targetWeight?: string
     restTime: number
     sets: {
+      id?: string
       reps: number | null
       weight: number | null
       completed: boolean
@@ -49,6 +50,9 @@ type ExerciseCardProps = {
     remainingSeconds: number
   }
   validationTrigger?: number
+  pendingRemoteUpdates?: Record<string, boolean>
+  onSetFieldFocus?: (setId: string, field: "reps" | "weight") => void
+  onSetFieldBlur?: (setId: string, field: "reps" | "weight") => void
   onRestStateChange?: (nextState: ExerciseCardProps["restState"] | null) => void
   onUpdateSet: (setIndex: number, field: "reps" | "weight", value: number | null) => void
   onCompleteSet: (setIndex: number) => void
@@ -63,6 +67,9 @@ export default function ExerciseCard({
   showPlateCalc = true, // Use prop instead of internal state
   restState,
   validationTrigger,
+  pendingRemoteUpdates,
+  onSetFieldFocus,
+  onSetFieldBlur,
   onRestStateChange,
   onUpdateSet,
   onCompleteSet,
@@ -375,6 +382,8 @@ export default function ExerciseCard({
                           onUpdateSet(idx, "weight", val === "" ? null : parsed)
                         }
                       }}
+                      onFocus={() => set.id && onSetFieldFocus?.(set.id, "weight")}
+                      onBlur={() => set.id && onSetFieldBlur?.(set.id, "weight")}
                       aria-invalid={showMissingForSet[idx] && isMissingWeight(set.weight)}
                       disabled={set.completed || !editable}
                       className="h-8 text-center text-sm font-semibold"
@@ -443,6 +452,8 @@ export default function ExerciseCard({
                           setRepCapErrors((prev) => ({ ...prev, [idx]: false }))
                         }
                       }}
+                      onFocus={() => set.id && onSetFieldFocus?.(set.id, "reps")}
+                      onBlur={() => set.id && onSetFieldBlur?.(set.id, "reps")}
                       aria-invalid={(showMissingForSet[idx] && isMissingReps(set.reps)) || repCapErrors[idx]}
                       disabled={set.completed || !editable}
                       className="h-8 text-center text-sm font-semibold"
@@ -525,6 +536,13 @@ export default function ExerciseCard({
                   </div>
                 )
               })()}
+
+              {set.id && pendingRemoteUpdates?.[set.id] && (
+                <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                  <span>↺</span>
+                  <span>Updated on another device</span>
+                </div>
+              )}
 
               {editable && activeSet === idx && !set.completed && (
                 <LastTimeCard

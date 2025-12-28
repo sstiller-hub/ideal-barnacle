@@ -8,6 +8,7 @@ export interface WorkoutSession {
   notes?: string
   routineId?: string
   routineName?: string
+  remoteSessionId?: string
   activeDurationSeconds: number
   currentExerciseIndex?: number
   exercises?: any[]
