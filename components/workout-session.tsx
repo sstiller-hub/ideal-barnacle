@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
 import { getExerciseHistory, getLatestPerformance, getWorkoutHistory, saveWorkout } from "@/lib/workout-storage"
+import { toast } from "sonner"
 import {
   getDefaultSetValues,
   getSetFlags,
@@ -18,12 +20,14 @@ import { supabase } from "@/lib/supabase"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import {
   getCurrentInProgressSession,
+  deleteSession,
+  deleteSetsForSession,
   type WorkoutSession,
   saveSession,
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
 import BottomNav from "@/components/bottom-nav"
-import { ChevronLeft, Check, Pause, Play } from "lucide-react"
+import { ChevronLeft, Check, Pause, Play, MoreHorizontal, Plus } from "lucide-react"
 import ExerciseCard from "@/components/exercise-card"
 
 type Exercise = {
@@ -66,8 +70,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [elapsedMs, setElapsedMs] = useState(0)
   const [isHydrated, setIsHydrated] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
   const [validationTrigger, setValidationTrigger] = useState(0)
+  const [editSetsByExerciseId, setEditSetsByExerciseId] = useState<Record<string, boolean>>({})
+  const [addHoldProgress, setAddHoldProgress] = useState(0)
+  const addHoldTimeoutRef = useRef<number | null>(null)
+  const addHoldRafRef = useRef<number | null>(null)
+  const addHoldStartRef = useRef<number | null>(null)
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
@@ -98,6 +108,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const commitActiveDuration = (targetSession: WorkoutSession): number => {
     return Math.floor(getElapsedMs(targetSession) / 1000)
+  }
+
+  const isGhostSet = (set: any) => {
+    const repsEmpty = set.reps === null || set.reps === undefined || set.reps === 0
+    const weightEmpty = set.weight === null || set.weight === undefined || set.weight === 0
+    return !set.completed && repsEmpty && weightEmpty
   }
 
   useEffect(() => {
@@ -379,6 +395,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const completedExercises = exercises.filter((e: any) => e.completed).length
   const totalExercises = exercises.length
   const progressPercentage = (completedExercises / totalExercises) * 100
+  const isEditMode = currentExercise ? Boolean(editSetsByExerciseId[currentExercise.id]) : false
 
   useEffect(() => {
     if (currentExercise?.name && typeof window !== "undefined") {
@@ -386,6 +403,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       setShowPlateCalc(savedPref !== null ? JSON.parse(savedPref) : true)
     }
   }, [currentExercise?.name])
+
+  useEffect(() => {
+    cancelAddHold()
+  }, [currentExerciseIndex])
 
   useEffect(() => {
     if (!session?.remoteSessionId) return
@@ -660,14 +681,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     await saveSession(updatedSession)
   }
 
-  const addSetToExercise = async () => {
+  const addSetToExercise = async (exerciseIndex = currentExerciseIndex) => {
     if (!session) return
-    const exercise = exercises[currentExerciseIndex]
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
     const defaults = getDefaultSetValues({
       sets: exercise.sets,
       targetReps: exercise.targetReps,
       targetWeight: exercise.targetWeight,
     })
+    const prevSet = exercise.sets[exercise.sets.length - 1]
+    const nextReps = prevSet?.reps ?? defaults.reps
+    const nextWeight = prevSet?.weight ?? defaults.weight
     const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
       workout.exercises
         .filter((ex: any) => ex.name === exercise.name)
@@ -676,26 +701,27 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         )
     )
     const outlierInfo = getSetFlags({
-      reps: defaults.reps,
-      weight: defaults.weight,
+      reps: nextReps,
+      weight: nextWeight,
       targetReps: exercise.targetReps,
       historyReps,
     })
+    const newSet = {
+      id: generateSetId(),
+      reps: nextReps,
+      weight: nextWeight,
+      completed: false,
+      isOutlier: outlierInfo.flags.includes("rep_outlier"),
+      validationFlags: outlierInfo.flags,
+      isIncomplete: outlierInfo.isIncomplete,
+    }
     const newSets = [
       ...exercise.sets,
-      {
-        id: generateSetId(),
-        reps: defaults.reps,
-        weight: defaults.weight,
-        completed: false,
-        isOutlier: outlierInfo.flags.includes("rep_outlier"),
-        validationFlags: outlierInfo.flags,
-        isIncomplete: outlierInfo.isIncomplete,
-      },
+      newSet,
     ]
 
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== currentExerciseIndex) {
+      if (exerciseIdx !== exerciseIndex) {
         return exercise
       }
 
@@ -712,35 +738,163 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       exercises: newExercises,
     }
 
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    toast("Set added", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void deleteSetById(exerciseIndex, newSet.id)
+        },
+      },
+    })
+  }
+
+  const deleteSetById = async (exerciseIndex: number, setId: string) => {
+    if (!session) return
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const deleteIndex = exercise.sets.findIndex((set: any) => set.id === setId)
+    if (deleteIndex === -1) return
+    await deleteSetFromExercise(deleteIndex, exerciseIndex, true)
+  }
+
+  const deleteSetFromExercise = async (
+    setIndex: number,
+    exerciseIndex = currentExerciseIndex,
+    silent = false,
+  ) => {
+    if (!session) return
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const removedSet = exercise.sets[setIndex]
+    const newSets = exercise.sets.filter((_: any, idx: number) => idx !== setIndex)
+
+    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
+      if (exerciseIdx !== exerciseIndex) {
+        return exercise
+      }
+
+      return {
+        ...exercise,
+        sets: newSets,
+      }
+    })
+
+    setExercises(newExercises)
+
+    const updatedSession: WorkoutSession = {
+      ...session,
+      exercises: newExercises,
+    }
+
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    if (!silent && removedSet) {
+      toast("Set removed", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void restoreSetAtIndex(exerciseIndex, setIndex, removedSet)
+          },
+        },
+      })
+    }
+  }
+
+  const restoreSetAtIndex = async (exerciseIndex: number, setIndex: number, setData: any) => {
+    if (!session) return
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const newSets = [
+      ...exercise.sets.slice(0, setIndex),
+      setData,
+      ...exercise.sets.slice(setIndex),
+    ]
+
+    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
+      if (exerciseIdx !== exerciseIndex) return exercise
+      return { ...exercise, sets: newSets }
+    })
+
+    setExercises(newExercises)
+
+    const updatedSession: WorkoutSession = {
+      ...session,
+      exercises: newExercises,
+    }
+
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    addSetToSession(session.id, exercise.id, setData)
+  }
+
+  const removeGhostSetsForExercise = async (exerciseIndex: number) => {
+    if (!session) return
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const cleanedSets = exercise.sets.filter((set: any) => !isGhostSet(set))
+    if (cleanedSets.length === exercise.sets.length) return
+    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
+      if (exerciseIdx !== exerciseIndex) return exercise
+      return { ...exercise, sets: cleanedSets }
+    })
+    setExercises(newExercises)
+    const updatedSession: WorkoutSession = {
+      ...session,
+      exercises: newExercises,
+    }
     setSession(updatedSession)
     await saveSession(updatedSession)
   }
 
-  const deleteSetFromExercise = async (setIndex: number) => {
-    if (!session) return
-    const exercise = exercises[currentExerciseIndex]
-    const newSets = exercise.sets.filter((_: any, idx: number) => idx !== setIndex)
-
-    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== currentExerciseIndex) {
-        return exercise
-      }
-
-      return {
-        ...exercise,
-        sets: newSets,
-      }
-    })
-
-    setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
+  const toggleEditSetsForExercise = async (exerciseIndex: number, nextValue?: boolean) => {
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const nextState =
+      typeof nextValue === "boolean" ? nextValue : !editSetsByExerciseId[exercise.id]
+    setEditSetsByExerciseId((prev) => ({ ...prev, [exercise.id]: nextState }))
+    if (!nextState) {
+      cancelAddHold()
+      await removeGhostSetsForExercise(exerciseIndex)
     }
+  }
 
-    setSession(updatedSession)
-    await saveSession(updatedSession)
+  const startAddHold = (exerciseIndex: number) => {
+    if (!editSetsByExerciseId[exercises[exerciseIndex]?.id]) return
+    if (addHoldTimeoutRef.current) return
+    const start = Date.now()
+    addHoldStartRef.current = start
+    setAddHoldProgress(0)
+    addHoldTimeoutRef.current = window.setTimeout(() => {
+      addHoldTimeoutRef.current = null
+      addHoldStartRef.current = null
+      setAddHoldProgress(0)
+      void addSetToExercise(exerciseIndex)
+    }, 500)
+
+    const tick = () => {
+      if (!addHoldStartRef.current) return
+      const elapsed = Date.now() - addHoldStartRef.current
+      setAddHoldProgress(Math.min(1, elapsed / 500))
+      if (elapsed < 500) {
+        addHoldRafRef.current = requestAnimationFrame(tick)
+      }
+    }
+    addHoldRafRef.current = requestAnimationFrame(tick)
+  }
+
+  const cancelAddHold = () => {
+    if (addHoldTimeoutRef.current) {
+      window.clearTimeout(addHoldTimeoutRef.current)
+      addHoldTimeoutRef.current = null
+    }
+    if (addHoldRafRef.current) {
+      cancelAnimationFrame(addHoldRafRef.current)
+      addHoldRafRef.current = null
+    }
+    addHoldStartRef.current = null
+    setAddHoldProgress(0)
   }
 
   const goToNextExercise = async () => {
@@ -780,7 +934,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const finishWorkout = async () => {
     if (!session) return
-    const firstInvalidExerciseIndex = exercises.findIndex((exercise: any) =>
+    if (isFinishing) return
+    setIsFinishing(true)
+    const cleanedExercises = exercises.map((exercise: any) => ({
+      ...exercise,
+      sets: exercise.sets.filter((set: any) => !isGhostSet(set)),
+    }))
+    const firstInvalidExerciseIndex = cleanedExercises.findIndex((exercise: any) =>
       exercise.sets?.some((set: any) => isSetIncomplete(set))
     )
     if (firstInvalidExerciseIndex !== -1) {
@@ -793,15 +953,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         await saveSession(updatedSession)
       }
       setValidationTrigger(Date.now())
+      setIsFinishing(false)
       return
     }
-    const completedSets = exercises.reduce((total: number, ex: any) => {
+    const completedSets = cleanedExercises.reduce((total: number, ex: any) => {
       return total + ex.sets.filter((s: any) => isSetEligibleForStats(s)).length
     }, 0)
 
-    const totalSets = exercises.reduce((total: number, ex: any) => total + ex.sets.length, 0)
+    const totalSets = cleanedExercises.reduce((total: number, ex: any) => total + ex.sets.length, 0)
 
-    const totalVolume = exercises.reduce((vol: number, ex: any) => {
+    const totalVolume = cleanedExercises.reduce((vol: number, ex: any) => {
       return (
         vol +
         ex.sets.filter((s: any) => isSetEligibleForStats(s)).reduce((sum: number, set: any) => {
@@ -810,7 +971,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       )
     }, 0)
 
-    const totalReps = exercises.reduce((reps: number, ex: any) => {
+    const totalReps = cleanedExercises.reduce((reps: number, ex: any) => {
       return (
         reps +
         ex.sets
@@ -826,7 +987,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       name: routine.name,
       date: new Date(session?.startedAt!).toISOString(),
       duration: durationSeconds,
-      exercises: exercises.map((ex: any) => ({
+      exercises: cleanedExercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,
         targetSets: ex.targetSets,
@@ -845,7 +1006,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       },
     }
 
-    await saveWorkout(completedWorkout)
+    try {
+      await Promise.resolve(saveWorkout(completedWorkout))
+    } catch (error) {
+      console.error("Failed to save workout", error)
+      toast.error("Couldn't save workout. Please try again.")
+      setIsFinishing(false)
+      return
+    }
 
     if (session) {
       const completedSession: WorkoutSession = {
@@ -855,11 +1023,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         activeDurationSeconds: commitActiveDuration(session),
         restTimer: undefined,
         lastActiveAt: undefined,
-        exercises,
+        exercises: cleanedExercises,
       }
       await saveSession(completedSession)
     }
 
+    deleteSetsForSession(session.id)
+    deleteSession(session.id)
     saveCurrentSessionId(null)
     setSession(null)
     setValidationTrigger(0)
@@ -972,15 +1142,71 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             </p>
             <div className="flex items-center justify-between gap-2 mb-1">
               <h2 className="text-xl font-bold text-foreground leading-tight">{currentExercise.name}</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleTogglePlateCalc}
-                className="text-xs h-7 px-2 flex-shrink-0"
-              >
-                <span className="mr-1">🏋️</span>
-                {showPlateCalc ? "Hide" : "Show"} plates
-              </Button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {isEditMode && (
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2"
+                      onPointerDown={() => startAddHold(currentExerciseIndex)}
+                      onPointerUp={cancelAddHold}
+                      onPointerLeave={cancelAddHold}
+                      onPointerCancel={cancelAddHold}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Hold to add
+                    </Button>
+                    {addHoldProgress > 0 && (
+                      <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-primary/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{ width: `${Math.round(addHoldProgress * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isEditMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => toggleEditSetsForExercise(currentExerciseIndex, false)}
+                  >
+                    Done
+                  </Button>
+                )}
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-36 p-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-xs"
+                      onClick={() => toggleEditSetsForExercise(currentExerciseIndex)}
+                    >
+                      {isEditMode ? "Done" : "Edit sets"}
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleTogglePlateCalc}
+                  className="text-xs h-7 px-2"
+                >
+                  <span className="mr-1">🏋️</span>
+                  {showPlateCalc ? "Hide" : "Show"} plates
+                </Button>
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {currentExercise.targetSets} sets × {currentExercise.targetReps} reps
@@ -991,6 +1217,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             exercise={currentExercise}
             exerciseIndex={currentExerciseIndex}
             editable={true}
+            editMode={isEditMode}
             showPlateCalc={showPlateCalc}
             restState={restState}
             validationTrigger={validationTrigger}
@@ -1024,8 +1251,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             }}
             onUpdateSet={updateSetData}
             onCompleteSet={completeSet}
-            onAddSet={addSetToExercise}
-            onDeleteSet={deleteSetFromExercise}
+            onAddSet={() => addSetToExercise(currentExerciseIndex)}
+            onDeleteSet={(setIndex) => deleteSetFromExercise(setIndex, currentExerciseIndex)}
           />
         </div>
       </div>

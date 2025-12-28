@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
 
@@ -73,6 +73,30 @@ export default function WorkoutSummaryPage() {
   const [workout, setWorkout] = useState<WorkoutRow | null>(null)
   const [exercises, setExercises] = useState<SummaryExercise[]>([])
   const [baselineExercises, setBaselineExercises] = useState<SummaryExercise[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
+  const buildSummaryExercises = (workoutRecord: CompletedWorkout): SummaryExercise[] => {
+    return workoutRecord.exercises.map((exercise, idx) => {
+      const workoutExerciseId = `${workoutRecord.id}-${idx}`
+      return {
+        id: workoutExerciseId,
+        workout_id: workoutRecord.id,
+        exercise_id: exercise.id || exercise.name,
+        name: exercise.name,
+        sort_index: idx,
+        sets: exercise.sets.map((set, setIndex) => ({
+          id: `${workoutExerciseId}-${setIndex}`,
+          workout_exercise_id: workoutExerciseId,
+          set_index: setIndex,
+          reps: set.reps ?? null,
+          weight: set.weight ?? null,
+          completed: set.completed,
+          validation_flags: set.validationFlags ?? undefined,
+        })),
+      }
+    })
+  }
 
   useEffect(() => {
     if (!workoutId) {
@@ -80,100 +104,51 @@ export default function WorkoutSummaryPage() {
       return
     }
 
-    const loadSummary = async () => {
-      const { data: workoutRow } = await supabase.from("workouts").select("*").eq("id", workoutId).single()
-      if (!workoutRow) {
-        router.push("/")
+    let cancelled = false
+    const maxAttempts = 5
+
+    const loadSummary = (attempt: number) => {
+      const history = getWorkoutHistory()
+      const workoutRecord = history.find((w) => w.id === workoutId) || null
+
+      if (!workoutRecord) {
+        if (attempt < maxAttempts - 1) {
+          setTimeout(() => {
+            if (!cancelled) loadSummary(attempt + 1)
+          }, 250)
+          return
+        }
+        if (!cancelled) {
+          setLoading(false)
+          setNotFound(true)
+        }
         return
       }
 
-      const { data: workoutExercises } = await supabase
-        .from("workout_exercises")
-        .select("*")
-        .eq("workout_id", workoutId)
-        .order("sort_index", { ascending: true })
+      const workoutRow: WorkoutRow = {
+        id: workoutRecord.id,
+        name: workoutRecord.name,
+        performed_at: workoutRecord.date,
+        date: workoutRecord.date,
+      }
 
-      const exerciseRows = (workoutExercises as WorkoutExerciseRow[]) ?? []
-      const exerciseIds = exerciseRows.map((ex) => ex.id)
+      const assembledExercises = buildSummaryExercises(workoutRecord)
+      const baselineWorkout = history
+        .filter((w) => w.id !== workoutRecord.id && w.name === workoutRecord.name)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
 
-      const { data: workoutSets } =
-        exerciseIds.length > 0
-          ? await supabase
-              .from("workout_sets")
-              .select("*")
-              .in("workout_exercise_id", exerciseIds)
-              .order("set_index", { ascending: true })
-          : { data: [] }
-
-      const setsByExerciseId = new Map<string, WorkoutSetRow[]>()
-      ;((workoutSets as WorkoutSetRow[]) ?? []).forEach((set) => {
-        const list = setsByExerciseId.get(set.workout_exercise_id) || []
-        list.push(set)
-        setsByExerciseId.set(set.workout_exercise_id, list)
-      })
-
-      const assembledExercises = exerciseRows.map((ex) => ({
-        ...ex,
-        sets: setsByExerciseId.get(ex.id) || [],
-      }))
-
-      setWorkout(workoutRow as WorkoutRow)
+      setWorkout(workoutRow)
       setExercises(assembledExercises)
-
-      const routineId = (workoutRow as WorkoutRow).routine_id || (workoutRow as WorkoutRow).routineId
-      const routineName = (workoutRow as WorkoutRow).name
-
-      let baselineQuery = supabase.from("workouts").select("*").neq("id", workoutId)
-      if (routineId) {
-        baselineQuery = baselineQuery.eq("routine_id", routineId)
-      } else {
-        baselineQuery = baselineQuery.eq("name", routineName)
-      }
-
-      const { data: baselineWorkout } = await baselineQuery
-        .order("performed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (!baselineWorkout) {
-        setBaselineExercises(null)
-        return
-      }
-
-      const { data: baselineExerciseRows } = await supabase
-        .from("workout_exercises")
-        .select("*")
-        .eq("workout_id", baselineWorkout.id)
-        .order("sort_index", { ascending: true })
-
-      const baselineRows = (baselineExerciseRows as WorkoutExerciseRow[]) ?? []
-      const baselineExerciseIds = baselineRows.map((ex) => ex.id)
-
-      const { data: baselineSets } =
-        baselineExerciseIds.length > 0
-          ? await supabase
-              .from("workout_sets")
-              .select("*")
-              .in("workout_exercise_id", baselineExerciseIds)
-              .order("set_index", { ascending: true })
-          : { data: [] }
-
-      const baselineSetsByExerciseId = new Map<string, WorkoutSetRow[]>()
-      ;((baselineSets as WorkoutSetRow[]) ?? []).forEach((set) => {
-        const list = baselineSetsByExerciseId.get(set.workout_exercise_id) || []
-        list.push(set)
-        baselineSetsByExerciseId.set(set.workout_exercise_id, list)
-      })
-
-      const baselineAssembled = baselineRows.map((ex) => ({
-        ...ex,
-        sets: baselineSetsByExerciseId.get(ex.id) || [],
-      }))
-
-      setBaselineExercises(baselineAssembled)
+      setBaselineExercises(baselineWorkout ? buildSummaryExercises(baselineWorkout) : null)
+      setLoading(false)
+      setNotFound(false)
     }
 
-    loadSummary()
+    loadSummary(0)
+
+    return () => {
+      cancelled = true
+    }
   }, [router, workoutId])
 
   const summary = useMemo<{
@@ -328,10 +303,21 @@ export default function WorkoutSummaryPage() {
     }
   }, [workout, exercises, baselineExercises])
 
-  if (!workout || !summary) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading summary...</p>
+      </div>
+    )
+  }
+
+  if (notFound || !workout || !summary) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-muted-foreground">Workout summary not found.</p>
+          <Button onClick={() => router.push("/")}>Back to Home</Button>
+        </div>
       </div>
     )
   }

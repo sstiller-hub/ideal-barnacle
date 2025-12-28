@@ -66,6 +66,68 @@ export function getSessionById(sessionId: string): WorkoutSession | null {
   return sessions.find((s) => s.id === sessionId) || null
 }
 
+export function updateSetForSession(
+  sessionId: string,
+  exerciseId: string,
+  setIndex: number,
+  patch: Partial<WorkoutSet>,
+): WorkoutSession | null {
+  const session = getSessionById(sessionId)
+  if (!session?.exercises) return session || null
+  const exercises = session.exercises.map((exercise: any) => {
+    if (exercise.id !== exerciseId) return exercise
+    const sets = Array.isArray(exercise.sets)
+      ? exercise.sets.map((set: any, idx: number) => (idx === setIndex ? { ...set, ...patch } : set))
+      : []
+    return { ...exercise, sets }
+  })
+  const updated = { ...session, exercises }
+  saveSession(updated)
+  return updated
+}
+
+export function addSetToSession(
+  sessionId: string,
+  exerciseId: string,
+  newSet: WorkoutSet,
+): WorkoutSession | null {
+  const session = getSessionById(sessionId)
+  if (!session?.exercises) return session || null
+  const exercises = session.exercises.map((exercise: any) => {
+    if (exercise.id !== exerciseId) return exercise
+    const sets = Array.isArray(exercise.sets) ? [...exercise.sets, newSet] : [newSet]
+    return { ...exercise, sets }
+  })
+  const updated = { ...session, exercises }
+  saveSession(updated)
+  return updated
+}
+
+export function removeSetFromSession(
+  sessionId: string,
+  exerciseId: string,
+  setIndex: number,
+): WorkoutSession | null {
+  const session = getSessionById(sessionId)
+  if (!session?.exercises) return session || null
+  const exercises = session.exercises.map((exercise: any) => {
+    if (exercise.id !== exerciseId) return exercise
+    const sets = Array.isArray(exercise.sets)
+      ? exercise.sets.filter((_: any, idx: number) => idx !== setIndex)
+      : []
+    return { ...exercise, sets }
+  })
+  const updated = { ...session, exercises }
+  saveSession(updated)
+  return updated
+}
+
+export function deleteSession(sessionId: string): void {
+  const sessions = loadSessions()
+  const filtered = sessions.filter((s) => s.id !== sessionId)
+  saveSessions(filtered)
+}
+
 // Set helpers
 export function loadSets(): WorkoutSet[] {
   if (typeof window === "undefined") return []
@@ -92,6 +154,12 @@ export function saveSet(set: WorkoutSet): void {
 export function getSetsForSession(sessionId: string): WorkoutSet[] {
   const sets = loadSets()
   return sets.filter((s) => s.sessionId === sessionId).sort((a, b) => a.setNumber - b.setNumber)
+}
+
+export function deleteSetsForSession(sessionId: string): void {
+  const sets = loadSets()
+  const filtered = sets.filter((s) => s.sessionId !== sessionId)
+  saveSets(filtered)
 }
 
 export function deleteSet(setId: string): void {

@@ -4,6 +4,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import PlateVisualizer from "@/components/plate-visualizer"
 import LastTimeCard from "@/components/last-time-card"
 import {
@@ -22,6 +32,7 @@ import {
   isSetIncomplete,
 } from "@/lib/set-validation"
 import Link from "next/link"
+import { Trash2 } from "lucide-react"
 
 type ExerciseCardProps = {
   exercise: {
@@ -43,6 +54,7 @@ type ExerciseCardProps = {
   }
   exerciseIndex: number
   editable?: boolean
+  editMode?: boolean
   showPlateCalc?: boolean // Add prop for external control
   restState?: {
     exerciseIndex: number
@@ -64,6 +76,7 @@ export default function ExerciseCard({
   exercise,
   exerciseIndex,
   editable = true,
+  editMode = false,
   showPlateCalc = true, // Use prop instead of internal state
   restState,
   validationTrigger,
@@ -91,6 +104,7 @@ export default function ExerciseCard({
   const [lastPerformed, setLastPerformed] = useState<string>("")
   const [activeRestTimer, setActiveRestTimer] = useState<number | null>(null)
   const [activeRestTime, setActiveRestTime] = useState(0)
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
 
   const [debouncedSets, setDebouncedSets] = useState(exercise.sets)
   const weightRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -373,7 +387,8 @@ export default function ExerciseCard({
                   <div className="flex-1 min-w-[50px]">
                     <Input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
                       value={set.weight ?? ""}
                       onChange={(e) => {
                         const val = e.target.value.trim()
@@ -433,6 +448,7 @@ export default function ExerciseCard({
                     <Input
                       type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       value={set.reps ?? ""}
                       onChange={(e) => {
                         const val = e.target.value.trim()
@@ -503,6 +519,23 @@ export default function ExerciseCard({
                     onClick={() => (set.completed ? onCompleteSet(idx) : startRestTimer(idx))}
                   >
                     {set.completed ? "✕" : "✓"}
+                  </Button>
+                )}
+
+                {editable && editMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      if (set.completed) {
+                        setConfirmDeleteIndex(idx)
+                        return
+                      }
+                      onDeleteSet(idx)
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -625,6 +658,27 @@ export default function ExerciseCard({
           </div>
         </div>
       )}
+
+      <AlertDialog open={confirmDeleteIndex !== null} onOpenChange={() => setConfirmDeleteIndex(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete completed set?</AlertDialogTitle>
+            <AlertDialogDescription>This will affect workout stats.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteIndex === null) return
+                onDeleteSet(confirmDeleteIndex)
+                setConfirmDeleteIndex(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
