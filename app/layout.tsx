@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import UpdateAvailableBanner from "@/components/update-available"
 import SonnerProvider from "@/components/sonner-provider"
+import MobilePreviewWrapper from "@/components/mobile-preview-wrapper"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -63,7 +64,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className={`font-sans antialiased`}>
-        {children}
+        <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
         <SonnerProvider />
         <UpdateAvailableBanner />
       </body>

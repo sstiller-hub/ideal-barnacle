@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
 import { getExerciseHistory, getLatestPerformance, getWorkoutHistory, saveWorkout } from "@/lib/workout-storage"
 import { toast } from "sonner"
@@ -27,7 +27,7 @@ import {
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
 import BottomNav from "@/components/bottom-nav"
-import { ChevronLeft, Check, Pause, Play, MoreHorizontal, Plus } from "lucide-react"
+import { ChevronLeft, Check, Pause, Play, PencilLine, Plus } from "lucide-react"
 import ExerciseCard from "@/components/exercise-card"
 
 type Exercise = {
@@ -69,7 +69,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [exercises, setExercises] = useState<any[]>([])
   const [elapsedMs, setElapsedMs] = useState(0)
   const [isHydrated, setIsHydrated] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
   const [validationTrigger, setValidationTrigger] = useState(0)
@@ -78,6 +77,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const addHoldTimeoutRef = useRef<number | null>(null)
   const addHoldRafRef = useRef<number | null>(null)
   const addHoldStartRef = useRef<number | null>(null)
+  const [uiNow, setUiNow] = useState(() => Date.now())
+  const restStartAtRef = useRef<number | null>(null)
+  const [inlineNoteDraft, setInlineNoteDraft] = useState("")
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
@@ -92,6 +94,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [pendingRemoteUpdates, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
 
   const generateSetId = () => {
+    const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
+    return c?.randomUUID ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  const isUuid = (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+
+  const generateWorkoutId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
     return c?.randomUUID ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
@@ -396,6 +408,70 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const totalExercises = exercises.length
   const progressPercentage = (completedExercises / totalExercises) * 100
   const isEditMode = currentExercise ? Boolean(editSetsByExerciseId[currentExercise.id]) : false
+  const firstIncompleteIndex =
+    currentExercise?.sets?.findIndex((set: any) => !set.completed) ?? -1
+  const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
+  const isResting =
+    Boolean(restState) &&
+    restState?.exerciseIndex === currentExerciseIndex &&
+    typeof restState?.remainingSeconds === "number"
+  const allSetsCompleted = currentExercise?.sets?.every((set: any) => set.completed) ?? false
+
+  const formatSeconds = (seconds: number) => formatTime(seconds * 1000)
+
+  const restRemainingSeconds = (() => {
+    if (!isResting || !restState) return 0
+    const startAt = restStartAtRef.current ?? uiNow
+    const elapsed = Math.floor((uiNow - startAt) / 1000)
+    return Math.max(0, restState.remainingSeconds - elapsed)
+  })()
+
+  const setRestStateAndPersist = async (
+    nextState: WorkoutSession["restTimer"] | null
+  ) => {
+    restStartAtRef.current = nextState ? Date.now() : null
+    setRestState(nextState || undefined)
+    if (session) {
+      const updatedSession: WorkoutSession = {
+        ...session,
+        restTimer: nextState || undefined,
+      }
+      setSession(updatedSession)
+      await saveSession(updatedSession)
+    }
+  }
+
+  const handlePrimaryAction = async () => {
+    if (!session || !currentExercise) return
+    if (currentSetIndex < 0 || currentSetIndex >= currentExercise.sets.length) return
+    if (isSetIncomplete(currentExercise.sets[currentSetIndex])) {
+      setValidationTrigger(Date.now())
+      return
+    }
+    await completeSet(currentSetIndex)
+    if (currentExercise.restTime > 0) {
+      await setRestStateAndPersist({
+        exerciseIndex: currentExerciseIndex,
+        setIndex: currentSetIndex,
+        remainingSeconds: currentExercise.restTime,
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (!isResting) return
+    const interval = setInterval(() => {
+      setUiNow(Date.now())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isResting])
+
+  useEffect(() => {
+    if (!isResting) return
+    if (restRemainingSeconds <= 0) {
+      void setRestStateAndPersist(null)
+    }
+  }, [isResting, restRemainingSeconds])
 
   useEffect(() => {
     if (currentExercise?.name && typeof window !== "undefined") {
@@ -407,6 +483,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   useEffect(() => {
     cancelAddHold()
   }, [currentExerciseIndex])
+
+  useEffect(() => {
+    setInlineNoteDraft(currentExercise?.sessionNote ?? "")
+  }, [currentExerciseIndex, currentExercise?.sessionNote])
 
   useEffect(() => {
     if (!session?.remoteSessionId) return
@@ -826,7 +906,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
-    addSetToSession(session.id, exercise.id, setData)
   }
 
   const removeGhostSetsForExercise = async (exerciseIndex: number) => {
@@ -859,6 +938,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       await removeGhostSetsForExercise(exerciseIndex)
     }
   }
+
 
   const startAddHold = (exerciseIndex: number) => {
     if (!editSetsByExerciseId[exercises[exerciseIndex]?.id]) return
@@ -982,8 +1062,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     const durationSeconds = session ? commitActiveDuration(session) : Math.floor(elapsedMs / 1000)
 
+    const completedWorkoutId = isUuid(session.id) ? session.id : generateWorkoutId()
     const completedWorkout = {
-      id: session?.id!,
+      id: completedWorkoutId,
       name: routine.name,
       date: new Date(session?.startedAt!).toISOString(),
       duration: durationSeconds,
@@ -1033,7 +1114,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     saveCurrentSessionId(null)
     setSession(null)
     setValidationTrigger(0)
-    router.push(`/workout-summary?workoutId=${completedWorkout.id}`)
+    router.push(`/workout-summary?workoutId=${completedWorkoutId}`)
   }
 
   const handleExit = async () => {
@@ -1101,12 +1182,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             </Button>
             <div className="text-center flex-1">
               <h1 className="text-base font-semibold text-foreground">{routine.name}</h1>
-              <div className="flex items-center justify-center gap-2 mt-0.5">
-                <p className="text-sm text-muted-foreground tabular-nums">{formatTime(elapsedMs)}</p>
-                {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
-              </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {!isResting && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold text-muted-foreground bg-muted tabular-nums">
+                  {formatTime(elapsedMs)}
+                </span>
+              )}
               <Button variant="ghost" size="icon" className="h-10 w-10" onClick={togglePause}>
                 {session?.status === "in_progress" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </Button>
@@ -1138,10 +1220,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           {/* Exercise Title */}
           <div className="mb-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              Exercise {currentExerciseIndex + 1} of {totalExercises}
+              Exercise {currentExerciseIndex + 1} of {totalExercises} · {currentExercise.sets.length} sets
             </p>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="text-xl font-bold text-foreground leading-tight">{currentExercise.name}</h2>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div>
+                <h2 className="text-xl font-bold text-foreground leading-tight">{currentExercise.name}</h2>
+                {isEditMode && (
+                  <div className="mt-1">
+                    <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                      Editing sets (session only)
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {isEditMode && (
                   <div className="relative">
@@ -1179,23 +1270,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   </Button>
                 )}
 
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-36 p-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start text-xs"
-                      onClick={() => toggleEditSetsForExercise(currentExerciseIndex)}
-                    >
-                      {isEditMode ? "Done" : "Edit sets"}
-                    </Button>
-                  </PopoverContent>
-                </Popover>
+                {!isEditMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => toggleEditSetsForExercise(currentExerciseIndex, true)}
+                  >
+                    <PencilLine className="h-4 w-4" />
+                  </Button>
+                )}
 
                 <Button
                   variant="ghost"
@@ -1208,9 +1292,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 </Button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {currentExercise.targetSets} sets × {currentExercise.targetReps} reps
-            </p>
           </div>
 
           <ExerciseCard
@@ -1239,21 +1320,45 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               }
             }}
             onRestStateChange={async (nextState) => {
-              setRestState(nextState || undefined)
-              if (session) {
-                const updatedSession: WorkoutSession = {
-                  ...session,
-                  restTimer: nextState || undefined,
-                }
-                setSession(updatedSession)
-                await saveSession(updatedSession)
-              }
+              await setRestStateAndPersist(nextState || null)
             }}
             onUpdateSet={updateSetData}
             onCompleteSet={completeSet}
             onAddSet={() => addSetToExercise(currentExerciseIndex)}
             onDeleteSet={(setIndex) => deleteSetFromExercise(setIndex, currentExerciseIndex)}
           />
+
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Note</span>
+              <span className="text-[10px] text-muted-foreground">Session only</span>
+            </div>
+            <Input
+              value={inlineNoteDraft}
+              placeholder="Add a quick note (optional)"
+              onChange={(e) => setInlineNoteDraft(e.target.value)}
+              onBlur={async () => {
+                if (!session || !currentExercise) return
+                const trimmed = inlineNoteDraft.trim()
+                if ((currentExercise.sessionNote ?? "") === trimmed) return
+                const newExercises = exercises.map((exercise: any, idx: number) => {
+                  if (idx !== currentExerciseIndex) return exercise
+                  return {
+                    ...exercise,
+                    sessionNote: trimmed,
+                  }
+                })
+                setExercises(newExercises)
+                const updatedSession: WorkoutSession = {
+                  ...session,
+                  exercises: newExercises,
+                }
+                setSession(updatedSession)
+                await saveSession(updatedSession)
+              }}
+              className="h-10"
+            />
+          </div>
         </div>
       </div>
 
@@ -1261,22 +1366,51 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <div className="bg-background border-t border-border" style={{ height: "var(--workout-footer-h)" }}>
           <div className="max-w-2xl mx-auto px-4 py-3 h-full flex items-center">
-            <div className="flex gap-3 w-full">
-              <Button
-                variant="outline"
-                className="flex-1 h-12 bg-transparent"
-                onClick={goToPreviousExercise}
-                disabled={currentExerciseIndex === 0}
-              >
-                Previous
-              </Button>
-              <Button
-                className="flex-1 h-12 bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={goToNextExercise}
-              >
-                {currentExerciseIndex === exercises.length - 1 ? "Finish" : "Next Exercise"}
-              </Button>
-            </div>
+            {isResting ? (
+              <div className="flex flex-col items-center justify-center w-full gap-1">
+                <div className="px-4 py-2 rounded-full text-base font-semibold text-foreground bg-muted tabular-nums">
+                  {formatSeconds(restRemainingSeconds)}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => setRestStateAndPersist(null)}
+                >
+                  Skip Rest
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 w-full">
+                <Button
+                  variant="ghost"
+                  className="h-10 px-3 text-muted-foreground"
+                  onClick={goToPreviousExercise}
+                  disabled={currentExerciseIndex === 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={allSetsCompleted ? goToNextExercise : handlePrimaryAction}
+                >
+                  {allSetsCompleted
+                    ? currentExerciseIndex === exercises.length - 1
+                      ? "Finish"
+                      : "Next Exercise"
+                    : "Complete Set"}
+                </Button>
+                {!allSetsCompleted && (
+                  <Button
+                    variant="outline"
+                    className="h-10 px-4 bg-transparent text-muted-foreground"
+                    onClick={goToNextExercise}
+                  >
+                    {currentExerciseIndex === exercises.length - 1 ? "Finish" : "Next Exercise"}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1285,6 +1419,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           <BottomNav fixed={false} />
         </div>
       </div>
+
     </div>
   )
 }

@@ -16,12 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import PlateVisualizer from "@/components/plate-visualizer"
 import LastTimeCard from "@/components/last-time-card"
-import {
-  getExerciseHistory,
-  getLatestPerformance,
-  getMostRecentSetPerformance,
-  getWorkoutHistory,
-} from "@/lib/workout-storage"
+import { getExerciseHistory, getMostRecentSetPerformance } from "@/lib/workout-storage"
 import {
   REP_MAX,
   REP_MIN,
@@ -31,8 +26,7 @@ import {
   isSetEligibleForStats,
   isSetIncomplete,
 } from "@/lib/set-validation"
-import Link from "next/link"
-import { Trash2 } from "lucide-react"
+import { Check, Trash2, X } from "lucide-react"
 
 type ExerciseCardProps = {
   exercise: {
@@ -93,15 +87,11 @@ export default function ExerciseCard({
     const firstIncomplete = exercise.sets.findIndex((s) => !s.completed)
     return firstIncomplete !== -1 ? firstIncomplete : 0
   })
-  const [restingSet, setRestingSet] = useState<number | null>(null)
-  const [restTimeRemaining, setRestTimeRemaining] = useState(exercise.restTime)
   const [isHydrated, setIsHydrated] = useState(false)
   const [repCapErrors, setRepCapErrors] = useState<Record<number, boolean>>({})
   const [showMissingForSet, setShowMissingForSet] = useState<Record<number, boolean>>({})
   const lastValidationTriggerRef = useRef<number | undefined>(undefined)
 
-  const [previousSets, setPreviousSets] = useState<{ reps: number; weight: number }[]>([])
-  const [lastPerformed, setLastPerformed] = useState<string>("")
   const [activeRestTimer, setActiveRestTimer] = useState<number | null>(null)
   const [activeRestTime, setActiveRestTime] = useState(0)
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
@@ -109,6 +99,7 @@ export default function ExerciseCard({
   const [debouncedSets, setDebouncedSets] = useState(exercise.sets)
   const weightRefs = useRef<(HTMLInputElement | null)[]>([])
   const repsRefs = useRef<(HTMLInputElement | null)[]>([])
+  const setCardRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -134,26 +125,6 @@ export default function ExerciseCard({
     })
   }, [exercise.sets])
 
-  const lastPerformance = useMemo(() => {
-    return getLatestPerformance(exercise.name)
-  }, [exercise.name])
-
-  const lastWorkout = useMemo(() => {
-    const normalizeName = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
-    const history = getWorkoutHistory()
-    const normalized = normalizeName(exercise.name)
-    return (
-      history.find((workout) =>
-        workout.exercises.some((ex: any) => normalizeName(ex.name) === normalized)
-      ) || null
-    )
-  }, [exercise.name])
-
-  const currentPerformance = useMemo(() => {
-    // Placeholder for computeCurrentPerformance logic
-    return {}
-  }, [debouncedSets])
-
   const historyReps = useMemo(() => {
     return getExerciseHistory(exercise.name).flatMap((workout) =>
       workout.exercises
@@ -171,28 +142,15 @@ export default function ExerciseCard({
     }
   }, [exercise.sets, activeSet])
 
-  useEffect(() => {
-    const lastPerformance = getLatestPerformance(exercise.name)
-    if (lastPerformance) {
-      const completedSets = lastPerformance.sets.filter((s) => isSetEligibleForStats(s))
-      setPreviousSets(
-        completedSets.map((set) => ({
-          reps: set.reps ?? 0,
-          weight: set.weight ?? 0,
-        })),
-      )
+  const currentSetIndex = activeSet
 
-      const history = typeof window !== "undefined" ? localStorage.getItem("workout_history") : null
-      if (history) {
-        const workouts = JSON.parse(history)
-        const lastWorkout = workouts.find((w: any) => w.exercises.some((e: any) => e.name === exercise.name))
-        if (lastWorkout) {
-          const date = new Date(lastWorkout.date)
-          setLastPerformed(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }))
-        }
-      }
+  useEffect(() => {
+    const target = setCardRefs.current[currentSetIndex]
+    if (target) {
+      target.scrollIntoView({ block: "nearest", behavior: "smooth" })
     }
-  }, [exercise.name])
+  }, [currentSetIndex])
+
 
   useEffect(() => {
     if (activeRestTimer !== null && activeRestTime > 0) {
@@ -304,63 +262,35 @@ export default function ExerciseCard({
     focusFirstMissingField()
   }, [validationTrigger, focusFirstMissingField])
 
-  const startRestTimer = (setIndex: number) => {
-    if (guardIncomplete(setIndex)) return
-    handleCompleteSet(setIndex)
-    setActiveRestTimer(setIndex)
-    setActiveRestTime(exercise.restTime)
-    onRestStateChange?.({
-      exerciseIndex,
-      setIndex,
-      remainingSeconds: exercise.restTime,
-    })
-  }
-
-  const skipRest = () => {
-    if (guardIncomplete(activeRestTimer ?? activeSet)) return
-    setActiveRestTimer(null)
-    setActiveRestTime(0)
-    onRestStateChange?.(null)
-  }
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
   const allSetsCompleted = exercise.sets.every((s) => s.completed)
+  const mostRecentSet = getMostRecentSetPerformance(exercise.name, currentSetIndex)
 
   return (
     <div className="space-y-2">
       {editable && <div className="flex items-center justify-start px-1"></div>}
 
-      {activeRestTimer !== null && activeRestTime > 0 && (
-        <Card className="p-4 bg-primary/10 border-primary/30">
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">Rest Time</p>
-            <p className="text-3xl font-bold tabular-nums text-foreground">{formatTime(activeRestTime)}</p>
-            <Button variant="outline" size="sm" onClick={skipRest} className="mt-2 bg-transparent">
-              Skip Rest
-            </Button>
-          </div>
-        </Card>
-      )}
-
       {/* Sets display */}
-      <div className="space-y-2">
-        {exercise.sets.map((set, idx) => (
-          <Card
-            key={idx}
-            className={`p-2.5 transition-all ${
-              activeSet === idx && !set.completed
-                ? "ring-2 ring-primary bg-primary/5"
-                : set.completed
-                  ? "bg-success/10 border-success/30"
-                  : "bg-card"
-            }`}
-          >
-            <div className="space-y-2">
+      <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+        {exercise.sets.map((set, idx) => {
+          const isCurrent = idx === currentSetIndex
+          const isContext = Math.abs(idx - currentSetIndex) <= 1
+          return (
+            <div
+              key={idx}
+              ref={(el) => {
+                setCardRefs.current[idx] = el
+              }}
+            >
+              <Card
+                className={`transition-all ${
+                  isCurrent
+                    ? "bg-card border border-border shadow-sm"
+                    : set.completed
+                      ? "bg-muted/20 border border-border/50"
+                      : "bg-muted/30 border border-border/40"
+                } ${isCurrent ? "p-4" : "p-3"} ${isContext ? "" : "opacity-60"}`}
+              >
+                <div className={`${isCurrent ? "space-y-3" : "space-y-2"}`}>
               <div className="flex items-center gap-2">
                 {/* Set badge */}
                 <div
@@ -373,17 +303,6 @@ export default function ExerciseCard({
 
                 {/* Weight control */}
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  {editable && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 flex-shrink-0 bg-transparent"
-                      onClick={() => onUpdateSet(idx, "weight", Math.max(0, (set.weight ?? 0) - 5))}
-                      disabled={set.completed}
-                    >
-                      −
-                    </Button>
-                  )}
                   <div className="flex-1 min-w-[50px]">
                     <Input
                       type="text"
@@ -401,7 +320,7 @@ export default function ExerciseCard({
                       onBlur={() => set.id && onSetFieldBlur?.(set.id, "weight")}
                       aria-invalid={showMissingForSet[idx] && isMissingWeight(set.weight)}
                       disabled={set.completed || !editable}
-                      className="h-8 text-center text-sm font-semibold"
+                      className={`${isCurrent ? "h-12 text-lg" : "h-10 text-sm"} text-center font-semibold`}
                       placeholder="0"
                       ref={(el) => {
                         weightRefs.current[idx] = el
@@ -414,36 +333,10 @@ export default function ExerciseCard({
                       )}
                     </div>
                   </div>
-                  {editable && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 flex-shrink-0 bg-transparent"
-                      onClick={() => onUpdateSet(idx, "weight", (set.weight ?? 0) + 5)}
-                      disabled={set.completed}
-                    >
-                      +
-                    </Button>
-                  )}
                 </div>
 
                 {/* Reps control */}
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  {editable && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 flex-shrink-0 bg-transparent"
-                      onClick={() => {
-                        const base = set.reps ?? REP_MIN
-                        onUpdateSet(idx, "reps", Math.max(REP_MIN, base - 1))
-                        setRepCapErrors((prev) => ({ ...prev, [idx]: false }))
-                      }}
-                      disabled={set.completed}
-                    >
-                      −
-                    </Button>
-                  )}
                   <div className="flex-1 min-w-[50px]">
                     <Input
                       type="text"
@@ -472,7 +365,7 @@ export default function ExerciseCard({
                       onBlur={() => set.id && onSetFieldBlur?.(set.id, "reps")}
                       aria-invalid={(showMissingForSet[idx] && isMissingReps(set.reps)) || repCapErrors[idx]}
                       disabled={set.completed || !editable}
-                      className="h-8 text-center text-sm font-semibold"
+                      className={`${isCurrent ? "h-12 text-lg" : "h-10 text-sm"} text-center font-semibold`}
                       placeholder="0"
                       ref={(el) => {
                         repsRefs.current[idx] = el
@@ -491,24 +384,8 @@ export default function ExerciseCard({
                       )}
                     </div>
                   </div>
-                  {editable && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 flex-shrink-0 bg-transparent"
-                      onClick={() => {
-                        const base = set.reps ?? REP_MIN - 1
-                        onUpdateSet(idx, "reps", Math.min(REP_MAX, base + 1))
-                        setRepCapErrors((prev) => ({ ...prev, [idx]: false }))
-                      }}
-                      disabled={set.completed}
-                    >
-                      +
-                    </Button>
-                  )}
                 </div>
 
-                {/* Checkmark button inline */}
                 {editable && (
                   <Button
                     variant={set.completed ? "outline" : "default"}
@@ -516,9 +393,9 @@ export default function ExerciseCard({
                     className={`h-8 w-8 flex-shrink-0 ${
                       set.completed ? "hover:bg-destructive hover:text-destructive-foreground" : ""
                     }`}
-                    onClick={() => (set.completed ? onCompleteSet(idx) : startRestTimer(idx))}
+                    onClick={() => onCompleteSet(idx)}
                   >
-                    {set.completed ? "✕" : "✓"}
+                    {set.completed ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                   </Button>
                 )}
 
@@ -577,7 +454,7 @@ export default function ExerciseCard({
                 </div>
               )}
 
-              {editable && activeSet === idx && !set.completed && (
+              {editable && isCurrent && (
                 <LastTimeCard
                   lastSetPerformance={getMostRecentSetPerformance(exercise.name, idx)}
                   currentSet={{ weight: set.weight ?? 0, reps: set.reps ?? 0 }}
@@ -596,58 +473,14 @@ export default function ExerciseCard({
                   <PlateVisualizer targetWeight={set.weight} />
                 </div>
               )}
+                </div>
+              </Card>
             </div>
-          </Card>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Last workout details (full sets) */}
-      {lastWorkout && (
-        <Card className="p-3 bg-muted/30 border-muted/40">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Last workout
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              {new Date(lastWorkout.date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </div>
-          </div>
-          <div className="space-y-1">
-            {lastWorkout.exercises
-              .find(
-                (e: any) =>
-                  e.name.toLowerCase().trim().replace(/\s+/g, " ") ===
-                  exercise.name.toLowerCase().trim().replace(/\s+/g, " ")
-              )
-              ?.sets.filter((s: any) => isSetEligibleForStats(s))
-              .map((set: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Set {idx + 1}</span>
-                  <span className="font-medium text-foreground">
-                    {set.weight} lbs × {set.reps}
-                  </span>
-                </div>
-              ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Previous performance link */}
-      {previousSets.length > 0 && (
-        <div className="pt-1">
-          <Link
-            href={`/exercise/${encodeURIComponent(exercise.name)}`}
-            className="text-xs text-primary hover:underline flex items-center justify-center gap-1.5"
-          >
-            <span>📊</span>
-            View exercise history
-            {lastPerformed && <span className="text-muted-foreground">(last: {lastPerformed})</span>}
-          </Link>
-        </div>
-      )}
+      {/* Last workout details removed per active session spec */}
 
       {/* All sets complete message */}
       {allSetsCompleted && (
