@@ -1,4 +1,5 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
@@ -64,7 +65,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className={`font-sans antialiased`}>
-        <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
+        <Suspense fallback={children}>
+          <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
+        </Suspense>
         <SonnerProvider />
         <UpdateAvailableBanner />
       </body>
