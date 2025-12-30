@@ -21,7 +21,12 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { getWorkoutHistory } from "@/lib/workout-storage"
 import { getRoutines } from "@/lib/routine-storage"
-import { getCurrentInProgressSession, saveCurrentSessionId } from "@/lib/autosave-workout-storage"
+import {
+  deleteSession,
+  deleteSetsForSession,
+  getCurrentInProgressSession,
+  saveCurrentSessionId,
+} from "@/lib/autosave-workout-storage"
 import { Play, ChevronLeft, ChevronRight, Calendar, Check, Plus, X, Moon, Pencil } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
@@ -323,6 +328,10 @@ export default function Home() {
 
   const handleDiscardExisting = () => {
     // Clear the current session
+    if (session?.id) {
+      deleteSetsForSession(session.id)
+      deleteSession(session.id)
+    }
     saveCurrentSessionId(null)
     setSession(null)
 
@@ -334,6 +343,10 @@ export default function Home() {
   }
 
   const handleDiscardSession = () => {
+    if (session?.id) {
+      deleteSetsForSession(session.id)
+      deleteSession(session.id)
+    }
     saveCurrentSessionId(null)
     setSession(null)
     setShowDiscardSessionDialog(false)

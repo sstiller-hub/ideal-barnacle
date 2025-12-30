@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { useState, useEffect } from "react"
 import { getRoutines, deleteRoutine, type WorkoutRoutine } from "@/lib/routine-storage"
-import { getCurrentInProgressSession, saveCurrentSessionId } from "@/lib/autosave-workout-storage"
+import {
+  deleteSession,
+  deleteSetsForSession,
+  getCurrentInProgressSession,
+  saveCurrentSessionId,
+} from "@/lib/autosave-workout-storage"
 import { BottomNav } from "@/components/bottom-nav"
 import {
   AlertDialog,
@@ -61,6 +66,10 @@ export default function WorkoutsPage() {
   }
 
   const handleDiscardExisting = () => {
+    if (session?.id) {
+      deleteSetsForSession(session.id)
+      deleteSession(session.id)
+    }
     saveCurrentSessionId(null)
     setSession(null)
     setShowConflictDialog(false)
