@@ -1,4 +1,5 @@
 import type { PersonalRecord, EvaluatedPR, PRMetric } from "./pr-types"
+import { formatExerciseName } from "./format-exercise-name"
 
 const PR_STORAGE_KEY = "personal_records"
 const USER_ID = "default_user" // In a real app, this would come from auth
@@ -7,7 +8,11 @@ const USER_ID = "default_user" // In a real app, this would come from auth
 export function getPersonalRecords(): PersonalRecord[] {
   if (typeof window === "undefined") return []
   const stored = localStorage.getItem(PR_STORAGE_KEY)
-  return stored ? JSON.parse(stored) : []
+  const records = stored ? (JSON.parse(stored) as PersonalRecord[]) : []
+  return records.map((record) => ({
+    ...record,
+    exerciseName: formatExerciseName(record.exerciseName),
+  }))
 }
 
 // Get PRs for a specific exercise

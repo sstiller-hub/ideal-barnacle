@@ -8,7 +8,7 @@ export const REAL_WORKOUTS: WorkoutRoutine[] = [
     exercises: [
       {
         id: "ub1-1",
-        name: "Overhand row (captioned)",
+        name: "Overhand row",
         type: "strength",
         targetSets: 2,
         targetReps: "6–8",

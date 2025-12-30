@@ -44,6 +44,7 @@ import { evaluateWorkoutPRs } from "./pr-evaluation"
 import { savePRs } from "./pr-storage"
 import type { EvaluatedPR } from "./pr-types"
 import { isSetEligibleForStats } from "./set-validation"
+import { formatExerciseName } from "./format-exercise-name"
 
 export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   if (typeof window === "undefined") {
@@ -97,7 +98,13 @@ export function getWorkoutHistory(): CompletedWorkout[] {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
   }
 
-  return normalized
+  return normalized.map((workout) => ({
+    ...workout,
+    exercises: workout.exercises.map((exercise) => ({
+      ...exercise,
+      name: formatExerciseName(exercise.name),
+    })),
+  }))
 }
 
 export function deleteWorkout(workoutId: string): void {

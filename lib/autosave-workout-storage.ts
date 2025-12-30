@@ -16,6 +16,7 @@ export interface WorkoutSession {
     exerciseIndex: number
     setIndex: number
     remainingSeconds: number
+    startedAt?: string
   }
   lastActiveAt?: string
 }

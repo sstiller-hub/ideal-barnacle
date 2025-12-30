@@ -21,6 +21,7 @@ export type RoutineExercise = {
 
 import { REAL_WORKOUTS } from "@/lib/real-routines"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
+import { formatExerciseName } from "@/lib/format-exercise-name"
 
 const ROUTINES_KEY = "workout_routines_v2"
 
@@ -29,7 +30,14 @@ export function getRoutines(): WorkoutRoutine[] {
   const stored = localStorage.getItem(ROUTINES_KEY)
   if (!stored) return REAL_WORKOUTS
   try {
-    return JSON.parse(stored) as WorkoutRoutine[]
+    const routines = JSON.parse(stored) as WorkoutRoutine[]
+    return routines.map((routine) => ({
+      ...routine,
+      exercises: routine.exercises.map((exercise) => ({
+        ...exercise,
+        name: formatExerciseName(exercise.name),
+      })),
+    }))
   } catch {
     return REAL_WORKOUTS
   }

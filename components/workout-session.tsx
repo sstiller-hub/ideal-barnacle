@@ -320,11 +320,22 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             normalizedSession.status === "in_progress" ? new Date().toISOString() : undefined,
         }
 
-        setSession(updatedSession)
-        setExercises(buildExercises(updatedSession.exercises))
-        setRestState(updatedSession.restTimer)
+        const restTimer =
+          updatedSession.restTimer && !updatedSession.restTimer.startedAt
+            ? { ...updatedSession.restTimer, startedAt: new Date().toISOString() }
+            : updatedSession.restTimer
+        const hydratedSession = restTimer ? { ...updatedSession, restTimer } : updatedSession
+
+        setSession(hydratedSession)
+        setExercises(buildExercises(hydratedSession.exercises))
+        setRestState(restTimer)
+        restStartAtRef.current = restTimer?.startedAt
+          ? new Date(restTimer.startedAt).getTime()
+          : restTimer
+            ? Date.now()
+            : null
         setElapsedMs(getElapsedMs(updatedSession))
-        await saveSession(updatedSession)
+        await saveSession(hydratedSession)
         setIsHydrated(true)
       } else {
         const newSessionId = Date.now().toString()
@@ -346,6 +357,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setSession(newSession)
         setExercises(newExercises)
         setRestState(undefined)
+        restStartAtRef.current = null
         setElapsedMs(getElapsedMs(newSession))
         await saveSession(newSession)
         setIsHydrated(true)
@@ -421,7 +433,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const restRemainingSeconds = (() => {
     if (!isResting || !restState) return 0
-    const startAt = restStartAtRef.current ?? uiNow
+    const startAt = restState.startedAt
+      ? new Date(restState.startedAt).getTime()
+      : restStartAtRef.current ?? uiNow
     const elapsed = Math.floor((uiNow - startAt) / 1000)
     return Math.max(0, restState.remainingSeconds - elapsed)
   })()
@@ -429,12 +443,21 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const setRestStateAndPersist = async (
     nextState: WorkoutSession["restTimer"] | null
   ) => {
-    restStartAtRef.current = nextState ? Date.now() : null
-    setRestState(nextState || undefined)
+    const nextWithStart = nextState
+      ? {
+          ...nextState,
+          startedAt: nextState.startedAt ?? new Date().toISOString(),
+        }
+      : null
+
+    restStartAtRef.current = nextWithStart?.startedAt
+      ? new Date(nextWithStart.startedAt).getTime()
+      : null
+    setRestState(nextWithStart || undefined)
     if (session) {
       const updatedSession: WorkoutSession = {
         ...session,
-        restTimer: nextState || undefined,
+        restTimer: nextWithStart || undefined,
       }
       setSession(updatedSession)
       await saveSession(updatedSession)
@@ -460,6 +483,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   useEffect(() => {
     if (!isResting) return
+    if (!restStartAtRef.current) {
+      restStartAtRef.current = restState?.startedAt
+        ? new Date(restState.startedAt).getTime()
+        : Date.now()
+    }
     const interval = setInterval(() => {
       setUiNow(Date.now())
     }, 1000)
