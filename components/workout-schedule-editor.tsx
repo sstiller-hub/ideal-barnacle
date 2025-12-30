@@ -10,6 +10,7 @@ import {
   type DayOfWeek,
   type ScheduledWorkout,
 } from "@/lib/schedule-storage"
+import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 
 const dayOrder: Array<{ key: DayOfWeek; label: string }> = [
   { key: "Mon", label: "Monday" },
@@ -34,15 +35,20 @@ export function WorkoutScheduleEditor() {
     setWeeklyScheduleState(getWeeklySchedule())
   }, [])
 
+  const fallbackRoutines = routines.length > 0 ? routines : GROWTH_V2_ROUTINES
+  const routineNameById = new Map(
+    [...routines, ...GROWTH_V2_ROUTINES].map((routine) => [routine.id, routine.name]),
+  )
+
   const updateDaySelection = (day: DayOfWeek, value: string) => {
     if (!weeklySchedule) return
     const next = { ...weeklySchedule }
     if (value === "rest") {
       next[day] = null
     } else {
-      const routine = routines.find((item) => item.id === value)
-      if (!routine) return
-      next[day] = { routineId: routine.id, routineName: routine.name }
+      const routineName = routineNameById.get(value)
+      if (!routineName) return
+      next[day] = { routineId: value, routineName }
     }
     setWeeklyScheduleState(next)
   }
@@ -73,6 +79,15 @@ export function WorkoutScheduleEditor() {
         {weeklySchedule &&
           dayOrder.map(({ key, label }) => {
             const entry = weeklySchedule[key]
+            const baseOptions = fallbackRoutines.map((routine) => ({
+              id: routine.id,
+              name: routine.name,
+            }))
+            const options =
+              entry && !baseOptions.some((option) => option.id === entry.routineId)
+                ? [...baseOptions, { id: entry.routineId, name: entry.routineName }]
+                : baseOptions
+
             return (
               <div key={key} className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium w-24">{label}</div>
@@ -82,7 +97,7 @@ export function WorkoutScheduleEditor() {
                   onChange={(e) => updateDaySelection(key, e.target.value)}
                 >
                   <option value="rest">Rest day</option>
-                  {routines.map((routine) => (
+                  {options.map((routine) => (
                     <option key={routine.id} value={routine.id}>
                       {routine.name}
                     </option>

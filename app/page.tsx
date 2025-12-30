@@ -24,6 +24,7 @@ import { getRoutines } from "@/lib/routine-storage"
 import { getCurrentInProgressSession, saveCurrentSessionId } from "@/lib/autosave-workout-storage"
 import { Play, ChevronLeft, ChevronRight, Calendar, Check, Plus, X, Moon, Pencil } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
+import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import {
   getScheduledWorkoutForDate,
   setScheduledWorkout as persistScheduledWorkout,
@@ -79,6 +80,7 @@ export default function Home() {
     }>
   >([])
   const [isAddWorkoutOpen, setIsAddWorkoutOpen] = useState(false)
+  const [showAllPrs, setShowAllPrs] = useState(false)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [showDiscardSessionDialog, setShowDiscardSessionDialog] = useState(false)
@@ -118,6 +120,19 @@ export default function Home() {
   const loadDataForDate = (date: Date) => {
     const history = getWorkoutHistory()
     const allRoutines = getRoutines()
+    const routinePool = allRoutines.length > 0 ? allRoutines : GROWTH_V2_ROUTINES
+    const routineById = new Map(routinePool.map((routine) => [routine.id, routine]))
+    const growthById = new Map(GROWTH_V2_ROUTINES.map((routine) => [routine.id, routine]))
+    const resolveRoutine = (entry: { routineId: string; routineName: string } | null | undefined) => {
+      if (!entry) return null
+      return (
+        routineById.get(entry.routineId) ||
+        growthById.get(entry.routineId) ||
+        routinePool.find((routine) => routine.name === entry.routineName) ||
+        GROWTH_V2_ROUTINES.find((routine) => routine.name === entry.routineName) ||
+        null
+      )
+    }
 
     // Normalize date to midnight for comparison
     const targetDate = new Date(date)
@@ -142,19 +157,19 @@ export default function Home() {
       restDay = true
     } else if (manualSchedule !== undefined) {
       // Has manual schedule
-      scheduledRoutine = allRoutines.find((r) => r.id === manualSchedule.routineId) || null
+      scheduledRoutine = resolveRoutine(manualSchedule)
     } else {
       // No manual schedule - use rotation
-      scheduledRoutine = allRoutines[0]
-      if (history.length > 0) {
+      scheduledRoutine = routinePool[0] ?? null
+      if (history.length > 0 && routinePool.length > 0) {
         const workoutsBeforeDate = history.filter((w) => new Date(w.date) < date)
         const lastWorkout = workoutsBeforeDate[0]
 
         if (lastWorkout) {
-          const lastRoutineIndex = allRoutines.findIndex((r) => r.name === lastWorkout.name)
+          const lastRoutineIndex = routinePool.findIndex((r) => r.name === lastWorkout.name)
           if (lastRoutineIndex >= 0) {
-            const nextIndex = (lastRoutineIndex + 1) % allRoutines.length
-            scheduledRoutine = allRoutines[nextIndex]
+            const nextIndex = (lastRoutineIndex + 1) % routinePool.length
+            scheduledRoutine = routinePool[nextIndex]
           }
         }
       }
@@ -621,14 +636,14 @@ export default function Home() {
                   variant="outline"
                   size="sm"
                   className="h-7 px-3 text-xs"
-                  onClick={() => router.push("/prs")}
+                  onClick={() => setShowAllPrs((prev) => !prev)}
                 >
-                  More PRs
+                  {showAllPrs ? "Hide PRs" : "More PRs"}
                 </Button>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {todayPRs.slice(0, 4).map((pr) => (
+              {todayPRs.slice(0, showAllPrs ? todayPRs.length : 4).map((pr) => (
                 <Card
                   key={pr.name}
                   className="p-2 cursor-pointer hover:bg-accent/50 transition-colors"
