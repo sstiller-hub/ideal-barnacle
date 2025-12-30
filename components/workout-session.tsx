@@ -133,6 +133,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       if (seed && seed.length > 0) {
         return seed.map((exercise: any) => ({
           ...exercise,
+          restTime: exercise.restTime ?? extractRestSeconds(exercise.notes),
           sets: Array.isArray(exercise.sets)
             ? exercise.sets.map((set: any) => ({
                 ...set,
@@ -472,11 +473,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return
     }
     await completeSet(currentSetIndex, { startRest: false })
-    if (currentExercise.restTime > 0) {
+    const restSeconds = currentExercise.restTime ?? extractRestSeconds(currentExercise.notes)
+    if (restSeconds > 0) {
       await setRestStateAndPersist({
         exerciseIndex: currentExerciseIndex,
         setIndex: currentSetIndex,
-        remainingSeconds: currentExercise.restTime,
+        remainingSeconds: restSeconds,
       })
     }
   }
@@ -806,10 +808,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     await saveSession(updatedSession)
 
     if (shouldAutoRest && shouldStartRest) {
+      const restSeconds =
+        exercises[currentExerciseIndex]?.restTime ??
+        extractRestSeconds(exercises[currentExerciseIndex]?.notes)
       await setRestStateAndPersist({
         exerciseIndex: currentExerciseIndex,
         setIndex,
-        remainingSeconds: exercises[currentExerciseIndex]?.restTime ?? 0,
+        remainingSeconds: restSeconds,
       })
     }
   }

@@ -187,14 +187,26 @@ export function saveCurrentSessionId(sessionId: string | null): void {
 // Get current in-progress session
 export function getCurrentInProgressSession(): WorkoutSession | null {
   const currentId = loadCurrentSessionId()
-  if (!currentId) return null
-
-  const session = getSessionById(currentId)
-  if (session && (session.status === "in_progress" || session.status === "paused")) {
-    return session
+  if (currentId) {
+    const session = getSessionById(currentId)
+    if (session && (session.status === "in_progress" || session.status === "paused")) {
+      return session
+    }
   }
 
-  return null
+  const sessions = loadSessions().filter(
+    (session) => session.status === "in_progress" || session.status === "paused",
+  )
+  if (sessions.length === 0) return null
+
+  const mostRecent = sessions.reduce((latest, session) => {
+    const latestStart = latest?.startedAt ? new Date(latest.startedAt).getTime() : 0
+    const sessionStart = session.startedAt ? new Date(session.startedAt).getTime() : 0
+    return sessionStart > latestStart ? session : latest
+  }, sessions[0])
+
+  saveCurrentSessionId(mostRecent.id)
+  return mostRecent
 }
 
 // Clear completed sessions older than 30 days

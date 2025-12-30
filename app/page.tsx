@@ -466,7 +466,7 @@ export default function Home() {
                 <div className="flex-1">
                   <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Rest Day</div>
                   <div className="text-lg font-bold">Recovery Time</div>
-                  <div className="text-xs text-muted-foreground">No workout scheduled</div>
+                  <div className="text-xs text-muted-foreground">Rest day</div>
                 </div>
               </div>
               <Dialog open={isAddWorkoutOpen} onOpenChange={setIsAddWorkoutOpen}>
@@ -583,7 +583,7 @@ export default function Home() {
           ) : (
             <Card className="p-4 bg-muted/30 border-dashed border-2 border-muted">
               <div className="text-center py-4">
-                <div className="text-muted-foreground mb-4">No workout scheduled</div>
+                <div className="text-muted-foreground mb-4">Rest day</div>
                 <Dialog open={isAddWorkoutOpen} onOpenChange={setIsAddWorkoutOpen}>
                   <DialogTrigger asChild>
                     <Button>
