@@ -3,7 +3,7 @@ import type { PersonalRecord } from "./pr-types"
 import type { WorkoutRoutine } from "./routine-storage"
 import { getRoutines } from "./routine-storage"
 import { getScheduledWorkoutForDate } from "./schedule-storage"
-import { GROWTH_V2_WEEKLY } from "./growth-v2-plan"
+import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "./growth-v2-plan"
 
 function createSet(weight: number, reps: number, completed = true): WorkoutSet {
   return { weight, reps, completed }
@@ -45,20 +45,28 @@ function hashToWeight(name: string, type: string): number {
 }
 
 function getScheduledRoutine(date: Date, routines: WorkoutRoutine[]): WorkoutRoutine | null {
+  const routineById = new Map(routines.map((routine) => [routine.id, routine]))
+  const growthById = new Map(GROWTH_V2_ROUTINES.map((routine) => [routine.id, routine]))
+  const resolveRoutine = (entry: { routineId: string; routineName: string } | null | undefined) => {
+    if (!entry) return null
+    return (
+      routineById.get(entry.routineId) ||
+      growthById.get(entry.routineId) ||
+      routines.find((routine) => routine.name === entry.routineName) ||
+      GROWTH_V2_ROUTINES.find((routine) => routine.name === entry.routineName) ||
+      null
+    )
+  }
+
   const manualSchedule = getScheduledWorkoutForDate(date)
   if (manualSchedule === null) {
     return null
   }
   if (manualSchedule) {
-    const routine = routines.find((item) => item.id === manualSchedule.routineId) || null
-    return routine
+    return resolveRoutine(manualSchedule)
   }
   const fallback = GROWTH_V2_WEEKLY[date.getDay()] ?? null
-  if (!fallback) {
-    return null
-  }
-  const routine = routines.find((item) => item.id === fallback.routineId) || null
-  return routine
+  return resolveRoutine(fallback)
 }
 
 function slugify(value: string): string {
@@ -78,6 +86,7 @@ export function seedDemoData() {
 
   const workouts: CompletedWorkout[] = []
   const routines = getRoutines()
+  const routinesFallback = routines.length > 0 ? routines : GROWTH_V2_ROUTINES
   const exerciseOccurrences = new Map<string, number>()
 
   const start = new Date()
@@ -86,7 +95,7 @@ export function seedDemoData() {
   for (let offset = 13; offset >= 0; offset -= 1) {
     const date = new Date(start)
     date.setDate(start.getDate() - offset)
-    const routine = getScheduledRoutine(date, routines)
+    const routine = getScheduledRoutine(date, routinesFallback)
     if (!routine) continue
 
     const exercises: Exercise[] = routine.exercises.map((exercise) => {

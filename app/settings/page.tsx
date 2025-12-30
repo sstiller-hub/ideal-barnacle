@@ -21,6 +21,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { Upload, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import { signInWithEmail } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
+import { useTheme } from "next-themes"
 import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
 import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
@@ -62,6 +63,7 @@ export default function SettingsPage() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const hasGoogleDriveConfig = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
@@ -252,6 +254,39 @@ export default function SettingsPage() {
         ) : (
           <SignInCard email={email} setEmail={setEmail} />
         )}
+
+        <Card className="p-4">
+          <h2 className="font-bold text-base mb-2">Appearance</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Choose a light, dark, or system theme.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={theme === "light" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setTheme("light")}
+            >
+              Light
+            </Button>
+            <Button
+              type="button"
+              variant={theme === "dark" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setTheme("dark")}
+            >
+              Dark
+            </Button>
+            <Button
+              type="button"
+              variant={theme === "system" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setTheme("system")}
+            >
+              System
+            </Button>
+          </div>
+        </Card>
 
         <Card className="p-4 border-blue-500">
           <h2 className="font-bold text-base mb-2">Cloud Sync</h2>

@@ -6,6 +6,7 @@ import "./globals.css"
 import UpdateAvailableBanner from "@/components/update-available"
 import SonnerProvider from "@/components/sonner-provider"
 import MobilePreviewWrapper from "@/components/mobile-preview-wrapper"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -58,18 +59,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className={`font-sans antialiased`}>
-        <Suspense fallback={children}>
-          <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
-        </Suspense>
-        <SonnerProvider />
-        <UpdateAvailableBanner />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <Suspense fallback={children}>
+            <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
+          </Suspense>
+          <SonnerProvider />
+          <UpdateAvailableBanner />
+        </ThemeProvider>
       </body>
     </html>
   )
