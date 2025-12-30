@@ -217,6 +217,7 @@ export default function Home() {
       .filter(Boolean)
 
     setTodayPRs(filteredPRs as any[])
+    setShowAllPrs(false)
 
   }
 
