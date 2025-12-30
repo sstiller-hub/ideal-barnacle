@@ -613,7 +613,7 @@ export default function Home() {
         </section>
 
         {todayPRs.length > 0 && (
-          <section className="rounded-2xl bg-muted/30 p-4">
+          <section className="rounded-2xl bg-muted/30 p-3">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase">Personal Records</h2>
               {todayPRs.length > 4 && (
@@ -627,18 +627,18 @@ export default function Home() {
                 </Button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {todayPRs.slice(0, 4).map((pr) => (
                 <Card
                   key={pr.name}
-                  className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                  className="p-2 cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => pr.workoutId && router.push(`/history/${pr.workoutId}`)}
                 >
-                  <div className="text-xs text-muted-foreground mb-1 leading-snug">{pr.name}</div>
-                  <div className="text-xl font-bold">{pr.weight > 0 ? `${pr.weight} × ${pr.reps}` : "—"}</div>
-                  <div className="text-xs text-muted-foreground">lbs</div>
+                  <div className="text-[11px] text-muted-foreground mb-1 leading-snug">{pr.name}</div>
+                  <div className="text-lg font-bold">{pr.weight > 0 ? `${pr.weight} × ${pr.reps}` : "—"}</div>
+                  <div className="text-[11px] text-muted-foreground">lbs</div>
                   {pr.achievedAt && (
-                    <div className="text-xs text-muted-foreground mt-1 leading-snug">
+                    <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
                       {getRelativeDate(pr.achievedAt)}
                       {pr.workoutName && ` · ${pr.workoutName}`}
                     </div>
