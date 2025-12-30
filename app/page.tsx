@@ -205,32 +205,44 @@ export default function Home() {
       .filter(Boolean)
 
     setTodayPRs(filteredPRs as any[])
+    calculateStreak()
   }
 
   const calculateStreak = () => {
     const history = getWorkoutHistory()
-    let currentStreak = 0
-    let lastWorkoutDate: string | null = null
+    if (history.length === 0) {
+      setStreak(0)
+      setLastWorkoutMessage("No workouts yet")
+      return
+    }
 
-    for (let i = history.length - 1; i >= 0; i--) {
-      const workoutDate = new Date(history[i].date)
-      const now = new Date()
-      const diffTime = now.getTime() - workoutDate.getTime()
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    const sorted = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const normalize = (value: Date) => {
+      const x = new Date(value)
+      x.setHours(0, 0, 0, 0)
+      return x
+    }
+
+    let currentStreak = 0
+    let cursor = normalize(new Date())
+
+    for (let i = 0; i < sorted.length; i++) {
+      const workoutDate = normalize(new Date(sorted[i].date))
+      const diffDays = Math.floor((cursor.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24))
 
       if (diffDays === 0) {
-        currentStreak++
-        lastWorkoutDate = history[i].date
-        break
+        currentStreak += 1
+        cursor.setDate(cursor.getDate() - 1)
       } else if (diffDays === 1) {
-        currentStreak++
+        currentStreak += 1
+        cursor.setDate(cursor.getDate() - 2)
       } else {
         break
       }
     }
 
     setStreak(currentStreak)
-    setLastWorkoutMessage(lastWorkoutDate ? `on ${getRelativeDate(lastWorkoutDate)}` : "No workouts yet")
+    setLastWorkoutMessage(`on ${getRelativeDate(sorted[0].date)}`)
   }
 
   const handleAddWorkout = (routine: any) => {
