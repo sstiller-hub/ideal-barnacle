@@ -20,6 +20,7 @@ export type RoutineExercise = {
 }
 
 import { REAL_WORKOUTS } from "@/lib/real-routines"
+import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 
 const ROUTINES_KEY = "workout_routines_v2"
 
@@ -52,4 +53,9 @@ export function deleteRoutine(id: string): void {
 
 export function getRoutineById(id: string): WorkoutRoutine | null {
   return getRoutines().find((r) => r.id === id) || null
+}
+
+export function resetRoutinesToGrowthV2(): void {
+  if (typeof window === "undefined") return
+  localStorage.setItem(ROUTINES_KEY, JSON.stringify(GROWTH_V2_ROUTINES))
 }

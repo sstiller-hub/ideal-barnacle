@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { getWorkoutHistory } from "@/lib/workout-storage"
+import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
 import { seedDemoData } from "@/lib/seed-demo-data"
 import { importWorkouts, type ImportResult } from "@/lib/import-workouts"
@@ -20,6 +21,9 @@ import { BottomNav } from "@/components/bottom-nav"
 import { Upload, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import { signInWithEmail } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
+import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
+import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
+import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
 
 function SignInCard({
   email,
@@ -163,6 +167,17 @@ export default function SettingsPage() {
       window.location.href = window.location.origin
     }, 100)
   }
+
+  function onResetGrowthV2() {
+    const ok = window.confirm("Reset to Growth v2? This will wipe old routines and schedule.")
+    if (!ok) return
+    clearInProgressWorkout()
+    resetRoutinesToGrowthV2()
+    resetScheduleToGrowthV2FixedDays(365)
+    window.location.href = "/"
+    // if you have a toast util, call it here
+  }
+
 
   const handleBackupToGoogleDrive = async () => {
     setBackupStatus("Connecting to Google Drive...")
@@ -417,13 +432,27 @@ export default function SettingsPage() {
         <Card className="p-4 border-orange-500">
           <h2 className="font-bold text-base mb-2">Demo Data</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Load realistic demo data with 8 weeks of workout history and progression tracking. Perfect for testing and
+            Load realistic demo data with 14 days of workout history and progressive overload. Perfect for testing and
             demonstrations.
           </p>
           <Button onClick={handleSeedDemoData} className="w-full" variant="default">
             Load Demo Data
           </Button>
           <p className="text-xs text-muted-foreground mt-2">Includes 10 workouts with progressive overload and PRs</p>
+        </Card>
+
+        <Card className="p-4 border-orange-500">
+          <WorkoutScheduleEditor />
+        </Card>
+
+        <Card className="p-4 border-red-500">
+          <h2 className="font-bold text-base mb-2">Reset Program</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Replace all routines and schedule with the Growth v2 program.
+          </p>
+          <Button onClick={onResetGrowthV2} className="w-full" variant="destructive">
+            Reset to Growth v2 (Wipes old routines)
+          </Button>
         </Card>
 
         <Card className="p-4">

@@ -110,6 +110,14 @@ export default function Home() {
     loadDataForDate(selectedDate)
   }, [selectedDate])
 
+  useEffect(() => {
+    const handleScheduleUpdated = () => {
+      loadDataForDate(selectedDate)
+    }
+    window.addEventListener("schedule:updated", handleScheduleUpdated)
+    return () => window.removeEventListener("schedule:updated", handleScheduleUpdated)
+  }, [selectedDate])
+
   const loadDataForDate = (date: Date) => {
     const history = getWorkoutHistory()
     const allRoutines = getRoutines()
@@ -534,14 +542,26 @@ export default function Home() {
                       {scheduledWorkout.exercises?.length || 0} exercises
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground"
-                    onClick={handleRemoveWorkout}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={() => router.push("/schedule")}
+                      aria-label="Edit schedule"
+                      title="Edit schedule"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={handleRemoveWorkout}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => handleStartWorkout(scheduledWorkout.id)} className="flex-1" size="lg">

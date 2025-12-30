@@ -212,3 +212,10 @@ export function cleanupOldSessions(): void {
 
   saveSessions(filtered)
 }
+
+export function clearInProgressWorkout(): void {
+  if (typeof window === "undefined") return
+  localStorage.removeItem(SESSIONS_KEY)
+  localStorage.removeItem(SETS_KEY)
+  localStorage.removeItem(CURRENT_SESSION_KEY)
+}
