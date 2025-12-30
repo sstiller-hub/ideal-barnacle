@@ -316,7 +316,11 @@ export default function ExerciseCard({
                           onUpdateSet(idx, "weight", val === "" ? null : parsed)
                         }
                       }}
-                      onFocus={() => set.id && onSetFieldFocus?.(set.id, "weight")}
+                      onFocus={(e) => {
+                        e.currentTarget.select()
+                        if (set.id) onSetFieldFocus?.(set.id, "weight")
+                      }}
+                      onClick={(e) => e.currentTarget.select()}
                       onBlur={() => set.id && onSetFieldBlur?.(set.id, "weight")}
                       aria-invalid={showMissingForSet[idx] && isMissingWeight(set.weight)}
                       disabled={set.completed || !editable}
@@ -361,7 +365,11 @@ export default function ExerciseCard({
                           setRepCapErrors((prev) => ({ ...prev, [idx]: false }))
                         }
                       }}
-                      onFocus={() => set.id && onSetFieldFocus?.(set.id, "reps")}
+                      onFocus={(e) => {
+                        e.currentTarget.select()
+                        if (set.id) onSetFieldFocus?.(set.id, "reps")
+                      }}
+                      onClick={(e) => e.currentTarget.select()}
                       onBlur={() => set.id && onSetFieldBlur?.(set.id, "reps")}
                       aria-invalid={(showMissingForSet[idx] && isMissingReps(set.reps)) || repCapErrors[idx]}
                       disabled={set.completed || !editable}

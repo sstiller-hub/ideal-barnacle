@@ -471,7 +471,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       setValidationTrigger(Date.now())
       return
     }
-    await completeSet(currentSetIndex)
+    await completeSet(currentSetIndex, { startRest: false })
     if (currentExercise.restTime > 0) {
       await setRestStateAndPersist({
         exerciseIndex: currentExerciseIndex,
@@ -714,8 +714,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     await saveSession(updatedSession)
   }
 
-  const completeSet = async (setIndex: number) => {
+  const completeSet = async (
+    setIndex: number,
+    options?: {
+      startRest?: boolean
+    }
+  ) => {
     if (!session) return
+    const shouldAutoRest = options?.startRest ?? true
+    let shouldStartRest = false
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
       if (exerciseIdx !== currentExerciseIndex) {
         return exercise
@@ -739,6 +746,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           targetReps: exercise.targetReps,
           historyReps,
         })
+
+        if (
+          shouldAutoRest &&
+          isCompleted &&
+          exerciseIdx === currentExerciseIndex &&
+          idx === currentSetIndex &&
+          exercise.restTime > 0
+        ) {
+          shouldStartRest = true
+        }
 
         const updatedSet = {
           ...set,
@@ -787,6 +804,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+
+    if (shouldAutoRest && shouldStartRest) {
+      await setRestStateAndPersist({
+        exerciseIndex: currentExerciseIndex,
+        setIndex,
+        remainingSeconds: exercises[currentExerciseIndex]?.restTime ?? 0,
+      })
+    }
   }
 
   const addSetToExercise = async (exerciseIndex = currentExerciseIndex) => {
