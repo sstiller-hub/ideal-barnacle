@@ -83,14 +83,12 @@ export default function Home() {
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [showDiscardSessionDialog, setShowDiscardSessionDialog] = useState(false)
   const [routines, setRoutines] = useState<any[]>([])
-  const [streak, setStreak] = useState<number>(0)
   const [lastWorkoutMessage, setLastWorkoutMessage] = useState<string>("")
   const [showCalendar, setShowCalendar] = useState(false)
   const [session, setSession] = useState<any | null>(null)
 
   useEffect(() => {
     setRoutines(getRoutines())
-    calculateStreak()
     const currentSession = getCurrentInProgressSession()
     if (currentSession?.startedAt) {
       const started = new Date(currentSession.startedAt)
@@ -205,44 +203,13 @@ export default function Home() {
       .filter(Boolean)
 
     setTodayPRs(filteredPRs as any[])
-    calculateStreak()
-  }
 
-  const calculateStreak = () => {
-    const history = getWorkoutHistory()
     if (history.length === 0) {
-      setStreak(0)
       setLastWorkoutMessage("No workouts yet")
-      return
+    } else {
+      const latest = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+      setLastWorkoutMessage(`on ${getRelativeDate(latest.date)}`)
     }
-
-    const sorted = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    const normalize = (value: Date) => {
-      const x = new Date(value)
-      x.setHours(0, 0, 0, 0)
-      return x
-    }
-
-    let currentStreak = 0
-    let cursor = normalize(new Date())
-
-    for (let i = 0; i < sorted.length; i++) {
-      const workoutDate = normalize(new Date(sorted[i].date))
-      const diffDays = Math.floor((cursor.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24))
-
-      if (diffDays === 0) {
-        currentStreak += 1
-        cursor.setDate(cursor.getDate() - 1)
-      } else if (diffDays === 1) {
-        currentStreak += 1
-        cursor.setDate(cursor.getDate() - 2)
-      } else {
-        break
-      }
-    }
-
-    setStreak(currentStreak)
-    setLastWorkoutMessage(`on ${getRelativeDate(sorted[0].date)}`)
   }
 
   const handleAddWorkout = (routine: any) => {
@@ -418,16 +385,8 @@ export default function Home() {
         <section>
           <div className="mb-6">
             <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-muted-foreground">Current Streak</div>
-                  <div className="text-3xl font-bold">{streak} days</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Last Workout</div>
-                  <div className="text-lg font-semibold">{lastWorkoutMessage}</div>
-                </div>
-              </div>
+              <div className="text-sm text-muted-foreground">Last Workout</div>
+              <div className="text-lg font-semibold">{lastWorkoutMessage}</div>
             </Card>
           </div>
 
@@ -678,14 +637,11 @@ export default function Home() {
                   className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => pr.workoutId && router.push(`/history/${pr.workoutId}`)}
                 >
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    <span>{getExerciseIcon(pr.name)}</span>
-                    <span className="truncate">{pr.name}</span>
-                  </div>
+                  <div className="text-xs text-muted-foreground mb-1 leading-snug">{pr.name}</div>
                   <div className="text-xl font-bold">{pr.weight > 0 ? `${pr.weight} × ${pr.reps}` : "—"}</div>
                   <div className="text-xs text-muted-foreground">lbs</div>
                   {pr.achievedAt && (
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
+                    <div className="text-xs text-muted-foreground mt-1 leading-snug">
                       {getRelativeDate(pr.achievedAt)}
                       {pr.workoutName && ` · ${pr.workoutName}`}
                     </div>
