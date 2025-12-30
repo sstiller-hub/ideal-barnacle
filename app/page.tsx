@@ -83,7 +83,6 @@ export default function Home() {
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [showDiscardSessionDialog, setShowDiscardSessionDialog] = useState(false)
   const [routines, setRoutines] = useState<any[]>([])
-  const [lastWorkoutMessage, setLastWorkoutMessage] = useState<string>("")
   const [showCalendar, setShowCalendar] = useState(false)
   const [session, setSession] = useState<any | null>(null)
 
@@ -204,12 +203,6 @@ export default function Home() {
 
     setTodayPRs(filteredPRs as any[])
 
-    if (history.length === 0) {
-      setLastWorkoutMessage("No workouts yet")
-    } else {
-      const latest = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-      setLastWorkoutMessage(`on ${getRelativeDate(latest.date)}`)
-    }
   }
 
   const handleAddWorkout = (routine: any) => {
@@ -381,15 +374,7 @@ export default function Home() {
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Workout Status Card */}
         <section>
-          <div className="mb-6">
-            <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Last Workout</div>
-              <div className="text-lg font-semibold">{lastWorkoutMessage}</div>
-            </Card>
-          </div>
-
           {session && session.routineId && (
             <Card className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
               <CardContent className="p-6">
@@ -628,10 +613,22 @@ export default function Home() {
         </section>
 
         {todayPRs.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Personal Records</h2>
+          <section className="rounded-2xl bg-muted/30 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase">Personal Records</h2>
+              {todayPRs.length > 4 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => router.push("/prs")}
+                >
+                  More PRs
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              {todayPRs.map((pr) => (
+              {todayPRs.slice(0, 4).map((pr) => (
                 <Card
                   key={pr.name}
                   className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
