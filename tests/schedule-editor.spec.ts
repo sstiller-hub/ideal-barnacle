@@ -17,12 +17,14 @@ const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 test("schedule editor saves and Home reflects rest day", async ({ page }) => {
   await page.addInitScript((routineSeed) => {
+    if (localStorage.getItem("__schedule_seeded") === "true") return
     localStorage.setItem("workout_routines_v2", JSON.stringify([routineSeed]))
     localStorage.removeItem("workout_schedule")
     localStorage.removeItem("workout_history")
     localStorage.removeItem("workoutSessions")
     localStorage.removeItem("workoutSets")
     localStorage.removeItem("currentSessionId")
+    localStorage.setItem("__schedule_seeded", "true")
   }, routine)
 
   await page.goto("/schedule")
@@ -53,13 +55,16 @@ test("schedule editor saves and Home reflects rest day", async ({ page }) => {
   expect(restStored).toBeTruthy()
 
   await page.goto("/")
-  await expect(page.getByText("Rest day")).toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event("schedule:updated")))
+  await expect(page.getByText(/Rest day/i).first()).toBeVisible()
 })
 
 test("scheduled workout shows on Home when set", async ({ page }) => {
   await page.addInitScript((routineSeed) => {
+    if (localStorage.getItem("__schedule_seeded") === "true") return
     localStorage.setItem("workout_routines_v2", JSON.stringify([routineSeed]))
     localStorage.removeItem("workout_schedule")
+    localStorage.setItem("__schedule_seeded", "true")
   }, routine)
 
   await page.goto("/schedule")

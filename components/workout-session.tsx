@@ -14,6 +14,8 @@ import {
   isIncomplete,
   isSetEligibleForStats,
   isSetIncomplete,
+  REP_MAX,
+  REP_MIN,
 } from "@/lib/set-validation"
 import { getOrCreateActiveSession, upsertSet } from "@/lib/supabase-session-sync"
 import { supabase } from "@/lib/supabase"
@@ -63,6 +65,64 @@ function extractRestSeconds(notes?: string): number {
   return 90
 }
 
+function normalizeExerciseName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
+function getRecentPerformanceSnapshots(
+  exerciseName: string,
+  history: any[],
+  count = 3,
+): Array<{ reps: number; weight: number }> {
+  const normalizedName = normalizeExerciseName(exerciseName)
+  const snapshots: Array<{ reps: number; weight: number }> = []
+
+  for (const workout of history) {
+    const exercise = workout.exercises?.find(
+      (ex: any) => normalizeExerciseName(ex.name) === normalizedName,
+    )
+    if (!exercise?.sets) continue
+    const validSets = exercise.sets.filter((set: any) => isSetEligibleForStats(set))
+    if (validSets.length === 0) continue
+    const firstSet = validSets[0]
+    if (typeof firstSet.reps !== "number" || typeof firstSet.weight !== "number") continue
+    snapshots.push({ reps: firstSet.reps, weight: firstSet.weight })
+    if (snapshots.length >= count) break
+  }
+
+  return snapshots
+}
+
+function applyProgressiveOverload(
+  snapshots: Array<{ reps: number; weight: number }>,
+): { reps: number | null; weight: number | null; mode: "reps" | "weight" | null } {
+  const latest = snapshots[0]
+  if (!latest) return { reps: null, weight: null, mode: null }
+  if (snapshots.length < 3) {
+    return { reps: latest.reps, weight: latest.weight, mode: null }
+  }
+
+  const chronological = [...snapshots].reverse()
+  const weightSteps = chronological.slice(1).map((set, idx) => set.weight - chronological[idx].weight)
+  const repSteps = chronological.slice(1).map((set, idx) => set.reps - chronological[idx].reps)
+  const repsStable = chronological.every((set) => set.reps === chronological[0].reps)
+  const weightStable = chronological.every((set) => Math.abs(set.weight - chronological[0].weight) <= 0.5)
+
+  const weightPattern = repsStable && weightSteps.every((step) => Math.abs(step - 5) <= 0.5)
+  const repsPattern = weightStable && repSteps.every((step) => step === 1)
+
+  if (weightPattern) {
+    return { reps: latest.reps, weight: Math.max(0, latest.weight + 5), mode: "weight" }
+  }
+
+  if (repsPattern) {
+    const nextReps = Math.min(REP_MAX, Math.max(REP_MIN, latest.reps + 1))
+    return { reps: nextReps, weight: latest.weight, mode: "reps" }
+  }
+
+  return { reps: latest.reps, weight: latest.weight, mode: null }
+}
+
 export default function WorkoutSessionComponent({ routine }: { routine: WorkoutRoutine }) {
   const router = useRouter()
   const [session, setSession] = useState<WorkoutSession | null>(null)
@@ -92,6 +152,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const editingSetIdRef = useRef<string | null>(null)
   const editingFieldRef = useRef<"reps" | "weight" | null>(null)
   const [pendingRemoteUpdates, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
+  const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = localStorage.getItem("progressive_autofill_enabled")
+    if (stored === null) return
+    setProgressiveAutofillEnabled(stored === "true")
+  }, [])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -192,11 +260,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 .filter((reps: any) => typeof reps === "number")
             )
         )
-        const defaults = getDefaultSetValues({
+        const baseDefaults = getDefaultSetValues({
           sets: [],
           targetReps,
           targetWeight: exercise.targetWeight,
         })
+        const progressiveDefaults =
+          progressiveAutofillEnabled && !isWarmup
+            ? applyProgressiveOverload(getRecentPerformanceSnapshots(exercise.name, normalizedHistory, 3))
+            : { reps: null, weight: null, mode: null }
+        const defaults = {
+          reps: progressiveDefaults.reps ?? baseDefaults.reps,
+          weight: progressiveDefaults.weight ?? baseDefaults.weight,
+        }
 
         const warmupDefaults = (() => {
           const lastWorkout = normalizedHistory.find((workout) =>

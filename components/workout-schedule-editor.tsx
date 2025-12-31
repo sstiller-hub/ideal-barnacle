@@ -89,10 +89,10 @@ export function WorkoutScheduleEditor() {
                 : baseOptions
 
             return (
-              <div key={key} className="flex items-center justify-between gap-3">
+              <div key={key} className="flex items-center justify-between gap-3 min-w-0">
                 <div className="text-sm font-medium w-24">{label}</div>
                 <select
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex-1 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={entry ? entry.routineId : "rest"}
                   onChange={(e) => updateDaySelection(key, e.target.value)}
                 >

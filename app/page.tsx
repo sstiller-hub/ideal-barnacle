@@ -366,6 +366,7 @@ export default function Home() {
           </div>
 
           <div className="flex-1 text-center min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Kova Fit</div>
             <h1 className="text-2xl font-bold leading-tight">{formatDateHeader()}</h1>
             <p className="text-sm text-muted-foreground">
               {selectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
@@ -470,7 +471,7 @@ export default function Home() {
                 Review Workout
               </Button>
             </Card>
-          ) : isRestDay ? (
+          ) : !session && isRestDay ? (
             <Card className="p-4 bg-muted/30 border-muted">
               <div className="flex items-start gap-3 mb-3">
                 <div className="mt-1 text-muted-foreground">
@@ -593,7 +594,7 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
-          ) : (
+          ) : !session ? (
             <Card className="p-4 bg-muted/30 border-dashed border-2 border-muted">
               <div className="text-center py-4">
                 <div className="text-muted-foreground mb-4">Rest day</div>
@@ -638,7 +639,7 @@ export default function Home() {
                 </Dialog>
               </div>
             </Card>
-          )}
+          ) : null}
         </section>
 
         {todayPRs.length > 0 && (
@@ -677,6 +678,7 @@ export default function Home() {
             </div>
           </section>
         )}
+
       </div>
 
       {/* Conflict Resolution Dialog */}
