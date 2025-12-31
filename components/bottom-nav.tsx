@@ -13,6 +13,7 @@ function BottomNav({ fixed = true }: BottomNavProps) {
   const router = useRouter()
   const [isMinimized, setIsMinimized] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [hoverHref, setHoverHref] = useState<string | null>(null)
   const lastScrollY = useRef(0)
   const navRef = useRef<HTMLDivElement>(null)
 
@@ -23,6 +24,13 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     { href: "/prs", icon: Trophy, label: "PRs" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ]
+  const iconOffsetByHref: Record<string, string> = {
+    "/": "translate-x-[6px]",
+    "/workout": "translate-x-[4px]",
+    "/history": "translate-x-[0px]",
+    "/prs": "translate-x-[-4px]",
+    "/settings": "translate-x-[-7px]",
+  }
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/"
@@ -51,14 +59,28 @@ function BottomNav({ fixed = true }: BottomNavProps) {
 
   useEffect(() => {
     if (!isExpanded) return
-    const onPointerUp = () => setIsExpanded(false)
+    const onPointerMove = (event: PointerEvent) => {
+      const target = document.elementFromPoint(event.clientX, event.clientY)
+      const button = target?.closest<HTMLButtonElement>("[data-nav-item]")
+      const href = button?.dataset.href ?? null
+      setHoverHref(href)
+    }
+    const onPointerUp = () => {
+      if (hoverHref && !isActive(hoverHref)) {
+        router.push(hoverHref)
+      }
+      setHoverHref(null)
+      setIsExpanded(false)
+    }
+    window.addEventListener("pointermove", onPointerMove)
     window.addEventListener("pointerup", onPointerUp)
     window.addEventListener("pointercancel", onPointerUp)
     return () => {
+      window.removeEventListener("pointermove", onPointerMove)
       window.removeEventListener("pointerup", onPointerUp)
       window.removeEventListener("pointercancel", onPointerUp)
     }
-  }, [isExpanded])
+  }, [isExpanded, hoverHref, router])
 
   const isCollapsed = !isExpanded
 
@@ -77,26 +99,31 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     >
       <div
         ref={navRef}
-        className={`flex items-center ${
+        className={`inline-flex items-center gap-1 ml-0 mr-auto ${
           fixed
             ? "pointer-events-auto rounded-full border border-border/50 bg-background/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(0,0,0,0.22),_0_2px_10px_rgba(0,0,0,0.16),_inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-300"
             : "bg-card border-t border-border"
         } ${isMinimized ? "py-1" : "py-2.5"} ${
           isCollapsed
-            ? "w-14 h-14 px-0 justify-center ml-0 mr-auto"
-            : "w-full max-w-2xl px-4 justify-around mx-auto"
+            ? "w-14 h-14 px-0 justify-center"
+            : "w-fit px-2 justify-start"
         }`}
       >
         {navItems.map(({ href, icon: Icon, label }) => {
           const active = isActive(href)
           const showLabel = isExpanded || (!isCollapsed && active)
           const showItem = active || isExpanded
+          const isHover = hoverHref === href
+          const iconOffset = iconOffsetByHref[href] ?? "translate-x-[6px]"
           return (
             <button
               key={href}
+              data-nav-item
+              data-href={href}
               onPointerDown={() => {
                 if (active) {
                   setIsExpanded(true)
+                  setHoverHref(href)
                 }
               }}
               onClick={() => {
@@ -104,25 +131,36 @@ function BottomNav({ fixed = true }: BottomNavProps) {
                 setIsExpanded(false)
                 router.push(href)
               }}
-              className={`flex flex-col items-center ${showLabel ? "gap-1" : "gap-0"} ${
-                isCollapsed ? "h-12 w-12 p-0 justify-center" : "px-3"
-              } ${isCollapsed ? "" : isMinimized ? "py-1" : "py-2"} rounded-lg transition-all duration-300 ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              className={`flex ${isCollapsed ? "items-center justify-center" : "flex-col items-center"} ${
+                showLabel ? "gap-1" : "gap-0"
+              } ${isCollapsed ? "h-12 w-12 p-0" : "px-3"} ${
+                isCollapsed ? "" : isMinimized ? "py-1" : "py-2"
+              } rounded-lg transition-all duration-300 focus-visible:outline-none focus-visible:ring-0 ${
+                active || isHover
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               } ${
                 showItem
                   ? "max-w-[84px] opacity-100 translate-x-0"
                   : "max-w-0 opacity-0 -translate-x-2 pointer-events-none"
               }`}
             >
-              <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
-              <span
-                className={`text-[10px] leading-none transition-all duration-300 ${
-                  showLabel ? "max-h-4 opacity-100 translate-y-0" : "max-h-0 opacity-0 translate-y-1"
-                } ${active ? "font-semibold" : ""}`}
-                aria-hidden={!showLabel}
-              >
-                {label}
+              <span className={isCollapsed ? "flex h-12 w-12 items-center justify-center" : ""}>
+                <Icon
+                  className={`w-5 h-5 block ${active ? "stroke-[2.5]" : ""} ${
+                    isCollapsed ? iconOffset : ""
+                  }`}
+                />
               </span>
+              {showLabel && (
+                <span
+                  className={`text-[10px] leading-none transition-all duration-300 ${
+                    isExpanded ? "opacity-100 translate-y-0" : "opacity-100 translate-y-0"
+                  } ${active ? "font-semibold" : ""}`}
+                >
+                  {label}
+                </span>
+              )}
             </button>
           )
         })}
