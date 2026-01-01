@@ -16,6 +16,7 @@ function BottomNav({ fixed = true }: BottomNavProps) {
   const [hoverHref, setHoverHref] = useState<string | null>(null)
   const lastScrollY = useRef(0)
   const navRef = useRef<HTMLDivElement>(null)
+  const lastTapRef = useRef(0)
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
@@ -99,14 +100,20 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     >
       <div
         ref={navRef}
+        data-nav-root
+        data-expanded={isExpanded ? "true" : "false"}
+        data-collapsed={isCollapsed ? "true" : "false"}
+        data-minimized={isMinimized ? "true" : "false"}
         className={`inline-flex items-center gap-1 ml-0 mr-auto ${
           fixed
-            ? "pointer-events-auto rounded-full border border-border/50 bg-background/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(0,0,0,0.22),_0_2px_10px_rgba(0,0,0,0.16),_inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-300"
+            ? "pointer-events-auto rounded-full border border-border/50 bg-background/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(0,0,0,0.22),_0_2px_10px_rgba(0,0,0,0.16),_inset_0_1px_0_rgba(255,255,255,0.12)] transition-[width,transform,opacity,box-shadow,backdrop-filter]"
             : "bg-card border-t border-border"
-        } ${isMinimized ? "py-1" : "py-2.5"} ${
+        } ${isCollapsed ? "duration-700 ease-[cubic-bezier(0.6,0,0.4,1)]" : "duration-700 ease-[cubic-bezier(0.2,0.9,0.2,1)]"} ${
+          isMinimized ? "py-1" : "py-2.5"
+        } ${
           isCollapsed
-            ? "w-14 h-14 px-0 justify-center"
-            : "w-fit px-2 justify-start"
+            ? "w-14 h-14 px-0 justify-center scale-[0.96] opacity-95"
+            : "w-fit px-2 justify-start scale-100 opacity-100"
         }`}
       >
         {navItems.map(({ href, icon: Icon, label }) => {
@@ -120,14 +127,36 @@ function BottomNav({ fixed = true }: BottomNavProps) {
               key={href}
               data-nav-item
               data-href={href}
-              onPointerDown={() => {
+              data-hovered={isHover ? "true" : "false"}
+              onPointerEnter={() => {
+                if (isExpanded) setHoverHref(href)
+              }}
+              onPointerLeave={() => {
+                if (isExpanded) setHoverHref(null)
+              }}
+              onPointerDown={(event) => {
                 if (active) {
+                  event.preventDefault()
+                  event.currentTarget.setPointerCapture?.(event.pointerId)
                   setIsExpanded(true)
                   setHoverHref(href)
                 }
               }}
               onClick={() => {
-                if (active) return
+                if (active) {
+                  const now = Date.now()
+                  if (now - lastTapRef.current < 300) {
+                    setIsExpanded((prev) => {
+                      const next = !prev
+                      setHoverHref(next ? href : null)
+                      return next
+                    })
+                    lastTapRef.current = 0
+                    return
+                  }
+                  lastTapRef.current = now
+                  return
+                }
                 setIsExpanded(false)
                 router.push(href)
               }}

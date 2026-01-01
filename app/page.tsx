@@ -30,6 +30,7 @@ import {
 import { Play, ChevronLeft, ChevronRight, Calendar, Check, Plus, X, Moon, Pencil } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
+import { formatExerciseName } from "@/lib/format-exercise-name"
 import {
   getScheduledWorkoutForDate,
   setScheduledWorkout as persistScheduledWorkout,
@@ -92,6 +93,7 @@ export default function Home() {
   const [routines, setRoutines] = useState<any[]>([])
   const [showCalendar, setShowCalendar] = useState(false)
   const [session, setSession] = useState<any | null>(null)
+  const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
 
   useEffect(() => {
     setRoutines(getRoutines())
@@ -199,7 +201,7 @@ export default function Home() {
       workout.exercises.forEach((exercise) => {
         const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0)
         completedSets.forEach((set: any) => {
-          const key = exercise.name.toLowerCase()
+          const key = normalizeExerciseName(exercise.name)
           const existing = prByExerciseName.get(key)
           if (!existing || set.weight > existing.weight) {
             prByExerciseName.set(key, {
@@ -215,8 +217,10 @@ export default function Home() {
       })
     })
 
-    // Get PRs for exercises in scheduled workout
-    const exerciseNames = scheduledRoutine?.exercises.map((e: any) => e.name.toLowerCase()) || []
+    // Get PRs for exercises in scheduled workout, or fall back to the most recent workout
+    const prSourceExercises =
+      scheduledRoutine?.exercises || workoutForDate?.exercises || history[0]?.exercises || []
+    const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
     const filteredPRs = exerciseNames
       .map((name: string) => prByExerciseName.get(name) || null)
       .filter(Boolean)
@@ -353,7 +357,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-background pb-20">
+    <main className="min-h-screen pb-20 glass-scope">
       <header className="bg-card border-b border-border sticky top-0 z-10">
         <div className="px-4 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">

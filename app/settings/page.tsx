@@ -253,7 +253,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen pb-20 glass-scope">
       <div className="sticky top-0 z-10 bg-background border-b p-3 flex items-center justify-between">
         <Link href="/" className="text-xl">
           ←

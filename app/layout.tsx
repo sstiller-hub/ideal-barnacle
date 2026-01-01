@@ -13,14 +13,14 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 // Added PWA metadata and viewport configuration
 export const metadata: Metadata = {
-  title: "Workout Tracker",
+  title: "Kova Fit",
   description: "Track workouts, monitor progress, and hit new PRs",
   generator: "v0.app",
-  applicationName: "Workout Tracker",
+  applicationName: "Kova Fit",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Workout Tracker",
+    title: "Kova Fit",
   },
   formatDetection: {
     telephone: false,
@@ -29,19 +29,23 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
+        url: "/kova-tab-2.svg",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/icon-light-32x32.png?v=2",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/icon-dark-32x32.png",
+        url: "/icon-dark-32x32.png?v=2",
         media: "(prefers-color-scheme: dark)",
       },
       {
-        url: "/icon.svg",
+        url: "/icon.svg?v=2",
         type: "image/svg+xml",
       },
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png?v=2", sizes: "180x180", type: "image/png" }],
   },
 }
 
@@ -62,6 +66,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/kova-tab-2.svg" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
