@@ -27,7 +27,18 @@ import {
   getCurrentInProgressSession,
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
-import { Play, ChevronLeft, ChevronRight, Calendar, Check, Plus, X, Moon, Pencil } from "lucide-react"
+import {
+  Play,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Check,
+  Plus,
+  X,
+  Moon,
+  Edit,
+  ArrowUpRight,
+} from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { formatExerciseName } from "@/lib/format-exercise-name"
@@ -83,6 +94,8 @@ export default function Home() {
       workoutId?: string
       achievedAt?: string
       workoutName?: string
+      trendPct?: number | null
+      chartData?: number[]
     }>
   >([])
   const [isAddWorkoutOpen, setIsAddWorkoutOpen] = useState(false)
@@ -197,6 +210,11 @@ export default function Home() {
       }
     >()
 
+    const getExerciseVolume = (exercise: any) =>
+      exercise.sets
+        .filter((s: any) => s.completed && s.weight > 0 && s.reps > 0)
+        .reduce((sum: number, s: any) => sum + s.weight * s.reps, 0)
+
     history.forEach((workout) => {
       workout.exercises.forEach((exercise) => {
         const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0)
@@ -222,7 +240,25 @@ export default function Home() {
       scheduledRoutine?.exercises || workoutForDate?.exercises || history[0]?.exercises || []
     const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
     const filteredPRs = exerciseNames
-      .map((name: string) => prByExerciseName.get(name) || null)
+      .map((name: string) => {
+        const pr = prByExerciseName.get(name)
+        if (!pr) return null
+        const volumes = history
+          .map((workout) => {
+            const exercise = workout.exercises.find((ex: any) => normalizeExerciseName(ex.name) === name)
+            if (!exercise) return null
+            const volume = getExerciseVolume(exercise)
+            return volume > 0 ? volume : null
+          })
+          .filter((v: number | null): v is number => v !== null)
+
+        const trendPct =
+          volumes.length >= 2 && volumes[1] > 0 ? Math.round(((volumes[0] - volumes[1]) / volumes[1]) * 100) : null
+
+        const chartData = volumes.slice(0, 7).reverse()
+
+        return { ...pr, trendPct, chartData }
+      })
       .filter(Boolean)
 
     setTodayPRs(filteredPRs as any[])
@@ -356,33 +392,48 @@ export default function Home() {
     setShowDiscardSessionDialog(false)
   }
 
+  const scheduledTotal = scheduledWorkout?.exercises?.length ?? 0
+  const scheduledCompleted = 0
+  const scheduledProgress = scheduledTotal > 0 ? scheduledCompleted / scheduledTotal : 0
+
   return (
-    <main className="min-h-screen pb-20 glass-scope">
-      <header className="bg-card border-b border-border sticky top-0 z-10">
+    <main className="relative min-h-screen pb-20 glass-scope">
+      <div className="home-atmosphere" aria-hidden="true">
+        <span className="home-particle" />
+        <span className="home-particle" />
+        <span className="home-particle" />
+        <span className="home-particle" />
+        <span className="home-particle" />
+      </div>
+      <header className="sticky top-0 z-10 bg-transparent">
         <div className="px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {!isToday() && (
+              <Button variant="outline" size="sm" className="h-10 px-3 bg-transparent" onClick={goToToday}>
+                Today
+              </Button>
+            )}
+          </div>
+
+          <div className="flex-1 text-left min-w-0 space-y-1">
+            <div className="text-white/30 tracking-wider" style={{ fontSize: "10px", fontWeight: 500 }}>
+              KOVA FIT
+            </div>
+            <h1 className="text-white/95" style={{ fontSize: "32px", fontWeight: 700, letterSpacing: "-0.02em" }}>
+              {formatDateHeader()}
+            </h1>
+            <p className="text-white/40" style={{ fontSize: "13px", fontWeight: 500 }}>
+              {selectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-10 w-10" onClick={goToPreviousDay}>
               <ChevronLeft className="w-6 h-6" />
             </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10" onClick={goToNextDay}>
               <ChevronRight className="w-6 h-6" />
             </Button>
-          </div>
-
-          <div className="flex-1 text-center min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Kova Fit</div>
-            <h1 className="text-2xl font-bold leading-tight">{formatDateHeader()}</h1>
-            <p className="text-sm text-muted-foreground">
-              {selectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {!isToday() && (
-              <Button variant="outline" size="sm" className="h-10 px-3 bg-transparent" onClick={goToToday}>
-                Today
-              </Button>
-            )}
             <Popover open={showCalendar} onOpenChange={setShowCalendar}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-10 w-10">
@@ -407,7 +458,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="relative z-10 p-6 pt-3 space-y-6">
         <section>
           {session && session.routineId && (
             <Card className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
@@ -517,85 +568,131 @@ export default function Home() {
               </Dialog>
             </Card>
           ) : !session && scheduledWorkout ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="mt-1 text-muted-foreground">
-                    {isFuture() ? <Calendar className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
-                      {isFuture() ? "Scheduled" : isToday() ? "Scheduled for Today" : "Missed"}
-                    </div>
-                    <div className="text-lg font-bold">{scheduledWorkout.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {scheduledWorkout.exercises?.length || 0} exercises
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                      onClick={() => router.push("/schedule")}
-                      aria-label="Edit schedule"
-                      title="Edit schedule"
+            <Card
+              className="relative overflow-hidden rounded-3xl border-0 py-0 gap-0 backdrop-blur-xl"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(255, 87, 51, 0.25) 0%, rgba(255, 60, 30, 0.15) 50%, rgba(200, 40, 20, 0.2) 100%)",
+                boxShadow: "0 8px 32px rgba(255, 87, 51, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              <CardContent className="relative p-5">
+                <Dialog open={isAddWorkoutOpen} onOpenChange={setIsAddWorkoutOpen}>
+                  <DialogTrigger asChild>
+                    <button
+                      className="absolute top-5 right-5 w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{
+                        background: "rgba(0, 0, 0, 0.3)",
+                        backdropFilter: "blur(10px)",
+                      }}
                     >
-                      <Calendar className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                      onClick={handleRemoveWorkout}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => handleStartWorkout(scheduledWorkout.id)} className="flex-1" size="lg">
-                    {isToday() ? "Start Workout" : "View Workout"}
-                  </Button>
-                  <Dialog open={isAddWorkoutOpen} onOpenChange={setIsAddWorkoutOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="lg" className="w-10 h-10 p-0 bg-transparent">
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Select Workout</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-2 mt-4">
-                        {routines.map((routine) => (
-                          <Button
-                            key={routine.id}
-                            variant="outline"
-                            className="w-full justify-start h-auto py-3 bg-transparent"
-                            onClick={() => handleAddWorkout(routine)}
-                          >
-                            <div className="text-left">
-                              <div className="font-semibold">{routine.name}</div>
-                              <div className="text-xs text-muted-foreground">{routine.exercises.length} exercises</div>
-                            </div>
-                          </Button>
-                        ))}
+                      <Edit size={16} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.7)" }} />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Select Workout</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-2 mt-4">
+                      {routines.map((routine) => (
                         <Button
-                          variant="ghost"
-                          className="w-full justify-start h-auto py-3 text-muted-foreground"
-                          onClick={handleSetRestDay}
+                          key={routine.id}
+                          variant="outline"
+                          className="w-full justify-start h-auto py-3 bg-transparent"
+                          onClick={() => handleAddWorkout(routine)}
                         >
-                          <Moon className="w-4 h-4 mr-2" />
                           <div className="text-left">
-                            <div className="font-semibold">Rest Day</div>
-                            <div className="text-xs">Mark as recovery day</div>
+                            <div className="font-semibold">{routine.name}</div>
+                            <div className="text-xs text-muted-foreground">{routine.exercises.length} exercises</div>
                           </div>
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start h-auto py-3 text-muted-foreground"
+                        onClick={handleSetRestDay}
+                      >
+                        <Moon className="w-4 h-4 mr-2" />
+                        <div className="text-left">
+                          <div className="font-semibold">Rest Day</div>
+                          <div className="text-xs">Mark as recovery day</div>
+                        </div>
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <div className="text-white/40 mb-3 tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
+                  {isFuture() ? "SCHEDULED" : isToday() ? "SCHEDULED FOR TODAY" : "MISSED"}
                 </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative">
+                    <svg
+                      width="44"
+                      height="44"
+                      className="absolute -left-3 -top-3"
+                      style={{ transform: "rotate(-90deg)" }}
+                      aria-hidden="true"
+                    >
+                      <circle cx="22" cy="22" r="20" fill="none" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="2" />
+                      <circle
+                        cx="22"
+                        cy="22"
+                        r="20"
+                        fill="none"
+                        stroke="rgb(255, 87, 51)"
+                        strokeWidth="2"
+                        strokeDasharray={`${scheduledProgress * 126} 126`}
+                        strokeLinecap="round"
+                        className="kova-ring-pulse"
+                        style={{ filter: "drop-shadow(0 0 4px rgba(255, 87, 51, 0.4))" }}
+                      />
+                    </svg>
+                    <Play size={20} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.7)" }} />
+                  </div>
+                  <div className="flex-1">
+                    <h3
+                      className="text-white/95 mb-0.5"
+                      style={{ fontSize: "17px", fontWeight: 600, letterSpacing: "-0.01em" }}
+                    >
+                      {scheduledWorkout.name}
+                    </h3>
+                    <p className="text-white/50" style={{ fontSize: "13px" }}>
+                      {scheduledWorkout.exercises?.length || 0} exercises
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/schedule")}
+                    aria-label="Edit schedule"
+                    title="Edit schedule"
+                  >
+                    <Calendar size={18} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.5)" }} />
+                  </button>
+                  <button type="button" onClick={handleRemoveWorkout} aria-label="Clear scheduled workout">
+                    <X size={18} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.5)" }} />
+                  </button>
+                </div>
+
+                <button
+                  className="w-full rounded-2xl py-3.5 transition-all duration-200 active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(135deg, rgb(230, 100, 80) 0%, rgb(200, 80, 65) 100%)",
+                    boxShadow: "0 4px 12px rgba(230, 100, 80, 0.3), 0 0 20px rgba(255, 87, 51, 0.15)",
+                  }}
+                  onMouseEnter={(event) => {
+                    event.currentTarget.style.boxShadow =
+                      "0 6px 16px rgba(230, 100, 80, 0.4), 0 0 25px rgba(255, 87, 51, 0.25)"
+                  }}
+                  onMouseLeave={(event) => {
+                    event.currentTarget.style.boxShadow =
+                      "0 4px 12px rgba(230, 100, 80, 0.3), 0 0 20px rgba(255, 87, 51, 0.15)"
+                  }}
+                  onClick={() => handleStartWorkout(scheduledWorkout.id)}
+                >
+                  <span className="text-white" style={{ fontSize: "15px", fontWeight: 600 }}>
+                    {isToday() ? "Start Workout" : "View Workout"}
+                  </span>
+                </button>
               </CardContent>
             </Card>
           ) : !session ? (
@@ -647,38 +744,155 @@ export default function Home() {
         </section>
 
         {todayPRs.length > 0 && (
-          <section className="rounded-2xl bg-muted/30 p-3">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase">Personal Records</h2>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white/50 tracking-wider" style={{ fontSize: "11px", fontWeight: 600 }}>
+                PERSONAL RECORDS
+              </h2>
               {todayPRs.length > 4 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-3 text-xs"
-                  onClick={() => setShowAllPrs((prev) => !prev)}
-                >
+                <button className="text-white/60" style={{ fontSize: "13px", fontWeight: 500 }} onClick={() => setShowAllPrs((prev) => !prev)}>
                   {showAllPrs ? "Hide PRs" : "More PRs"}
-                </Button>
+                </button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {todayPRs.slice(0, showAllPrs ? todayPRs.length : 4).map((pr) => (
-                <Card
-                  key={pr.name}
-                  className="p-2 cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => pr.workoutId && router.push(`/history/${pr.workoutId}`)}
-                >
-                  <div className="text-[11px] text-muted-foreground mb-1 leading-snug">{pr.name}</div>
-                  <div className="text-lg font-bold">{pr.weight > 0 ? `${pr.weight} × ${pr.reps}` : "—"}</div>
-                  <div className="text-[11px] text-muted-foreground">lbs</div>
-                  {pr.achievedAt && (
-                    <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                      {getRelativeDate(pr.achievedAt)}
-                      {pr.workoutName && ` · ${pr.workoutName}`}
+            <div className="grid grid-cols-2 gap-3">
+              {todayPRs.slice(0, showAllPrs ? todayPRs.length : 4).map((pr) => {
+                const chartData = pr.chartData || []
+                const maxValue = chartData.length > 0 ? Math.max(...chartData) : 1
+                const minValue = chartData.length > 0 ? Math.min(...chartData) : 0
+                const range = maxValue - minValue || 1
+                const chartId = pr.name.replace(/\s+/g, "-")
+                const points = chartData.map((value, index) => {
+                  const x = (index / Math.max(chartData.length - 1, 1)) * 100
+                  const y = 80 - ((value - minValue) / range) * 60
+                  return `${x},${y}`
+                })
+                const linePath = points.length > 0 ? `M ${points.join(" L ")}` : ""
+                const areaPath =
+                  points.length > 0 ? `M 0,80 ${points.map((p) => `L ${p}`).join(" ")} L 100,80 Z` : ""
+
+                return (
+                  <div key={pr.name} className="aspect-square">
+                    <div
+                      className="rounded-2xl p-4 backdrop-blur-xl relative overflow-hidden h-full cursor-pointer"
+                      style={{
+                        background: "linear-gradient(135deg, rgba(30, 30, 35, 0.8) 0%, rgba(20, 20, 25, 0.9) 100%)",
+                        boxShadow: "0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                      }}
+                      onClick={() => pr.workoutId && router.push(`/history/${pr.workoutId}`)}
+                    >
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: "radial-gradient(circle at top right, rgba(255, 87, 51, 0.08) 0%, transparent 60%)",
+                          opacity: pr.trendPct && pr.trendPct > 0 ? 1 : 0,
+                        }}
+                      />
+
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-white/50" style={{ fontSize: "11px", fontWeight: 500 }}>
+                            {pr.name}
+                          </div>
+                          {pr.trendPct !== null && pr.trendPct !== 0 && (
+                            <div
+                              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md"
+                              style={{
+                                background:
+                                  pr.trendPct > 0 ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                              }}
+                            >
+                              <ArrowUpRight
+                                size={10}
+                                strokeWidth={2.5}
+                                style={{
+                                  color: pr.trendPct > 0 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+                                  transform: pr.trendPct > 0 ? "none" : "rotate(90deg)",
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: 600,
+                                  color: pr.trendPct > 0 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+                                }}
+                              >
+                                {Math.abs(pr.trendPct)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <div className="flex items-baseline gap-2">
+                            <div
+                              className="text-white/95"
+                              style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: "1" }}
+                            >
+                              {pr.reps}
+                            </div>
+                            <div className="text-white/50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                              reps
+                            </div>
+                            <X size={12} strokeWidth={2.5} style={{ color: "rgba(255, 87, 51, 0.4)" }} />
+                            <div
+                              className="text-white/95"
+                              style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: "1" }}
+                            >
+                              {pr.weight}
+                            </div>
+                            <div className="text-white/50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                              lbs
+                            </div>
+                          </div>
+                        </div>
+
+                        {pr.achievedAt && (
+                          <div className="text-white/40" style={{ fontSize: "10px", lineHeight: "1.4" }}>
+                            {getRelativeDate(pr.achievedAt)}
+                            {pr.workoutName && ` · ${pr.workoutName}`}
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        className="absolute bottom-0 left-0 right-0 pointer-events-none"
+                        style={{
+                          height: "80px",
+                          maskImage: "linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%)",
+                          WebkitMaskImage: "linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%)",
+                        }}
+                      >
+                        <svg
+                          width="100%"
+                          height="100%"
+                          viewBox="0 0 100 80"
+                          preserveAspectRatio="none"
+                          style={{
+                            opacity: 0.5,
+                          }}
+                        >
+                          <defs>
+                            <linearGradient id={`gradient-${chartId}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor="rgb(100, 100, 110)" stopOpacity="0.6" />
+                              <stop offset="100%" stopColor="rgb(60, 60, 70)" stopOpacity="0.2" />
+                            </linearGradient>
+                          </defs>
+                          <path d={areaPath} fill={`url(#gradient-${chartId})`} />
+                          <path
+                            d={linePath}
+                            fill="none"
+                            stroke="rgba(140, 140, 150, 0.8)"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
                     </div>
-                  )}
-                </Card>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}

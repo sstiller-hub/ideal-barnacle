@@ -504,7 +504,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     Boolean(restState) &&
     restState?.exerciseIndex === currentExerciseIndex &&
     typeof restState?.remainingSeconds === "number"
-  const allSetsCompleted = currentExercise?.sets?.every((set: any) => set.completed) ?? false
+  const allSetsCompleted =
+    currentExercise?.sets?.every((set: any) => set.completed && !isSetIncomplete(set)) ?? false
 
   const formatSeconds = (seconds: number) => formatTime(seconds * 1000)
 
@@ -864,7 +865,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         return updatedSet
       })
 
-      const allSetsCompleted = newSets.every((set: any) => set.completed)
+      const allSetsCompleted = newSets.every((set: any) => set.completed && !isSetIncomplete(set))
 
       return {
         ...exercise,
