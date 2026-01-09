@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
 import { getExerciseHistory, getLatestPerformance, getWorkoutHistory, saveWorkout } from "@/lib/workout-storage"
 import { toast } from "sonner"
@@ -20,6 +21,13 @@ import {
 import { getOrCreateActiveSession, upsertSet } from "@/lib/supabase-session-sync"
 import { supabase } from "@/lib/supabase"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
+import {
+  clearExerciseNextNote,
+  getExerciseNextNote,
+  markExerciseNextNoteDone,
+  setExerciseNextNote,
+  type NextSessionNote,
+} from "@/lib/next-session-notes"
 import {
   getCurrentInProgressSession,
   deleteSession,
@@ -140,6 +148,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [uiNow, setUiNow] = useState(() => Date.now())
   const restStartAtRef = useRef<number | null>(null)
   const [inlineNoteDraft, setInlineNoteDraft] = useState("")
+  const [exerciseNextNote, setExerciseNextNoteState] = useState<NextSessionNote | null>(null)
+  const [exerciseNoteDraft, setExerciseNoteDraft] = useState("")
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
@@ -153,6 +163,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const editingFieldRef = useRef<"reps" | "weight" | null>(null)
   const [pendingRemoteUpdates, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
+  const NOTE_CHAR_LIMIT = 360
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -517,6 +528,49 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const elapsed = Math.floor((uiNow - startAt) / 1000)
     return Math.max(0, restState.remainingSeconds - elapsed)
   })()
+
+  useEffect(() => {
+    if (!currentExercise) {
+      setExerciseNextNoteState(null)
+      setExerciseNoteDraft("")
+      return
+    }
+    const note = getExerciseNextNote(
+      routine.id,
+      routine.name,
+      currentExercise.id,
+      currentExercise.name,
+    )
+    setExerciseNextNoteState(note)
+    setExerciseNoteDraft(note?.text ?? "")
+  }, [routine.id, routine.name, currentExercise?.id, currentExercise?.name])
+
+  const saveExerciseNextNote = () => {
+    if (!currentExercise) return
+    const next = setExerciseNextNote(
+      routine.id,
+      routine.name,
+      currentExercise.id,
+      currentExercise.name,
+      exerciseNoteDraft,
+    )
+    setExerciseNextNoteState(next)
+    setExerciseNoteDraft(next?.text ?? "")
+  }
+
+  const clearExerciseNote = () => {
+    if (!currentExercise) return
+    clearExerciseNextNote(routine.id, routine.name, currentExercise.id, currentExercise.name)
+    setExerciseNextNoteState(null)
+    setExerciseNoteDraft("")
+  }
+
+  const markExerciseNoteDone = () => {
+    if (!currentExercise) return
+    markExerciseNextNoteDone(routine.id, routine.name, currentExercise.id, currentExercise.name)
+    setExerciseNextNoteState(null)
+    setExerciseNoteDraft("")
+  }
 
   const setRestStateAndPersist = async (
     nextState: WorkoutSession["restTimer"] | null
@@ -1466,33 +1520,71 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Note</span>
-              <span className="text-[10px] text-muted-foreground">Session only</span>
             </div>
-            <Input
-              value={inlineNoteDraft}
-              placeholder="Add a quick note (optional)"
-              onChange={(e) => setInlineNoteDraft(e.target.value)}
-              onBlur={async () => {
-                if (!session || !currentExercise) return
-                const trimmed = inlineNoteDraft.trim()
-                if ((currentExercise.sessionNote ?? "") === trimmed) return
-                const newExercises = exercises.map((exercise: any, idx: number) => {
-                  if (idx !== currentExerciseIndex) return exercise
-                  return {
-                    ...exercise,
-                    sessionNote: trimmed,
+            <div className="rounded-2xl border border-border/60 bg-muted/10 px-3 py-2 space-y-3">
+              <div className="space-y-2">
+                <span className="text-[10px] text-muted-foreground">Session only</span>
+                <Input
+                  value={inlineNoteDraft}
+                  placeholder="Add a quick note (optional)"
+                  onChange={(e) => setInlineNoteDraft(e.target.value)}
+                  onBlur={async () => {
+                    if (!session || !currentExercise) return
+                    const trimmed = inlineNoteDraft.trim()
+                    if ((currentExercise.sessionNote ?? "") === trimmed) return
+                    const newExercises = exercises.map((exercise: any, idx: number) => {
+                      if (idx !== currentExerciseIndex) return exercise
+                      return {
+                        ...exercise,
+                        sessionNote: trimmed,
+                      }
+                    })
+                    setExercises(newExercises)
+                    const updatedSession: WorkoutSession = {
+                      ...session,
+                      exercises: newExercises,
+                    }
+                    setSession(updatedSession)
+                    await saveSession(updatedSession)
+                  }}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Next session</span>
+                  {exerciseNextNote?.linkedByName && (
+                    <span className="text-[10px] text-muted-foreground">Linked by name</span>
+                  )}
+                </div>
+                <Input
+                  value={exerciseNoteDraft}
+                  onChange={(event) =>
+                    setExerciseNoteDraft(event.target.value.slice(0, NOTE_CHAR_LIMIT))
                   }
-                })
-                setExercises(newExercises)
-                const updatedSession: WorkoutSession = {
-                  ...session,
-                  exercises: newExercises,
-                }
-                setSession(updatedSession)
-                await saveSession(updatedSession)
-              }}
-              className="h-10"
-            />
+                  placeholder="Add a note for next session"
+                  className="h-10"
+                  onBlur={async () => {
+                    if (!session || !currentExercise) return
+                    const trimmed = exerciseNoteDraft.trim()
+                    if (!trimmed) return
+                    await saveExerciseNextNote()
+                  }}
+                />
+                <div className="flex items-center justify-end gap-2">
+                  {exerciseNextNote && (
+                    <Button variant="ghost" size="sm" onClick={markExerciseNoteDone}>
+                      Done
+                    </Button>
+                  )}
+                  {exerciseNextNote && (
+                    <Button variant="ghost" size="sm" onClick={clearExerciseNote}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

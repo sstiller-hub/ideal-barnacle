@@ -47,6 +47,7 @@ import {
   setScheduledWorkout as persistScheduledWorkout,
   setRestDay,
 } from "@/lib/schedule-storage"
+import { supabase } from "@/lib/supabase"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -106,6 +107,8 @@ export default function Home() {
   const [routines, setRoutines] = useState<any[]>([])
   const [showCalendar, setShowCalendar] = useState(false)
   const [session, setSession] = useState<any | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [weightEntries, setWeightEntries] = useState<Array<{ measured_at: string; weight_lb: number }>>([])
   const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
 
   useEffect(() => {
@@ -126,6 +129,18 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
     loadDataForDate(selectedDate)
   }, [selectedDate])
 
@@ -136,6 +151,39 @@ export default function Home() {
     window.addEventListener("schedule:updated", handleScheduleUpdated)
     return () => window.removeEventListener("schedule:updated", handleScheduleUpdated)
   }, [selectedDate])
+
+  useEffect(() => {
+    if (!userId) {
+      setWeightEntries([])
+      return
+    }
+    const end = new Date(selectedDate)
+    end.setHours(23, 59, 59, 999)
+    const start = new Date(selectedDate)
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 29)
+
+    const loadWeights = async () => {
+      const { data, error } = await supabase
+        .from("body_weight_entries")
+        .select("measured_at, weight_lb")
+        .eq("user_id", userId)
+        .gte("measured_at", start.toISOString())
+        .lte("measured_at", end.toISOString())
+        .order("measured_at", { ascending: true })
+      if (error) {
+        setWeightEntries([])
+        return
+      }
+      const filtered = (data ?? []).filter(
+        (entry): entry is { measured_at: string; weight_lb: number } =>
+          typeof entry.weight_lb === "number" && Number.isFinite(entry.weight_lb),
+      )
+      setWeightEntries(filtered)
+    }
+
+    void loadWeights()
+  }, [selectedDate, userId])
 
   const loadDataForDate = (date: Date) => {
     const history = getWorkoutHistory()
@@ -396,8 +444,12 @@ export default function Home() {
   const scheduledCompleted = 0
   const scheduledProgress = scheduledTotal > 0 ? scheduledCompleted / scheduledTotal : 0
 
+  const weightChartData = weightEntries.map((entry) => entry.weight_lb)
+  const latestWeight = weightChartData.length > 0 ? weightChartData[weightChartData.length - 1] : null
+  const startWeight = weightChartData.length > 0 ? weightChartData[0] : null
+
   return (
-    <main className="relative min-h-screen pb-20 glass-scope">
+    <main className="relative min-h-screen pb-[calc(env(safe-area-inset-bottom)+140px)] glass-scope">
       <div className="home-atmosphere" aria-hidden="true">
         <span className="home-particle" />
         <span className="home-particle" />
@@ -406,7 +458,7 @@ export default function Home() {
         <span className="home-particle" />
       </div>
       <header className="sticky top-0 z-10 bg-transparent">
-        <div className="px-4 py-4 flex items-center justify-between gap-3">
+        <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {!isToday() && (
               <Button variant="outline" size="sm" className="h-10 px-3 bg-transparent" onClick={goToToday}>
@@ -428,15 +480,27 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={goToPreviousDay}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={goToPreviousDay}
+              aria-label="Previous day"
+            >
               <ChevronLeft className="w-6 h-6" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={goToNextDay}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={goToNextDay}
+              aria-label="Next day"
+            >
               <ChevronRight className="w-6 h-6" />
             </Button>
             <Popover open={showCalendar} onOpenChange={setShowCalendar}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10">
+                <Button variant="ghost" size="icon" className="h-10 w-10" aria-label="Open calendar">
                   <Calendar className="w-6 h-6" />
                 </Button>
               </PopoverTrigger>
@@ -458,7 +522,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="relative z-10 p-6 pt-3 space-y-6">
+      <div className="relative z-10 px-6 pt-4 space-y-8">
         <section>
           {session && session.routineId && (
             <Card className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
@@ -478,7 +542,12 @@ export default function Home() {
                   </div>
                   <AlertDialog open={showDiscardSessionDialog} onOpenChange={setShowDiscardSessionDialog}>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        aria-label="Discard workout"
+                      >
                         <X className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -569,11 +638,11 @@ export default function Home() {
             </Card>
           ) : !session && scheduledWorkout ? (
             <Card
-              className="relative overflow-hidden rounded-3xl border-0 py-0 gap-0 backdrop-blur-xl"
+              className="relative overflow-hidden rounded-3xl border border-white/10 py-0 gap-0 backdrop-blur-xl"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(255, 87, 51, 0.25) 0%, rgba(255, 60, 30, 0.15) 50%, rgba(200, 40, 20, 0.2) 100%)",
-                boxShadow: "0 8px 32px rgba(255, 87, 51, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
               }}
             >
               <CardContent className="relative p-5">
@@ -581,6 +650,8 @@ export default function Home() {
                   <DialogTrigger asChild>
                     <button
                       className="absolute top-5 right-5 w-9 h-9 rounded-xl flex items-center justify-center"
+                      aria-label="Edit scheduled workout"
+                      title="Edit scheduled workout"
                       style={{
                         background: "rgba(0, 0, 0, 0.3)",
                         backdropFilter: "blur(10px)",
@@ -650,12 +721,12 @@ export default function Home() {
                     <Play size={20} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.7)" }} />
                   </div>
                   <div className="flex-1">
-                    <h3
+                    <h2
                       className="text-white/95 mb-0.5"
                       style={{ fontSize: "17px", fontWeight: 600, letterSpacing: "-0.01em" }}
                     >
                       {scheduledWorkout.name}
-                    </h3>
+                    </h2>
                     <p className="text-white/50" style={{ fontSize: "13px" }}>
                       {scheduledWorkout.exercises?.length || 0} exercises
                     </p>
@@ -677,15 +748,15 @@ export default function Home() {
                   className="w-full rounded-2xl py-3.5 transition-all duration-200 active:scale-[0.98]"
                   style={{
                     background: "linear-gradient(135deg, rgb(230, 100, 80) 0%, rgb(200, 80, 65) 100%)",
-                    boxShadow: "0 4px 12px rgba(230, 100, 80, 0.3), 0 0 20px rgba(255, 87, 51, 0.15)",
+                    boxShadow: "0 4px 12px rgba(230, 100, 80, 0.28), 0 0 18px rgba(255, 87, 51, 0.12)",
                   }}
                   onMouseEnter={(event) => {
                     event.currentTarget.style.boxShadow =
-                      "0 6px 16px rgba(230, 100, 80, 0.4), 0 0 25px rgba(255, 87, 51, 0.25)"
+                      "0 6px 16px rgba(230, 100, 80, 0.35), 0 0 24px rgba(255, 87, 51, 0.2)"
                   }}
                   onMouseLeave={(event) => {
                     event.currentTarget.style.boxShadow =
-                      "0 4px 12px rgba(230, 100, 80, 0.3), 0 0 20px rgba(255, 87, 51, 0.15)"
+                      "0 4px 12px rgba(230, 100, 80, 0.28), 0 0 18px rgba(255, 87, 51, 0.12)"
                   }}
                   onClick={() => handleStartWorkout(scheduledWorkout.id)}
                 >
@@ -746,11 +817,15 @@ export default function Home() {
         {todayPRs.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-white/50 tracking-wider" style={{ fontSize: "11px", fontWeight: 600 }}>
+              <h2 className="text-white/40 tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
                 PERSONAL RECORDS
               </h2>
               {todayPRs.length > 4 && (
-                <button className="text-white/60" style={{ fontSize: "13px", fontWeight: 500 }} onClick={() => setShowAllPrs((prev) => !prev)}>
+                <button
+                  className="text-white/50"
+                  style={{ fontSize: "12px", fontWeight: 500 }}
+                  onClick={() => setShowAllPrs((prev) => !prev)}
+                >
                   {showAllPrs ? "Hide PRs" : "More PRs"}
                 </button>
               )}
@@ -774,10 +849,10 @@ export default function Home() {
                 return (
                   <div key={pr.name} className="aspect-square">
                     <div
-                      className="rounded-2xl p-4 backdrop-blur-xl relative overflow-hidden h-full cursor-pointer"
+                      className="rounded-3xl p-4 backdrop-blur-xl relative overflow-hidden h-full cursor-pointer border border-white/10"
                       style={{
                         background: "linear-gradient(135deg, rgba(30, 30, 35, 0.8) 0%, rgba(20, 20, 25, 0.9) 100%)",
-                        boxShadow: "0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
                       }}
                       onClick={() => pr.workoutId && router.push(`/history/${pr.workoutId}`)}
                     >
@@ -791,7 +866,7 @@ export default function Home() {
 
                       <div className="relative z-10">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="text-white/50" style={{ fontSize: "11px", fontWeight: 500 }}>
+                          <div className="text-white/45" style={{ fontSize: "11px", fontWeight: 500 }}>
                             {pr.name}
                           </div>
                           {pr.trendPct !== null && pr.trendPct !== 0 && (
@@ -799,14 +874,14 @@ export default function Home() {
                               className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md"
                               style={{
                                 background:
-                                  pr.trendPct > 0 ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                  pr.trendPct > 0 ? "rgba(34, 197, 94, 0.12)" : "rgba(239, 68, 68, 0.12)",
                               }}
                             >
                               <ArrowUpRight
                                 size={10}
                                 strokeWidth={2.5}
                                 style={{
-                                  color: pr.trendPct > 0 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+                                  color: pr.trendPct > 0 ? "rgba(34, 197, 94, 0.85)" : "rgba(239, 68, 68, 0.85)",
                                   transform: pr.trendPct > 0 ? "none" : "rotate(90deg)",
                                 }}
                               />
@@ -814,7 +889,7 @@ export default function Home() {
                                 style={{
                                   fontSize: "9px",
                                   fontWeight: 600,
-                                  color: pr.trendPct > 0 ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+                                  color: pr.trendPct > 0 ? "rgba(34, 197, 94, 0.85)" : "rgba(239, 68, 68, 0.85)",
                                 }}
                               >
                                 {Math.abs(pr.trendPct)}%
@@ -831,7 +906,7 @@ export default function Home() {
                             >
                               {pr.reps}
                             </div>
-                            <div className="text-white/50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                            <div className="text-white/45" style={{ fontSize: "12px", fontWeight: 600 }}>
                               reps
                             </div>
                             <X size={12} strokeWidth={2.5} style={{ color: "rgba(255, 87, 51, 0.4)" }} />
@@ -841,7 +916,7 @@ export default function Home() {
                             >
                               {pr.weight}
                             </div>
-                            <div className="text-white/50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                            <div className="text-white/45" style={{ fontSize: "12px", fontWeight: 600 }}>
                               lbs
                             </div>
                           </div>
@@ -850,7 +925,6 @@ export default function Home() {
                         {pr.achievedAt && (
                           <div className="text-white/40" style={{ fontSize: "10px", lineHeight: "1.4" }}>
                             {getRelativeDate(pr.achievedAt)}
-                            {pr.workoutName && ` · ${pr.workoutName}`}
                           </div>
                         )}
                       </div>
@@ -893,6 +967,112 @@ export default function Home() {
                   </div>
                 )
               })}
+            </div>
+          </section>
+        )}
+
+        {weightChartData.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white/40 tracking-wider" style={{ fontSize: "10px", fontWeight: 600 }}>
+                BODY WEIGHT
+              </h2>
+              <div className="text-white/45" style={{ fontSize: "11px", fontWeight: 500 }}>
+                Last 30 days
+              </div>
+            </div>
+            <div
+              className="rounded-3xl p-5 backdrop-blur-xl relative overflow-hidden border border-white/10"
+              style={{
+                background: "linear-gradient(135deg, rgba(30, 30, 35, 0.8) 0%, rgba(20, 20, 25, 0.9) 100%)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div className="relative z-10 flex items-baseline justify-between gap-6">
+                <div>
+                  <div className="text-white/40" style={{ fontSize: "11px", fontWeight: 600 }}>
+                    30d ago
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <div
+                      className="text-white/95"
+                      style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: "1" }}
+                    >
+                      {startWeight?.toFixed(1)}
+                    </div>
+                    <div className="text-white/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      lbs
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-white/40" style={{ fontSize: "11px", fontWeight: 600 }}>
+                    Now
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <div
+                      className="text-white/95"
+                      style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: "1" }}
+                    >
+                      {latestWeight?.toFixed(1)}
+                    </div>
+                    <div className="text-white/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      lbs
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {(() => {
+                const maxValue = Math.max(...weightChartData)
+                const minValue = Math.min(...weightChartData)
+                const range = maxValue - minValue || 1
+                const points = weightChartData.map((value, index) => {
+                  const x = (index / Math.max(weightChartData.length - 1, 1)) * 100
+                  const y = 80 - ((value - minValue) / range) * 60
+                  return `${x},${y}`
+                })
+                const linePath = points.length > 0 ? `M ${points.join(" L ")}` : ""
+                const areaPath =
+                  points.length > 0 ? `M 0,80 ${points.map((p) => `L ${p}`).join(" ")} L 100,80 Z` : ""
+
+                return (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 pointer-events-none"
+                    style={{
+                      height: "90px",
+                      maskImage: "linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%)",
+                      WebkitMaskImage: "linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%)",
+                    }}
+                  >
+                    <svg
+                      width="100%"
+                      height="100%"
+                      viewBox="0 0 100 80"
+                      preserveAspectRatio="none"
+                      style={{
+                        opacity: 0.5,
+                      }}
+                    >
+                      <defs>
+                        <linearGradient id="gradient-body-weight" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(100, 100, 110)" stopOpacity="0.6" />
+                          <stop offset="100%" stopColor="rgb(60, 60, 70)" stopOpacity="0.2" />
+                        </linearGradient>
+                      </defs>
+                      <path d={areaPath} fill="url(#gradient-body-weight)" />
+                      <path
+                        d={linePath}
+                        fill="none"
+                        stroke="rgba(140, 140, 150, 0.8)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                )
+              })()}
             </div>
           </section>
         )}

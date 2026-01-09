@@ -23,8 +23,7 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 
 function uuid() {
   // Support older browsers
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const c: any = globalThis.crypto
+  const c = globalThis.crypto as Crypto | undefined
   return c?.randomUUID
     ? c.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`

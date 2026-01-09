@@ -1,26 +1,23 @@
 import { test, expect } from "@playwright/test"
 
-const getVisibleNavItems = async (page: any) => {
-  return page.locator("[data-nav-item]").evaluateAll((nodes: HTMLElement[]) => {
-    return nodes.filter((node) => {
-      const style = window.getComputedStyle(node)
-      const rect = node.getBoundingClientRect()
-      return (
-        style.opacity !== "0" &&
-        style.pointerEvents !== "none" &&
-        rect.width > 0 &&
-        rect.height > 0
-      )
-    }).length
-  })
-}
-
-test("collapsed nav shows only the active item", async ({ page }) => {
+test("dock renders 5 tabs with readable labels and is centered", async ({ page }) => {
   await page.goto("/")
   const navRoot = page.locator("[data-nav-root]")
-  await expect(navRoot).toHaveAttribute("data-collapsed", "true")
-  const visibleCount = await getVisibleNavItems(page)
-  expect(visibleCount).toBe(1)
+  const labels = page.locator("[data-nav-label]")
+  await expect(labels).toHaveCount(5)
+  await expect(labels.nth(0)).toHaveText("Home")
+  await expect(labels.nth(1)).toHaveText("Workouts")
+  await expect(labels.nth(2)).toHaveText("History")
+  await expect(labels.nth(3)).toHaveText("PRs")
+  await expect(labels.nth(4)).toHaveText("Settings")
+
+  const navBox = await navRoot.boundingBox()
+  expect(navBox).not.toBeNull()
+  if (!navBox) return
+  const viewport = page.viewportSize()
+  const viewportWidth = viewport?.width ?? (await page.evaluate(() => window.innerWidth))
+  const navCenter = navBox.x + navBox.width / 2
+  expect(Math.abs(navCenter - viewportWidth / 2)).toBeLessThanOrEqual(12)
 })
 
 test("hold and slide navigates to another tab", async ({ page }) => {

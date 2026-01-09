@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Home, Dumbbell, History, Trophy, Settings } from "lucide-react"
 
@@ -11,12 +11,8 @@ type BottomNavProps = {
 function BottomNav({ fixed = true }: BottomNavProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [isMinimized, setIsMinimized] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [hoverHref, setHoverHref] = useState<string | null>(null)
-  const lastScrollY = useRef(0)
-  const navRef = useRef<HTMLDivElement>(null)
-  const lastTapRef = useRef(0)
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
@@ -25,38 +21,18 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     { href: "/prs", icon: Trophy, label: "PRs" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ]
-  const iconOffsetByHref: Record<string, string> = {
-    "/": "translate-x-[6px]",
-    "/workout": "translate-x-[4px]",
-    "/history": "translate-x-[0px]",
-    "/prs": "translate-x-[-4px]",
-    "/settings": "translate-x-[-7px]",
-  }
+  const navIndexByHref = useMemo(() => {
+    const indexByHref: Record<string, number> = {}
+    navItems.forEach((item, index) => {
+      indexByHref[item.href] = index
+    })
+    return indexByHref
+  }, [navItems])
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/"
     return pathname.startsWith(href)
   }
-
-  useEffect(() => {
-    if (!fixed) return
-    const onScroll = () => {
-      const currentY = window.scrollY
-      const delta = currentY - lastScrollY.current
-      if (currentY < 10) {
-        setIsMinimized(false)
-      } else if (delta > 8) {
-        setIsMinimized(true)
-      } else if (delta < -8) {
-        setIsMinimized(false)
-      }
-      lastScrollY.current = currentY
-    }
-
-    lastScrollY.current = window.scrollY
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [fixed])
 
   useEffect(() => {
     if (!isExpanded) return
@@ -83,45 +59,43 @@ function BottomNav({ fixed = true }: BottomNavProps) {
     }
   }, [isExpanded, hoverHref, router])
 
-  const isCollapsed = !isExpanded
+  const activeIndex = navItems.findIndex((item) => isActive(item.href))
+  const hoverIndex = hoverHref ? navIndexByHref[hoverHref] ?? activeIndex : activeIndex
+  const highlightIndex = hoverIndex >= 0 ? hoverIndex : 0
 
   return (
     <nav
       className={
         fixed
-          ? "fixed left-0 right-0 z-50 pointer-events-none px-4"
+          ? "fixed left-0 right-0 z-50 pointer-events-none flex justify-center px-4 pb-[env(safe-area-inset-bottom)]"
           : "w-full"
       }
       style={
         fixed
-          ? { bottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)" }
+          ? { bottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }
           : undefined
       }
     >
       <div
-        ref={navRef}
         data-nav-root
         data-expanded={isExpanded ? "true" : "false"}
-        data-collapsed={isCollapsed ? "true" : "false"}
-        data-minimized={isMinimized ? "true" : "false"}
-        className={`inline-flex items-center gap-1 ml-0 mr-auto ${
+        className={`relative flex items-center w-full max-w-[520px] px-1.5 py-1.5 ${
           fixed
-            ? "pointer-events-auto rounded-full border border-border/50 bg-background/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(0,0,0,0.22),_0_2px_10px_rgba(0,0,0,0.16),_inset_0_1px_0_rgba(255,255,255,0.12)] transition-[width,transform,opacity,box-shadow,backdrop-filter]"
+            ? "pointer-events-auto rounded-full border border-border/40 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),rgba(255,255,255,0.06))] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(0,0,0,0.28),_0_2px_10px_rgba(0,0,0,0.18),_inset_0_1px_0_rgba(255,255,255,0.12)]"
             : "bg-card border-t border-border"
-        } ${isCollapsed ? "duration-700 ease-[cubic-bezier(0.6,0,0.4,1)]" : "duration-700 ease-[cubic-bezier(0.2,0.9,0.2,1)]"} ${
-          isMinimized ? "py-1" : "py-2.5"
-        } ${
-          isCollapsed
-            ? "w-14 h-14 px-0 justify-center scale-[0.96] opacity-95"
-            : "w-fit px-2 justify-start scale-100 opacity-100"
         }`}
       >
+        <div
+          aria-hidden="true"
+          className="absolute top-1.5 bottom-1.5 rounded-full bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.5),rgba(255,255,255,0.12)_55%,rgba(0,0,0,0.08)_100%)] shadow-[0_6px_16px_rgba(0,0,0,0.35),_inset_0_1px_0_rgba(255,255,255,0.6)] transition-[left] duration-500 ease-[cubic-bezier(0.2,0.9,0.2,1)]"
+          style={{
+            width: `calc((100% - 12px) / ${navItems.length})`,
+            left: `calc(${highlightIndex} * (100% - 12px) / ${navItems.length} + 6px)`,
+          }}
+        />
         {navItems.map(({ href, icon: Icon, label }) => {
           const active = isActive(href)
-          const showLabel = isExpanded || (!isCollapsed && active)
-          const showItem = active || isExpanded
           const isHover = hoverHref === href
-          const iconOffset = iconOffsetByHref[href] ?? "translate-x-[6px]"
           return (
             <button
               key={href}
@@ -144,52 +118,24 @@ function BottomNav({ fixed = true }: BottomNavProps) {
               }}
               onClick={() => {
                 if (active) {
-                  const now = Date.now()
-                  if (now - lastTapRef.current < 300) {
-                    setIsExpanded((prev) => {
-                      const next = !prev
-                      setHoverHref(next ? href : null)
-                      return next
-                    })
-                    lastTapRef.current = 0
-                    return
-                  }
-                  lastTapRef.current = now
                   return
                 }
                 setIsExpanded(false)
                 router.push(href)
               }}
-              className={`flex ${isCollapsed ? "items-center justify-center" : "flex-col items-center"} ${
-                showLabel ? "gap-1" : "gap-0"
-              } ${isCollapsed ? "h-12 w-12 p-0" : "px-3"} ${
-                isCollapsed ? "" : isMinimized ? "py-1" : "py-2"
-              } rounded-lg transition-all duration-300 focus-visible:outline-none focus-visible:ring-0 ${
+              className={`relative z-10 flex min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-0 ${
                 active || isHover
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              } ${
-                showItem
-                  ? "max-w-[84px] opacity-100 translate-x-0"
-                  : "max-w-0 opacity-0 -translate-x-2 pointer-events-none"
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground"
               }`}
             >
-              <span className={isCollapsed ? "flex h-12 w-12 items-center justify-center" : ""}>
-                <Icon
-                  className={`w-5 h-5 block ${active ? "stroke-[2.5]" : ""} ${
-                    isCollapsed ? iconOffset : ""
-                  }`}
-                />
+              <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
+              <span
+                data-nav-label
+                className={`max-w-[72px] truncate text-center text-[10px] leading-none ${active ? "font-semibold" : ""}`}
+              >
+                {label}
               </span>
-              {showLabel && (
-                <span
-                  className={`text-[10px] leading-none transition-all duration-300 ${
-                    isExpanded ? "opacity-100 translate-y-0" : "opacity-100 translate-y-0"
-                  } ${active ? "font-semibold" : ""}`}
-                >
-                  {label}
-                </span>
-              )}
             </button>
           )
         })}

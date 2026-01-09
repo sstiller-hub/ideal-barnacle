@@ -93,6 +93,7 @@ export function WorkoutScheduleEditor() {
                 <div className="text-sm font-medium w-24">{label}</div>
                 <select
                   className="flex-1 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  aria-label={`${label} schedule`}
                   value={entry ? entry.routineId : "rest"}
                   onChange={(e) => updateDaySelection(key, e.target.value)}
                 >
