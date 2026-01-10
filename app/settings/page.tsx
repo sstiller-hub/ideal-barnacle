@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { getWorkoutHistory } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
 import { seedDemoData } from "@/lib/seed-demo-data"
@@ -21,6 +21,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown } from "lucide-react"
 import { signInWithEmail } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
+import type { User } from "@supabase/supabase-js"
 import { useTheme } from "next-themes"
 import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
 import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
@@ -57,8 +58,8 @@ function SignInCard({
 
 export default function SettingsPage() {
   const [email, setEmail] = useState("")
-  const [workouts, setWorkouts] = useState<any[]>([])
-  const [user, setUser] = useState<any>(null)
+  const [workouts, setWorkouts] = useState<CompletedWorkout[]>([])
+  const [user, setUser] = useState<User | null>(null)
   const [syncStatus, setSyncStatus] = useState<string>("")
   const [isSyncing, setIsSyncing] = useState(false)
   const [backupStatus, setBackupStatus] = useState<string>("")

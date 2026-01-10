@@ -79,7 +79,14 @@ export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
 export function getWorkoutHistory(): CompletedWorkout[] {
   if (typeof window === "undefined") return []
   const stored = localStorage.getItem(STORAGE_KEY)
-  const history = stored ? (JSON.parse(stored) as CompletedWorkout[]) : []
+  let history: CompletedWorkout[] = []
+  if (stored) {
+    try {
+      history = JSON.parse(stored) as CompletedWorkout[]
+    } catch {
+      history = []
+    }
+  }
   let didMigrate = false
 
   const normalized = history.map((workout) => {

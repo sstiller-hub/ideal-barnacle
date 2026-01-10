@@ -36,18 +36,13 @@ function calculatePlatesForWeight(weight: number): { plate: Plate; count: number
 }
 
 export default function PlateCalculator({ weightPerSide, barWeight = 45 }: PlateCalculatorProps) {
-  console.log("[v0] PlateCalculator rendered - weightPerSide:", weightPerSide, "type:", typeof weightPerSide)
-
   if (!weightPerSide || isNaN(weightPerSide) || weightPerSide <= 0) {
-    console.log("[v0] PlateCalculator returning null - invalid weight")
     return null
   }
 
   const plates = calculatePlatesForWeight(weightPerSide)
-  console.log("[v0] Plates calculated:", plates)
 
   if (plates.length === 0) {
-    console.log("[v0] PlateCalculator returning null - no plates needed")
     return null
   }
 

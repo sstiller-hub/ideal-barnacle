@@ -19,7 +19,6 @@ function getDateKey(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-let hasLoggedScheduleDebug = false
 const DAY_ORDER: DayOfWeek[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DAY_TO_INDEX: Record<DayOfWeek, number> = {
   Sun: 0,
@@ -55,10 +54,6 @@ export function getScheduledWorkoutForDate(date: Date): ScheduledWorkout | null 
   const schedule = getSchedule()
   const key = getDateKey(date)
   const entry = schedule[key]
-  if (!hasLoggedScheduleDebug && process.env.NODE_ENV !== "production") {
-    hasLoggedScheduleDebug = true
-    console.log("[schedule] todayKey", key, "weekday", date.getDay(), "entry", entry ?? null)
-  }
   return entry // undefined means no manual override, null means rest day
 }
 

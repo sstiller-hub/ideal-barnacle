@@ -1,6 +1,6 @@
 // lib/supabase-sync.ts
 import { supabase } from "@/lib/supabase"
-import { getWorkoutHistory } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 
 // Local outbox for offline-first sync
 const OUTBOX_KEY = "sync_outbox_v1"
@@ -9,7 +9,44 @@ type OutboxItem = {
   id: string
   type: "workout_upsert"
   createdAt: string
-  workout: any
+  workout: WorkoutPayload
+}
+
+type WorkoutSet = {
+  setIndex?: number
+  set_index?: number
+  reps?: number | null
+  weight?: number | null
+  completed?: boolean
+}
+
+type WorkoutExercise = {
+  id?: string
+  exerciseId?: string
+  exercise_id?: string
+  name?: string
+  targetSets?: number
+  target_sets?: number
+  targetReps?: number | string
+  target_reps?: number | string
+  targetWeight?: number | string
+  target_weight?: number | string
+  sets?: WorkoutSet[]
+}
+
+type WorkoutPayload = {
+  id?: string
+  name?: string
+  routineName?: string
+  performed_at?: string
+  date?: string
+  durationSeconds?: number
+  duration_seconds?: number
+  duration?: number
+  stats?: Record<string, unknown>
+  clientId?: string
+  client_id?: string
+  exercises?: WorkoutExercise[]
 }
 
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -36,7 +73,7 @@ function isUuid(value: string | undefined | null): boolean {
   )
 }
 
-function ensureWorkoutUuid(workout: any): string {
+function ensureWorkoutUuid(workout: WorkoutPayload): string {
   const currentId = workout?.id
   if (isUuid(currentId)) return currentId
 
@@ -44,7 +81,7 @@ function ensureWorkoutUuid(workout: any): string {
   workout.id = newId
 
   if (typeof window !== "undefined") {
-    const history = getWorkoutHistory() as any[]
+    const history = getWorkoutHistory() as CompletedWorkout[]
     const idx = history.findIndex((w) => w.id === currentId)
     if (idx >= 0) {
       history[idx] = { ...history[idx], id: newId }
@@ -69,7 +106,7 @@ export function getOutboxCount() {
   return getOutbox().length
 }
 
-export function enqueueWorkoutForSync(workout: any) {
+export function enqueueWorkoutForSync(workout: WorkoutPayload) {
   if (typeof window === "undefined") return
 
   const items = getOutbox()
@@ -94,11 +131,11 @@ export function enqueueWorkoutForSync(workout: any) {
   }
 }
 
-function toPerformedAt(workout: any): string {
+function toPerformedAt(workout: WorkoutPayload): string {
   return workout?.performed_at || workout?.date || new Date().toISOString()
 }
 
-function toDurationSeconds(workout: any): number {
+function toDurationSeconds(workout: WorkoutPayload): number {
   return (
     Number(
       workout?.durationSeconds ?? workout?.duration_seconds ?? workout?.duration ?? 0
@@ -106,11 +143,11 @@ function toDurationSeconds(workout: any): number {
   )
 }
 
-function toStatsJson(workout: any) {
+function toStatsJson(workout: WorkoutPayload): Record<string, unknown> {
   return workout?.stats || {}
 }
 
-function toClientId(workout: any): string {
+function toClientId(workout: WorkoutPayload): string {
   return workout?.clientId || workout?.client_id || workout?.id || uuid()
 }
 
@@ -119,7 +156,7 @@ async function ensureAuthed() {
   return data?.user ?? null
 }
 
-async function upsertWorkoutGraph(workout: any, userId: string) {
+async function upsertWorkoutGraph(workout: WorkoutPayload, userId: string) {
   // Upsert workout
   const workoutId = ensureWorkoutUuid(workout)
   const workoutRow = {
@@ -148,7 +185,9 @@ async function upsertWorkoutGraph(workout: any, userId: string) {
     .delete()
     .eq("workout_id", persistedWorkoutId)
 
-  const exercises: any[] = Array.isArray(workout?.exercises) ? workout.exercises : []
+  const exercises: WorkoutExercise[] = Array.isArray(workout?.exercises)
+    ? workout.exercises
+    : []
   if (exercises.length === 0) return
 
   const exerciseRows = exercises.map((ex, idx) => ({
@@ -175,16 +214,25 @@ async function upsertWorkoutGraph(workout: any, userId: string) {
   if (exErr) throw exErr
 
   const exIdByIndex = new Map<number, string>()
-  ;(insertedExercises || []).forEach((row: any) =>
-    exIdByIndex.set(row.sort_index, row.id)
-  )
+  ;(insertedExercises || []).forEach((row) => {
+    if (row?.id && typeof row.sort_index === "number") {
+      exIdByIndex.set(row.sort_index, row.id)
+    }
+  })
 
-  const setsRows: any[] = []
+  const setsRows: Array<{
+    workout_exercise_id: string
+    set_index: number
+    reps: number | null
+    weight: number | null
+    completed: boolean
+    updated_at: string
+  }> = []
   exercises.forEach((ex, idx) => {
     const workoutExerciseId = exIdByIndex.get(idx)
     if (!workoutExerciseId) return
 
-    const sets: any[] = Array.isArray(ex?.sets) ? ex.sets : []
+    const sets: WorkoutSet[] = Array.isArray(ex?.sets) ? ex.sets : []
     sets.forEach((s, setIndex) => {
       setsRows.push({
         workout_exercise_id: workoutExerciseId,
@@ -279,7 +327,7 @@ export async function pullSupabaseToLocal() {
   const cloud = workouts || []
   if (cloud.length === 0) return { success: true, message: "No cloud workouts" }
 
-  const cloudWorkouts: any[] = []
+  const cloudWorkouts: WorkoutPayload[] = []
 
   for (const w of cloud) {
     const { data: ex, error: exErr } = await supabase
@@ -293,9 +341,12 @@ export async function pullSupabaseToLocal() {
     if (exErr) throw exErr
 
     const exercises = ex || []
-    const exerciseIds = exercises.map((e: any) => e.id)
+    const exerciseIds = exercises.map((e) => e.id)
 
-    const setsByExerciseId = new Map<string, any[]>()
+    const setsByExerciseId = new Map<
+      string,
+      Array<{ setIndex: number; reps: number | null; weight: number | null; completed: boolean }>
+    >()
 
     if (exerciseIds.length > 0) {
       const { data: sets, error: sErr } = await supabase
@@ -306,7 +357,7 @@ export async function pullSupabaseToLocal() {
 
       if (sErr) throw sErr
 
-      ;(sets || []).forEach((s: any) => {
+      ;(sets || []).forEach((s) => {
         const list = setsByExerciseId.get(s.workout_exercise_id) || []
         list.push({
           setIndex: s.set_index,
@@ -338,8 +389,8 @@ export async function pullSupabaseToLocal() {
 
   // Merge cloud into local (cloud wins by id)
   if (typeof window !== "undefined") {
-    const local = getWorkoutHistory() as any[]
-    const byId = new Map<string, any>()
+    const local = getWorkoutHistory() as CompletedWorkout[]
+    const byId = new Map<string, CompletedWorkout | WorkoutPayload>()
     local.forEach((w) => byId.set(w.id, w))
     cloudWorkouts.forEach((w) => byId.set(w.id, w))
 
