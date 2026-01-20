@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 type WorkoutSessionRow = {
   id: string
   user_id: string
-  status: "active" | "completed" | "abandoned"
+  status: "active" | "completed" | "abandoned" | "scheduled"
   started_at: string
   ended_at: string | null
   active_duration_seconds: number
