@@ -23,7 +23,13 @@ import {
 } from "@/lib/autosave-workout-storage"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { formatExerciseName } from "@/lib/format-exercise-name"
-import { getScheduledWorkoutForDate, type ScheduledWorkout } from "@/lib/schedule-storage"
+import {
+  getScheduledWorkoutForDate,
+  removeScheduledWorkout,
+  setRestDay,
+  setScheduledWorkout,
+  type ScheduledWorkout,
+} from "@/lib/schedule-storage"
 import {
   clearScheduleOverride,
   getScheduleOverrideForDate,
@@ -31,12 +37,12 @@ import {
   type ScheduleOverrideResult,
 } from "@/lib/supabase-schedule-overrides"
 import { deriveWorkoutType } from "@/lib/workout-type"
-import { BottomNav } from "@/components/bottom-nav"
 import { supabase } from "@/lib/supabase"
 import {
   ArrowDown,
   ArrowLeftRight,
   ArrowUp,
+  Settings,
   ChevronLeft,
   ChevronRight,
   ChevronRight as ChevronRightSmall,
@@ -117,6 +123,7 @@ export default function Home() {
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [scheduleOverride, setScheduleOverrideState] = useState<ScheduleOverrideResult | undefined>(undefined)
+  const [localOverride, setLocalOverride] = useState(false)
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -363,6 +370,7 @@ export default function Home() {
     const resolvedRestDay = restDay || !nextRoutine
     setBaseScheduledRoutine(nextRoutine)
     setBaseIsRestDay(resolvedRestDay)
+    setLocalOverride(manualSchedule !== undefined)
   }
 
   const handleStartWorkout = (routineId: string) => {
@@ -401,21 +409,50 @@ export default function Home() {
     if (isPastDay) return
     const baseRoutineId = baseScheduledRoutine?.id ?? null
     const baseRestDay = baseIsRestDay
+    const resolvedRoutine = routineId ? routinePool.find((routine) => routine.id === routineId) ?? null : null
 
     if ((routineId === null && baseRestDay) || (routineId && routineId === baseRoutineId)) {
-      const cleared = await clearScheduleOverride(selectedDate)
-      if (cleared) {
-        setScheduleOverrideState(undefined)
+      if (userId) {
+        const cleared = await clearScheduleOverride(selectedDate)
+        if (cleared) {
+          setScheduleOverrideState(undefined)
+          setLocalOverride(false)
+        }
+      } else {
+        removeScheduledWorkout(selectedDate)
+        setLocalOverride(false)
+        loadDataForDate(selectedDate)
+        window.dispatchEvent(new Event("schedule:updated"))
       }
+      loadDataForDate(selectedDate)
       setShowWorkoutPicker(false)
       return
     }
 
     const routineName = routineId ? routineNameById.get(routineId) ?? null : null
     const workout = routineId && routineName ? { routineId, routineName } : null
-    const updated = await setScheduleOverride(selectedDate, workout)
-    if (updated) {
-      setScheduleOverrideState({ workout, isOverride: true })
+    setBaseScheduledRoutine(resolvedRoutine)
+    setBaseIsRestDay(routineId === null)
+    setScheduledRoutine(resolvedRoutine)
+    if (userId) {
+      const updated = await setScheduleOverride(selectedDate, workout)
+      if (updated) {
+        setScheduleOverrideState({
+          workout,
+          isOverride: true,
+          workoutType: deriveWorkoutType(routineName),
+        })
+        setLocalOverride(false)
+      }
+    } else {
+      if (workout) {
+        setScheduledWorkout(selectedDate, workout)
+      } else {
+        setRestDay(selectedDate)
+      }
+      setLocalOverride(true)
+      loadDataForDate(selectedDate)
+      window.dispatchEvent(new Event("schedule:updated"))
     }
     setShowWorkoutPicker(false)
   }
@@ -448,7 +485,7 @@ export default function Home() {
     return selected.getTime() < today.getTime()
   }, [selectedDate])
 
-  const isOverridden = scheduleOverride?.isOverride ?? false
+  const isOverridden = scheduleOverride?.isOverride ?? localOverride
   const effectiveRestDay = scheduleOverride?.workout === null ? true : scheduleOverride ? false : baseIsRestDay
   const scheduledWorkoutType = effectiveRestDay
     ? "Rest"
@@ -468,8 +505,25 @@ export default function Home() {
   const selectedTitle = scheduledWorkoutType
 
   return (
-    <main className="relative min-h-[100dvh] pb-[calc(env(safe-area-inset-bottom)+120px)] bg-[#0A0A0C]">
-      <div className="px-5 pt-5 pb-8">
+    <>
+      <button
+        onClick={() => router.push("/settings")}
+        className="fixed z-50 text-white/25 hover:text-white/50 transition-colors duration-200"
+        style={{
+          top: "24px",
+          right: "24px",
+          background: "transparent",
+          border: "none",
+          padding: "8px",
+          cursor: "pointer",
+        }}
+        aria-label="Open settings"
+        type="button"
+      >
+        <Settings size={20} strokeWidth={1.5} />
+      </button>
+      <main className="relative min-h-[100dvh] overflow-hidden bg-[#0A0A0C]">
+        <div className="relative z-50 px-5 pt-5 pb-8">
         <div className="flex items-start justify-between gap-4">
           <div className="relative flex-shrink-0">
             <div className="flex items-center gap-2 mb-1">
@@ -549,10 +603,13 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="flex-shrink-0">
+          <div className="flex items-start gap-4">
             <div className="flex items-center gap-1.5">
               <button
-                onClick={goToPreviousDay}
+                onClick={() => {
+                  setShowWorkoutPicker(false)
+                  goToPreviousDay()
+                }}
                 aria-label="Previous day"
                 className="text-white/40 hover:text-white/70 transition-colors"
               >
@@ -575,7 +632,10 @@ export default function Home() {
               </div>
 
               <button
-                onClick={goToNextDay}
+                onClick={() => {
+                  setShowWorkoutPicker(false)
+                  goToNextDay()
+                }}
                 aria-label="Next day"
                 className="text-white/40 hover:text-white/70 transition-colors"
               >
@@ -645,7 +705,7 @@ export default function Home() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: "20px" }}>
+      <div className="flex-1 overflow-hidden" style={{ paddingBottom: "20px" }}>
         {actualState === "completed" && workoutForDate && (
           <div className="px-5 mb-12">
             <div
@@ -885,9 +945,7 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <BottomNav />
-
-      <style>{`
+        <style>{`
         .flex.overflow-x-auto::-webkit-scrollbar {
           display: none;
         }
@@ -922,8 +980,9 @@ export default function Home() {
             opacity: 1;
           }
         }
-      `}</style>
-    </main>
+        `}</style>
+      </main>
+    </>
   )
 }
 
@@ -1041,19 +1100,20 @@ function PRCard({
                 strokeLinejoin="round"
               />
 
-              {chartData.map((value, index) => {
-                const x = (index / (chartData.length - 1)) * 100
-                const y = 42 - ((value - minValue) / range) * 32
-                return (
-                  <circle
-                    key={`${exercise}-${index}`}
-                    cx={x}
-                    cy={y}
-                    r={index === chartData.length - 1 ? 1.5 : 0.8}
-                    fill={index === chartData.length - 1 ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.15)"}
-                  />
-                )
-              })}
+              {chartData.length > 1 &&
+                chartData.map((value, index) => {
+                  const x = (index / (chartData.length - 1)) * 100
+                  const y = 42 - ((value - minValue) / range) * 32
+                  return (
+                    <circle
+                      key={`${exercise}-${index}`}
+                      cx={x}
+                      cy={y}
+                      r={index === chartData.length - 1 ? 1.5 : 0.8}
+                      fill={index === chartData.length - 1 ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.15)"}
+                    />
+                  )
+                })}
             </>
           )}
         </svg>

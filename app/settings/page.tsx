@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
@@ -17,8 +17,7 @@ import {
 } from "@/lib/google-drive-backup"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { BottomNav } from "@/components/bottom-nav"
-import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown } from "lucide-react"
+import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft } from "lucide-react"
 import { signInWithGoogle } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
@@ -33,6 +32,7 @@ import {
 } from "@/lib/wyze-weight-import"
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [workouts, setWorkouts] = useState<CompletedWorkout[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [syncStatus, setSyncStatus] = useState<string>("")
@@ -330,11 +330,25 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen pb-20 glass-scope">
+    <div className="min-h-screen glass-scope">
       <div className="sticky top-0 z-10 bg-background border-b p-3 flex items-center justify-between">
-        <Link href="/" className="text-xl">
-          ←
-        </Link>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: "0",
+            cursor: "pointer",
+          }}
+          aria-label="Back to home"
+        >
+          <ChevronLeft size={16} strokeWidth={2} />
+          <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+            Back
+          </span>
+        </button>
         <h1 className="text-lg font-bold">Settings</h1>
         <div className="w-6" />
       </div>
@@ -946,7 +960,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <BottomNav />
     </div>
   )
 }

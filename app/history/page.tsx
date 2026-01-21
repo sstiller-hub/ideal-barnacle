@@ -1,13 +1,12 @@
 "use client"
 
 import type React from "react"
-import { X } from "lucide-react"
+import { ChevronLeft, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { getWorkoutHistory, deleteWorkout, type CompletedWorkout } from "@/lib/workout-storage"
-import { BottomNav } from "@/components/bottom-nav"
 
 export default function HistoryPage() {
   const router = useRouter()
@@ -50,14 +49,28 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b border-border">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/")}>
-              <span className="text-xl">‹</span>
-            </Button>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "0",
+                cursor: "pointer",
+              }}
+              aria-label="Back to home"
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+              <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+                Back
+              </span>
+            </button>
             <div>
               <h1 className="text-lg font-bold text-foreground">Workout History</h1>
               <p className="text-xs text-muted-foreground">{workouts.length} workouts completed</p>
@@ -138,7 +151,6 @@ export default function HistoryPage() {
         )}
       </div>
 
-      <BottomNav />
     </div>
   )
 }

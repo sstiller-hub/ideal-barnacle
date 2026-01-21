@@ -12,7 +12,6 @@ import {
   getCurrentInProgressSession,
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
-import { BottomNav } from "@/components/bottom-nav"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,7 +79,7 @@ export default function WorkoutsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background pb-20">
+    <main className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border px-4 py-4 flex items-center justify-between">
         <button onClick={() => router.push("/")} className="text-muted-foreground">
@@ -208,7 +207,6 @@ export default function WorkoutsPage() {
       </AlertDialog>
 
       {/* Bottom Navigation */}
-      <BottomNav />
     </main>
   )
 }

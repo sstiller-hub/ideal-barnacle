@@ -36,7 +36,6 @@ import {
   saveSession,
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
-import BottomNav from "@/components/bottom-nav"
 import { ChevronLeft, Check, Pause, Play, PencilLine, Plus } from "lucide-react"
 import ExerciseCard from "@/components/exercise-card"
 
@@ -1394,7 +1393,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       <style jsx global>{`
         :root {
           --workout-footer-h: 80px;
-          --bottom-nav-h: 68px;
+          --bottom-nav-h: 0px;
         }
       `}</style>
 
@@ -1641,10 +1640,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           </div>
         </div>
 
-        {/* Bottom Navigation */}
-        <div style={{ height: "var(--bottom-nav-h)" }} className="bg-background">
-          <BottomNav fixed={false} />
-        </div>
       </div>
 
     </div>

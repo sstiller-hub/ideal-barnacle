@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getWorkoutHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
-import { BottomNav } from "@/components/bottom-nav"
+import { ChevronLeft } from "lucide-react"
 
 type MaxWeightRecord = {
   exerciseName: string
@@ -69,9 +69,23 @@ export default function PRsPage() {
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
           <div className="max-w-2xl mx-auto px-4 py-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
-                <span className="text-xl">‹</span>
-              </Button>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "0",
+                  cursor: "pointer",
+                }}
+                aria-label="Back to home"
+              >
+                <ChevronLeft size={16} strokeWidth={2} />
+                <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+                  Back
+                </span>
+              </button>
               <h1 className="text-lg font-bold text-foreground">Max Weights</h1>
             </div>
           </div>
@@ -88,7 +102,6 @@ export default function PRsPage() {
           </Button>
         </div>
 
-        <BottomNav />
       </div>
     )
   }
@@ -96,13 +109,27 @@ export default function PRsPage() {
   const totalMaxWeight = maxWeights.reduce((sum, record) => sum + record.maxWeight, 0)
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
-              <span className="text-xl">‹</span>
-            </Button>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "0",
+                cursor: "pointer",
+              }}
+              aria-label="Back to home"
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+              <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+                Back
+              </span>
+            </button>
             <h1 className="text-lg font-bold text-foreground">Max Weights</h1>
           </div>
           <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl p-4 border border-primary/10">
@@ -138,7 +165,6 @@ export default function PRsPage() {
         ))}
       </div>
 
-      <BottomNav />
     </div>
   )
 }
