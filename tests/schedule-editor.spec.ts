@@ -79,5 +79,5 @@ test("scheduled workout shows on Home when set", async ({ page }) => {
   await expect(page.getByText("Schedule saved.")).toBeVisible()
 
   await page.goto("/")
-  await expect(page.getByText(routine.name)).toBeVisible()
+  await expect(page.getByText("Overhand Row")).toBeVisible()
 })

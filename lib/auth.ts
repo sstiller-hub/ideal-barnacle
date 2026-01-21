@@ -1,11 +1,10 @@
-// lib/auth.ts
 import { supabase } from "@/lib/supabase"
 
-export async function signInWithEmail(email: string) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
     options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`
+      redirectTo: `${window.location.origin}/auth/callback`,
     },
   })
 

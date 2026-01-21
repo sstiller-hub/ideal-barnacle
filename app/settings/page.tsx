@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/bottom-nav"
 import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown } from "lucide-react"
-import { signInWithEmail } from "@/lib/auth"
+import { signInWithGoogle } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 import { useTheme } from "next-themes"
@@ -32,32 +32,7 @@ import {
   type WyzeParseResult,
 } from "@/lib/wyze-weight-import"
 
-function SignInCard({
-  email,
-  setEmail,
-}: {
-  email: string
-  setEmail: (value: string) => void
-}) {
-  return (
-    <Card className="p-4">
-      <h2 className="font-bold text-base mb-3">Sign in</h2>
-      <div className="flex flex-col gap-3">
-        <input
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@email.com"
-        />
-        <Button onClick={() => signInWithEmail(email)}>Sign in</Button>
-      </div>
-    </Card>
-  )
-}
-
 export default function SettingsPage() {
-  const [email, setEmail] = useState("")
   const [workouts, setWorkouts] = useState<CompletedWorkout[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [syncStatus, setSyncStatus] = useState<string>("")
@@ -411,14 +386,7 @@ export default function SettingsPage() {
                 <div>
                   <h2 className="font-bold text-base mb-3">Sign in</h2>
                   <div className="flex flex-col gap-3">
-                    <input
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@email.com"
-                    />
-                    <Button onClick={() => signInWithEmail(email)}>Sign in</Button>
+                    <Button onClick={() => signInWithGoogle()}>Sign in with Google</Button>
                   </div>
                 </div>
               )}

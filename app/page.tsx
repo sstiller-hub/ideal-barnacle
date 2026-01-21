@@ -219,13 +219,18 @@ export default function Home() {
         achievedAt?: string
       }
     >()
+    const prTimelineByExercise = new Map<string, Array<{ weight: number; achievedAt: string }>>()
 
     const getExerciseVolume = (exercise: any) =>
       exercise.sets
         .filter((s: any) => s.completed && s.weight > 0 && s.reps > 0)
         .reduce((sum: number, s: any) => sum + s.weight * s.reps, 0)
 
-    workoutHistory.forEach((workout) => {
+    const sortedHistory = [...workoutHistory].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+
+    sortedHistory.forEach((workout) => {
       workout.exercises.forEach((exercise) => {
         const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0)
         completedSets.forEach((set: any) => {
@@ -242,6 +247,18 @@ export default function Home() {
             })
           }
         })
+
+        const key = normalizeExerciseName(exercise.name)
+        const maxWeight = completedSets.reduce((max: number, set: any) => Math.max(max, set.weight ?? 0), 0)
+        if (!maxWeight) return
+        const currentTimeline = prTimelineByExercise.get(key) ?? []
+        const lastEntry = currentTimeline[currentTimeline.length - 1]
+        if (!lastEntry || maxWeight > lastEntry.weight) {
+          prTimelineByExercise.set(key, [
+            ...currentTimeline,
+            { weight: maxWeight, achievedAt: workout.date },
+          ])
+        }
       })
     })
 
@@ -261,8 +278,11 @@ export default function Home() {
           })
           .filter((v: number | null): v is number => v !== null)
 
+        const timeline = prTimelineByExercise.get(name) ?? []
+        const last = timeline[timeline.length - 1]
+        const prev = timeline[timeline.length - 2]
         const trendPct =
-          volumes.length >= 2 && volumes[1] > 0 ? Math.round(((volumes[0] - volumes[1]) / volumes[1]) * 100) : null
+          prev && prev.weight > 0 ? Math.round(((last.weight - prev.weight) / prev.weight) * 100) : null
 
         const chartData = volumes.slice(0, 7).reverse()
 
@@ -533,6 +553,7 @@ export default function Home() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={goToPreviousDay}
+                aria-label="Previous day"
                 className="text-white/40 hover:text-white/70 transition-colors"
               >
                 <ChevronLeft size={16} strokeWidth={2} />
@@ -555,6 +576,7 @@ export default function Home() {
 
               <button
                 onClick={goToNextDay}
+                aria-label="Next day"
                 className="text-white/40 hover:text-white/70 transition-colors"
               >
                 <ChevronRight size={16} strokeWidth={2} />
@@ -832,7 +854,7 @@ export default function Home() {
                   weight={pr.weight}
                   details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
                   chartData={pr.chartData || []}
-                  trendPct={pr.trendPct ?? 0}
+                  trendPct={pr.trendPct ?? undefined}
                   onClick={pr.workoutId ? () => router.push(`/history/${pr.workoutId}`) : undefined}
                 />
               ))}
