@@ -508,12 +508,13 @@ export default function Home() {
     <>
       <button
         onClick={() => router.push("/settings")}
-        className="fixed z-50 text-white/25 hover:text-white/50 transition-colors duration-200"
+        className="fixed z-50 text-white/50 hover:text-white/90 transition-all duration-200"
         style={{
           top: "24px",
           right: "24px",
-          background: "transparent",
-          border: "none",
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "1px",
           padding: "8px",
           cursor: "pointer",
         }}
