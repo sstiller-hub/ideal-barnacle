@@ -21,7 +21,7 @@ import {
   saveCurrentSessionId,
   type WorkoutSession,
 } from "@/lib/autosave-workout-storage"
-import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
+import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "@/lib/growth-v2-plan"
 import { formatExerciseName } from "@/lib/format-exercise-name"
 import {
   getScheduledWorkoutForDate,
@@ -92,6 +92,8 @@ type PersonalRecord = {
   chartData?: number[]
 }
 
+type DayState = "scheduled" | "rest" | "completed" | "activeSession"
+
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -127,6 +129,11 @@ export default function Home() {
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [uiStateOverride, setUiStateOverride] = useState<DayState | null>(null)
+  const [devModeEnabled, setDevModeEnabled] = useState(false)
+  const [devModeTapCount, setDevModeTapCount] = useState(0)
+  const [devModeTapTimeout, setDevModeTapTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [wyzeWeightSeries, setWyzeWeightSeries] = useState<number[]>([])
 
   const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
 
@@ -184,6 +191,29 @@ export default function Home() {
   }, [selectedDate])
 
   useEffect(() => {
+    const handleFocus = () => {
+      loadDataForDate(selectedDate)
+      if (userId) {
+        void loadWyzeWeights(userId)
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        loadDataForDate(selectedDate)
+        if (userId) {
+          void loadWyzeWeights(userId)
+        }
+      }
+    }
+    window.addEventListener("focus", handleFocus)
+    document.addEventListener("visibilitychange", handleVisibility)
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibility)
+    }
+  }, [selectedDate, userId])
+
+  useEffect(() => {
     let active = true
     if (!userId) {
       setScheduleOverrideState(undefined)
@@ -197,6 +227,30 @@ export default function Home() {
       active = false
     }
   }, [selectedDate, userId])
+
+  const loadWyzeWeights = async (targetUserId: string) => {
+    const { data, error } = await supabase
+      .from("body_weight_entries")
+      .select("weight_lb, measured_at")
+      .eq("user_id", targetUserId)
+      .eq("source", "wyze_import")
+      .order("measured_at", { ascending: true })
+      .limit(30)
+    if (error) return
+    const series =
+      data
+        ?.map((entry) => entry.weight_lb)
+        .filter((value): value is number => typeof value === "number" && !Number.isNaN(value)) ?? []
+    setWyzeWeightSeries(series)
+  }
+
+  useEffect(() => {
+    if (!userId) {
+      setWyzeWeightSeries([])
+      return
+    }
+    void loadWyzeWeights(userId)
+  }, [userId])
 
   useEffect(() => {
     if (routinePool.length === 0) return
@@ -343,28 +397,19 @@ export default function Home() {
     setWorkoutForDate(completedWorkout || null)
 
     const manualSchedule = getScheduledWorkoutForDate(date)
+    const weeklySchedule = GROWTH_V2_WEEKLY[targetDate.getDay()] ?? null
 
     let nextRoutine: WorkoutRoutine | null = null
     let restDay = false
 
-    if (manualSchedule === null) {
+    const resolvedSchedule = manualSchedule !== undefined ? manualSchedule : weeklySchedule
+
+    if (resolvedSchedule === null) {
       restDay = true
-    } else if (manualSchedule !== undefined) {
-      nextRoutine = resolveRoutineEntry(manualSchedule)
+    } else if (resolvedSchedule) {
+      nextRoutine = resolveRoutineEntry(resolvedSchedule)
     } else {
       nextRoutine = pool[0] ?? null
-      if (history.length > 0 && pool.length > 0) {
-        const workoutsBeforeDate = history.filter((w) => new Date(w.date) < date)
-        const lastWorkout = workoutsBeforeDate[0]
-
-        if (lastWorkout) {
-          const lastRoutineIndex = pool.findIndex((r) => r.name === lastWorkout.name)
-          if (lastRoutineIndex >= 0) {
-            const nextIndex = (lastRoutineIndex + 1) % pool.length
-            nextRoutine = pool[nextIndex]
-          }
-        }
-      }
     }
 
     const resolvedRestDay = restDay || !nextRoutine
@@ -458,15 +503,40 @@ export default function Home() {
   }
 
   const goToPreviousDay = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setDate(newDate.getDate() - 1)
-    setSelectedDate(newDate)
+    setSelectedDate((prev) => {
+      const next = new Date(prev)
+      next.setDate(next.getDate() - 1)
+      return next
+    })
   }
 
   const goToNextDay = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setDate(newDate.getDate() + 1)
-    setSelectedDate(newDate)
+    setSelectedDate((prev) => {
+      const next = new Date(prev)
+      next.setDate(next.getDate() + 1)
+      return next
+    })
+  }
+
+  const handleDevModeActivation = () => {
+    const newCount = devModeTapCount + 1
+    setDevModeTapCount(newCount)
+
+    if (devModeTapTimeout) {
+      clearTimeout(devModeTapTimeout)
+    }
+
+    if (newCount >= 5) {
+      setDevModeEnabled((prev) => !prev)
+      setDevModeTapCount(0)
+      setDevModeTapTimeout(null)
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      setDevModeTapCount(0)
+    }, 1000)
+    setDevModeTapTimeout(timeout)
   }
 
   const isToday = () => {
@@ -490,13 +560,15 @@ export default function Home() {
   const scheduledWorkoutType = effectiveRestDay
     ? "Rest"
     : scheduleOverride?.workoutType || deriveWorkoutType(scheduledRoutine?.name)
-  const actualState = workoutForDate
-    ? "completed"
-    : effectiveRestDay
-      ? "rest"
-      : session && isToday()
-        ? "activeSession"
-        : "scheduled"
+  const actualState =
+    uiStateOverride ||
+    (workoutForDate
+      ? "completed"
+      : effectiveRestDay
+        ? "rest"
+        : session && isToday()
+          ? "activeSession"
+          : "scheduled")
 
   const routineNameById = useMemo(() => new Map(routinePool.map((routine) => [routine.id, routine.name])), [routinePool])
 
@@ -508,31 +580,73 @@ export default function Home() {
     <>
       <button
         onClick={() => router.push("/settings")}
-        className="fixed z-50 text-white/25 hover:text-white/50 transition-colors duration-200"
+        className="fixed z-[60] text-white/25 hover:text-white/50 transition-colors duration-200"
         style={{
           top: "24px",
-          right: "24px",
+          right: "12px",
           background: "transparent",
           border: "none",
           padding: "8px",
           cursor: "pointer",
+          pointerEvents: "auto",
         }}
         aria-label="Open settings"
         type="button"
       >
-        <Settings size={20} strokeWidth={1.5} />
+        <Settings size={16} strokeWidth={1.5} />
       </button>
-      <main className="relative min-h-[100dvh] overflow-hidden bg-[#0A0A0C]">
-        <div className="relative z-50 px-5 pt-5 pb-8">
+      <main
+        className="relative flex flex-col overflow-hidden bg-[#0A0A0C]"
+        style={{ height: "100dvh", paddingTop: "20px", paddingBottom: "env(safe-area-inset-bottom, 100px)" }}
+      >
+        {devModeEnabled && (
+          <div className="px-5 pb-4 flex-shrink-0">
+            <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+              {(["scheduled", "rest", "completed", "activeSession"] as DayState[]).map((state) => (
+                <button
+                  key={state}
+                  onClick={() => setUiStateOverride(uiStateOverride === state ? null : state)}
+                  className="flex-shrink-0 transition-all duration-200"
+                  style={{
+                    background: uiStateOverride === state ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
+                    border: uiStateOverride === state ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: "1px",
+                    padding: "6px 10px",
+                  }}
+                  type="button"
+                >
+                  <span
+                    className={uiStateOverride === state ? "text-white/70" : "text-white/30"}
+                    style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  >
+                    {state.toUpperCase()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="relative z-50 px-5 pb-8 flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="relative flex-shrink-0">
             <div className="flex items-center gap-2 mb-1">
-              <div
-                className="text-white/25 tracking-widest"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              <button
+                onClick={handleDevModeActivation}
+                className="text-white/25 tracking-widest select-none"
+                style={{
+                  fontSize: "7px",
+                  fontWeight: 500,
+                  letterSpacing: "0.18em",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "default",
+                }}
+                type="button"
               >
                 SCHEDULED
-              </div>
+              </button>
               {isOverridden && (
                 <div
                   className="flex items-center gap-1"
@@ -603,7 +717,7 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4" style={{ marginTop: "20px" }}>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => {
@@ -649,7 +763,7 @@ export default function Home() {
           <div className="mt-6 -mx-5">
             <div className="fixed inset-0 z-40" onClick={() => setShowWorkoutPicker(false)} style={{ background: "transparent" }} />
             <div
-              className="relative z-50 flex gap-3 overflow-x-auto px-5"
+              className="relative z-50 flex gap-3 overflow-x-auto px-5 pb-1"
               style={{
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
@@ -667,6 +781,19 @@ export default function Home() {
                   padding: "12px 18px",
                   minWidth: "100px",
                 }}
+                onMouseEnter={(e) => {
+                  if (!effectiveRestDay) {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.10)"
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!effectiveRestDay) {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)"
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
+                  }
+                }}
+                type="button"
               >
                 <div
                   className={effectiveRestDay ? "text-white/90" : "text-white/50"}
@@ -690,6 +817,19 @@ export default function Home() {
                       minWidth: "100px",
                       animation: `slideInItem 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.03}s backwards`,
                     }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
+                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.10)"
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)"
+                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
+                      }
+                    }}
+                    type="button"
                   >
                     <div
                       className={isSelected ? "text-white/90" : "text-white/50"}
@@ -881,6 +1021,22 @@ export default function Home() {
                 )}
               </div>
             </button>
+
+            <div className="mt-4">
+              <div
+                className="text-white/25 tracking-widest mb-2"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                WEIGHT TREND
+              </div>
+              {wyzeWeightSeries.length > 0 && (
+                <WeightTrendCard
+                  currentWeight={wyzeWeightSeries[wyzeWeightSeries.length - 1]}
+                  chartData={wyzeWeightSeries}
+                  timeframe="30d"
+                />
+              )}
+            </div>
           </div>
         )}
 
@@ -924,23 +1080,73 @@ export default function Home() {
       </div>
 
       <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          className="border-0"
+          style={{
+            background: "rgba(10, 10, 12, 0.96)",
+            borderRadius: "18px",
+            boxShadow: "0 30px 80px rgba(0, 0, 0, 0.45)",
+            padding: "24px",
+          }}
+        >
           <AlertDialogHeader>
-            <AlertDialogTitle>Active Workout Detected</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle
+              className="text-white"
+              style={{ fontSize: "18px", fontWeight: 500, letterSpacing: "-0.01em" }}
+            >
+              Active Workout Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription
+              className="text-white/40"
+              style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
+            >
               You have an active workout in progress ({session?.routineName || "Workout"}). Would you like to resume it
               or start a new workout? Starting a new workout will discard your current progress.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowConflictDialog(false)}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex flex-col gap-2 sm:flex-col sm:space-x-0">
+            <AlertDialogAction
+              onClick={handleResumeExisting}
+              className="w-full"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            >
+              <span className="text-white/90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.02em" }}>
+                Resume Existing
+              </span>
+            </AlertDialogAction>
             <AlertDialogAction
               onClick={handleDiscardExisting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="w-full"
+              style={{
+                background: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
             >
-              Discard & Start New
+              <span className="text-white/60" style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.02em" }}>
+                Discard & Start New
+              </span>
             </AlertDialogAction>
-            <AlertDialogAction onClick={handleResumeExisting}>Resume Existing</AlertDialogAction>
+            <AlertDialogCancel
+              onClick={() => setShowConflictDialog(false)}
+              className="w-full"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: "8px",
+                padding: "10px",
+              }}
+            >
+              <span className="text-white/40" style={{ fontSize: "11px", fontWeight: 400 }}>
+                Cancel
+              </span>
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1003,9 +1209,13 @@ function PRCard({
   trendPct?: number
   onClick?: () => void
 }) {
-  const maxValue = chartData.length > 0 ? Math.max(...chartData) : 1
-  const minValue = chartData.length > 0 ? Math.min(...chartData) : 0
+  const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
+  const maxValue = chartSeries.length > 0 ? Math.max(...chartSeries) : 1
+  const minValue = chartSeries.length > 0 ? Math.min(...chartSeries) : 0
   const range = maxValue - minValue || 1
+  const chartTop = 6
+  const chartBottom = 40
+  const chartHeight = chartBottom - chartTop
 
   return (
     <button
@@ -1067,18 +1277,18 @@ function PRCard({
         <svg width="100%" height="100%" viewBox="0 0 100 42" preserveAspectRatio="none">
           <defs>
             <linearGradient id={`grad-${exercise.replace(/\s+/g, "-")}`} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.06)" />
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.12)" />
               <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
             </linearGradient>
           </defs>
 
-          {chartData.length > 0 && (
+          {chartSeries.length > 0 && (
             <>
               <path
-                d={`M 0,42 ${chartData
+                d={`M 0,42 ${chartSeries
                   .map((value, index) => {
-                    const x = (index / (chartData.length - 1)) * 100
-                    const y = 42 - ((value - minValue) / range) * 32
+                    const x = (index / (chartSeries.length - 1)) * 100
+                    const y = chartBottom - ((value - minValue) / range) * chartHeight
                     return `L ${x},${y}`
                   })
                   .join(" ")} L 100,42 Z`}
@@ -1086,31 +1296,31 @@ function PRCard({
               />
 
               <path
-                d={`M ${chartData
+                d={`M ${chartSeries
                   .map((value, index) => {
-                    const x = (index / (chartData.length - 1)) * 100
-                    const y = 42 - ((value - minValue) / range) * 32
+                    const x = (index / (chartSeries.length - 1)) * 100
+                    const y = chartBottom - ((value - minValue) / range) * chartHeight
                     return `${x},${y}`
                   })
                   .join(" L ")}`}
                 fill="none"
-                stroke="rgba(255, 255, 255, 0.25)"
+                stroke="rgba(255, 255, 255, 0.35)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
 
-              {chartData.length > 1 &&
-                chartData.map((value, index) => {
-                  const x = (index / (chartData.length - 1)) * 100
-                  const y = 42 - ((value - minValue) / range) * 32
+              {chartSeries.length > 1 &&
+                chartSeries.map((value, index) => {
+                  const x = (index / (chartSeries.length - 1)) * 100
+                  const y = chartBottom - ((value - minValue) / range) * chartHeight
                   return (
                     <circle
                       key={`${exercise}-${index}`}
                       cx={x}
                       cy={y}
-                      r={index === chartData.length - 1 ? 1.5 : 0.8}
-                      fill={index === chartData.length - 1 ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.15)"}
+                      r={index === chartSeries.length - 1 ? 2 : 1}
+                      fill={index === chartSeries.length - 1 ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.25)"}
                     />
                   )
                 })}
@@ -1123,5 +1333,106 @@ function PRCard({
         {details}
       </div>
     </button>
+  )
+}
+
+function WeightTrendCard({
+  currentWeight,
+  chartData,
+  timeframe,
+}: {
+  currentWeight: number
+  chartData: number[]
+  timeframe: string
+}) {
+  const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
+  const maxValue = chartSeries.length > 0 ? Math.max(...chartSeries) : 1
+  const minValue = chartSeries.length > 0 ? Math.min(...chartSeries) : 0
+  const range = maxValue - minValue || 1
+
+  const currentValue = chartSeries[chartSeries.length - 1]
+  const previousValue = chartSeries[chartSeries.length - 2]
+  const changePercent = previousValue ? Math.round(((currentValue - previousValue) / previousValue) * 100) : 0
+  const isPositive = changePercent > 0
+
+  return (
+    <div>
+      <div className="mb-4">
+        <div className="flex items-baseline gap-2">
+          <div
+            className="text-white/95"
+            style={{
+              fontSize: "34px",
+              fontWeight: 500,
+              letterSpacing: "-0.04em",
+              lineHeight: "1",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {currentWeight}
+          </div>
+          <div className="text-white/20" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
+            lbs
+          </div>
+
+          {changePercent !== 0 && (
+            <div className="flex items-center gap-0.5 ml-1">
+              {isPositive ? (
+                <ArrowUp size={8} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
+              ) : (
+                <ArrowDown size={8} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
+              )}
+              <span
+                style={{
+                  fontSize: "8px",
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.3)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {Math.abs(changePercent)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ height: "48px", width: "100%" }}>
+        <svg width="100%" height="100%" viewBox="0 0 100 48" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="grad-weight" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.08)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
+            </linearGradient>
+          </defs>
+
+          <path
+            d={`M 0,48 ${chartSeries
+              .map((value, index) => {
+                const x = (index / (chartSeries.length - 1)) * 100
+                const y = 48 - ((value - minValue) / range) * 38
+                return `L ${x},${y}`
+              })
+              .join(" ")} L 100,48 Z`}
+            fill="url(#grad-weight)"
+          />
+
+          <path
+            d={`M ${chartSeries
+              .map((value, index) => {
+                const x = (index / (chartSeries.length - 1)) * 100
+                const y = 48 - ((value - minValue) / range) * 38
+                return `${x},${y}`
+              })
+              .join(" L ")}`}
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.25)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
   )
 }
