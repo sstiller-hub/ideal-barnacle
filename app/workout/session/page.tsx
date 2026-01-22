@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import WorkoutSession from "@/components/workout-session"
+import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { getRoutineById, type WorkoutRoutine } from "@/lib/routine-storage"
 
 export default function WorkoutSessionPage() {
@@ -14,7 +15,12 @@ export default function WorkoutSessionPage() {
   useEffect(() => {
     if (routineId) {
       const loadedRoutine = getRoutineById(routineId)
-      setRoutine(loadedRoutine)
+      if (loadedRoutine) {
+        setRoutine(loadedRoutine)
+        return
+      }
+      const growthRoutine = GROWTH_V2_ROUTINES.find((routine) => routine.id === routineId) || null
+      setRoutine(growthRoutine)
     }
   }, [routineId])
 

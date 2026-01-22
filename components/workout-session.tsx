@@ -1714,11 +1714,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const pauseSession = async () => {
     if (session?.status !== "in_progress") return
+    const persistedRestTimer = session.restTimer ?? restState ?? undefined
     const updatedSession: WorkoutSession = {
       ...session,
       status: "paused",
       activeDurationSeconds: commitActiveDuration(session),
       lastActiveAt: undefined,
+      restTimer: persistedRestTimer,
     }
     setSession(updatedSession)
     await saveSession(updatedSession)
@@ -1739,7 +1741,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("pagehide", handlePageHide)
     }
-  }, [session?.id, session?.status, session?.lastActiveAt])
+  }, [session?.id, session?.status, session?.lastActiveAt, restState])
 
   const handleTogglePlateCalc = () => {
     const newValue = !showPlateCalc

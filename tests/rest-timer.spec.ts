@@ -27,8 +27,8 @@ test("starts rest timer after completing a set", async ({ page }) => {
 
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
-  const weightInput = page.locator('input[placeholder="0"]').nth(0)
-  const repsInput = page.locator('input[placeholder="0"]').nth(1)
+  const weightInput = page.locator('input[type="number"]').nth(0)
+  const repsInput = page.locator('input[type="number"]').nth(1)
   await weightInput.fill("100")
   await repsInput.fill("8")
 
@@ -57,8 +57,8 @@ test("rest timer persists after reload", async ({ page }) => {
 
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
-  const weightInput = page.locator('input[placeholder="0"]').nth(0)
-  const repsInput = page.locator('input[placeholder="0"]').nth(1)
+  const weightInput = page.locator('input[type="number"]').nth(0)
+  const repsInput = page.locator('input[type="number"]').nth(1)
   await weightInput.fill("100")
   await repsInput.fill("8")
 
