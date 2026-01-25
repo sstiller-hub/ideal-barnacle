@@ -986,23 +986,24 @@ export default function Home() {
               </div>
             </button>
 
-            <div className="mt-4">
-              <div
-                className="text-white/25 tracking-widest mb-2"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-              >
-                WEIGHT TREND
-              </div>
-              {wyzeWeightSeries.length > 0 && (
-                <WeightTrendCard
-                  currentWeight={wyzeWeightSeries[wyzeWeightSeries.length - 1]}
-                  chartData={wyzeWeightSeries}
-                  timeframe="30d"
-                />
-              )}
-            </div>
           </div>
         )}
+
+        <div className="px-5 mt-4">
+          <div
+            className="text-white/25 tracking-widest mb-2"
+            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+          >
+            WEIGHT TREND
+          </div>
+          {wyzeWeightSeries.length > 0 && (
+            <WeightTrendCard
+              currentWeight={wyzeWeightSeries[wyzeWeightSeries.length - 1]}
+              chartData={wyzeWeightSeries}
+              timeframe="30d"
+            />
+          )}
+        </div>
 
         {todayPRs.length > 0 && (
           <div className="flex-shrink-0">
@@ -1314,10 +1315,31 @@ function WeightTrendCard({
   const minValue = chartSeries.length > 0 ? Math.min(...chartSeries) : 0
   const range = maxValue - minValue || 1
 
+  const weekWindow = 7
+  const currentWeekData = chartData.slice(-weekWindow)
+  const previousWeekData = chartData.slice(-weekWindow * 2, -weekWindow)
+  const hasWeekCompare = currentWeekData.length > 0 && previousWeekData.length > 0
+  const currentWeekAvg = hasWeekCompare
+    ? currentWeekData.reduce((sum, val) => sum + val, 0) / currentWeekData.length
+    : 0
+  const previousWeekAvg = hasWeekCompare
+    ? previousWeekData.reduce((sum, val) => sum + val, 0) / previousWeekData.length
+    : 0
+  const weeklyChange = currentWeekAvg - previousWeekAvg
+  const weeklyChangePercent = previousWeekAvg ? (weeklyChange / previousWeekAvg) * 100 : 0
+  const isWeightLoss = weeklyChange < 0
+
   const currentValue = chartSeries[chartSeries.length - 1]
   const previousValue = chartSeries[chartSeries.length - 2]
   const changePercent = previousValue ? Math.round(((currentValue - previousValue) / previousValue) * 100) : 0
   const isPositive = changePercent > 0
+  const highlightStartIndex = Math.max(0, chartSeries.length - weekWindow)
+  const highlightWidth =
+    chartSeries.length > 1
+      ? ((chartSeries.length - 1 - highlightStartIndex) / (chartSeries.length - 1)) * 100
+      : 100
+  const highlightX =
+    chartSeries.length > 1 ? (highlightStartIndex / (chartSeries.length - 1)) * 100 : 0
 
   return (
     <div>
@@ -1359,6 +1381,50 @@ function WeightTrendCard({
             </div>
           )}
         </div>
+        {hasWeekCompare && (
+          <div className="mt-2 flex items-center gap-2">
+            <div
+              className="text-white/40"
+              style={{
+                fontSize: "7px",
+                fontWeight: 500,
+                letterSpacing: "0.16em",
+                fontFamily: "'Archivo Narrow', sans-serif",
+              }}
+            >
+              WEEK/WEEK
+            </div>
+            <div className="flex items-center gap-1">
+              {isWeightLoss ? (
+                <ArrowDown size={10} strokeWidth={2.5} style={{ color: "#FF5733" }} />
+              ) : (
+                <ArrowUp size={10} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.25)" }} />
+              )}
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontVariantNumeric: "tabular-nums",
+                  color: isWeightLoss ? "#FF5733" : "rgba(255, 255, 255, 0.25)",
+                }}
+              >
+                {Math.abs(weeklyChange).toFixed(1)} lbs
+              </div>
+              <div
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 500,
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontVariantNumeric: "tabular-nums",
+                  color: isWeightLoss ? "rgba(255, 87, 51, 0.6)" : "rgba(255, 255, 255, 0.2)",
+                }}
+              >
+                ({Math.abs(weeklyChangePercent).toFixed(1)}%)
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ height: "48px", width: "100%" }}>
@@ -1369,6 +1435,34 @@ function WeightTrendCard({
               <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
             </linearGradient>
           </defs>
+
+          {chartSeries.length > 0 && (
+            <rect
+              x={highlightX}
+              y="0"
+              width={highlightWidth}
+              height="48"
+              fill="rgba(255, 87, 51, 0.03)"
+            />
+          )}
+
+          {chartSeries.length > 0 &&
+            chartSeries.map((_, index) => {
+              if (index === 0 || index % weekWindow !== 0) return null
+              const x = (index / (chartSeries.length - 1)) * 100
+              return (
+                <line
+                  key={`week-${index}`}
+                  x1={x}
+                  x2={x}
+                  y1="0"
+                  y2="48"
+                  stroke="rgba(255, 255, 255, 0.06)"
+                  strokeWidth="0.5"
+                  strokeDasharray="2,2"
+                />
+              )
+            })}
 
           <path
             d={`M 0,48 ${chartSeries
