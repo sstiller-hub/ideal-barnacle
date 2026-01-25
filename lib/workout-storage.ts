@@ -27,7 +27,7 @@ export type CompletedWorkout = {
   id: string
   name: string
   date: string
-  duration: number
+  duration?: number
   durationUnit?: "seconds" | "minutes"
   exercises: Exercise[]
   stats: {
@@ -53,7 +53,11 @@ export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   }
 
   const history = getWorkoutHistory()
-  history.unshift({ ...workout, durationUnit: workout.durationUnit ?? "seconds" })
+  const normalizedWorkout =
+    typeof workout.duration === "number"
+      ? { ...workout, durationUnit: workout.durationUnit ?? "seconds" }
+      : workout
+  history.unshift(normalizedWorkout)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
 
   // Evaluate PRs for this workout

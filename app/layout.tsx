@@ -45,7 +45,7 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
-    apple: [{ url: "/apple-icon.png?v=2", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/akt-180.png", sizes: "180x180", type: "image/png" }],
   },
 }
 
@@ -65,6 +65,7 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/kova-tab-2.svg" />
+        <link rel="apple-touch-icon" href="/icons/akt-180.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>

@@ -27,10 +27,6 @@ function createExercise(
   }
 }
 
-function minutesToSeconds(minutes: number): number {
-  return minutes * 60
-}
-
 function parseTargetReps(targetReps?: string): number {
   if (!targetReps) return 8
   const segment = targetReps.split("/")[0]?.trim() ?? targetReps
@@ -139,7 +135,6 @@ export function seedDemoData() {
       id: `w_${date.getTime()}_${routine.id}`,
       name: routine.name,
       date: date.toISOString(),
-      duration: minutesToSeconds(45 + routine.exercises.length * 2),
       exercises,
       stats,
     })

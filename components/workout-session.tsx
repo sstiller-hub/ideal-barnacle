@@ -138,7 +138,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const router = useRouter()
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [exercises, setExercises] = useState<any[]>([])
-  const [elapsedMs, setElapsedMs] = useState(0)
   const [isHydrated, setIsHydrated] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
@@ -192,20 +191,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const generateWorkoutId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
     return c?.randomUUID ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-  }
-
-  const getElapsedMs = (targetSession: WorkoutSession | null, now = Date.now()) => {
-    if (!targetSession) return 0
-    const baseMs = (targetSession.activeDurationSeconds || 0) * 1000
-    if (targetSession.status !== "in_progress") return baseMs
-    if (!targetSession.lastActiveAt) return baseMs
-    const lastActiveAtMs = new Date(targetSession.lastActiveAt).getTime()
-    const deltaMs = Math.max(0, now - lastActiveAtMs)
-    return baseMs + deltaMs
-  }
-
-  const commitActiveDuration = (targetSession: WorkoutSession): number => {
-    return Math.floor(getElapsedMs(targetSession) / 1000)
   }
 
   const isGhostSet = (set: any) => {
@@ -373,8 +358,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
 
     const initSession = async () => {
-      const currentSession = getCurrentInProgressSession()
+      let currentSession = getCurrentInProgressSession()
       if (currentSession) {
+        if (currentSession.status === "paused") {
+          const resumedSession: WorkoutSession = {
+            ...currentSession,
+            status: "in_progress",
+          }
+          currentSession = resumedSession
+          setSession(resumedSession)
+          await saveSession(resumedSession)
+        }
         const normalizedStatus =
           (currentSession as any).status === "active"
             ? "in_progress"
@@ -384,42 +378,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           ...currentSession,
           id: currentSession.id || (currentSession as any).sessionId || Date.now().toString(),
           status: normalizedStatus,
-          activeDurationSeconds:
-            currentSession.activeDurationSeconds ??
-            Math.max(
-              0,
-              Math.floor(
-                (Date.now() - new Date(currentSession.startedAt).getTime()) / 1000
-              )
-            ),
+          activeDurationSeconds: currentSession.activeDurationSeconds ?? 0,
         }
 
         saveCurrentSessionId(normalizedSession.id)
 
-        const now = Date.now()
-        const lastActiveAt = normalizedSession.lastActiveAt
-          ? new Date(normalizedSession.lastActiveAt).getTime()
-          : null
-        const additionalSeconds =
-          normalizedSession.status === "in_progress" && lastActiveAt
-            ? Math.floor((now - lastActiveAt) / 1000)
-            : 0
-
-        const updatedSession: WorkoutSession = {
-          ...normalizedSession,
-          activeDurationSeconds: Math.max(
-            0,
-            (normalizedSession.activeDurationSeconds || 0) + additionalSeconds
-          ),
-          lastActiveAt:
-            normalizedSession.status === "in_progress" ? new Date().toISOString() : undefined,
-        }
-
         const restTimer =
-          updatedSession.restTimer && !updatedSession.restTimer.startedAt
-            ? { ...updatedSession.restTimer, startedAt: new Date().toISOString() }
-            : updatedSession.restTimer
-        const hydratedSession = restTimer ? { ...updatedSession, restTimer } : updatedSession
+          normalizedSession.restTimer && !normalizedSession.restTimer.startedAt
+            ? { ...normalizedSession.restTimer, startedAt: new Date().toISOString() }
+            : normalizedSession.restTimer
+        const hydratedSession = restTimer ? { ...normalizedSession, restTimer } : normalizedSession
 
         setSession(hydratedSession)
         setExercises(buildExercises(hydratedSession.exercises))
@@ -429,7 +397,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           : restTimer
             ? Date.now()
             : null
-        setElapsedMs(getElapsedMs(updatedSession))
         await saveSession(hydratedSession)
         setIsHydrated(true)
       } else {
@@ -445,7 +412,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           currentExerciseIndex: 0,
           exercises: newExercises,
           restTimer: undefined,
-          lastActiveAt: new Date().toISOString(),
         }
 
         saveCurrentSessionId(newSessionId)
@@ -453,7 +419,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setExercises(newExercises)
         setRestState(undefined)
         restStartAtRef.current = null
-        setElapsedMs(getElapsedMs(newSession))
         await saveSession(newSession)
         setIsHydrated(true)
       }
@@ -483,32 +448,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }, [isHydrated, session?.id, session?.routineId, routine.id, routine.name])
 
-  useEffect(() => {
-    if (!session) {
-      setElapsedMs(0)
-      return
-    }
-
-    setElapsedMs(getElapsedMs(session))
-
-    if (session.status !== "in_progress") {
-      return
-    }
-
-    const interval = setInterval(() => {
-      setElapsedMs(getElapsedMs(session))
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [session?.id, session?.status, session?.lastActiveAt, session?.activeDurationSeconds])
-
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000)
-    const mins = Math.floor(totalSeconds / 60)
-    const secs = totalSeconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
   const resolvedExerciseIndex = Number.isFinite(Number(session?.currentExerciseIndex))
     ? Number(session?.currentExerciseIndex)
     : 0
@@ -525,7 +464,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const allSetsCompleted =
     currentExercise?.sets?.every((set: any) => set.completed && !isSetIncomplete(set)) ?? false
 
-  const formatSeconds = (seconds: number) => formatTime(seconds * 1000)
+  const formatSeconds = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
 
   const restRemainingSeconds = (() => {
     if (!isResting || !restState) return 0
@@ -1193,10 +1136,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const goToNextExercise = async () => {
     if (!session) return
-    if (currentExercise?.sets?.some((set: any) => isSetIncomplete(set))) {
-      setValidationTrigger(Date.now())
-      return
-    }
     if (currentExerciseIndex < exercises.length - 1) {
       const newIndex = currentExerciseIndex + 1
       const updatedSession: WorkoutSession = {
@@ -1230,10 +1169,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (!session) return
     if (nextIndex < 0 || nextIndex >= exercises.length) return
     if (nextIndex === currentExerciseIndex) return
-    if (nextIndex > currentExerciseIndex && currentExercise?.sets?.some((set: any) => isSetIncomplete(set))) {
-      setValidationTrigger(Date.now())
-      return
-    }
 
     const updatedSession: WorkoutSession = {
       ...session,
@@ -1257,16 +1192,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const pageWidth = container.offsetWidth || 1
       const newIndex = Math.round(container.scrollLeft / pageWidth)
       if (newIndex === currentExerciseIndex) return
-
-      if (newIndex > currentExerciseIndex && currentExercise?.sets?.some((set: any) => isSetIncomplete(set))) {
-        setValidationTrigger(Date.now())
-        isScrollingProgrammatically.current = true
-        container.scrollTo({ left: currentExerciseIndex * pageWidth, behavior: "smooth" })
-        window.setTimeout(() => {
-          isScrollingProgrammatically.current = false
-        }, 300)
-        return
-      }
 
       void setExerciseIndex(newIndex)
     }, 100)
@@ -1320,14 +1245,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       )
     }, 0)
 
-    const durationSeconds = session ? commitActiveDuration(session) : Math.floor(elapsedMs / 1000)
-
     const completedWorkoutId = isUuid(session.id) ? session.id : generateWorkoutId()
     const completedWorkout = {
       id: completedWorkoutId,
       name: routine.name,
       date: new Date(session?.startedAt!).toISOString(),
-      duration: durationSeconds,
       exercises: cleanedExercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,
@@ -1361,9 +1283,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         ...session,
         status: "completed",
         endedAt: new Date().toISOString(),
-        activeDurationSeconds: commitActiveDuration(session),
+        activeDurationSeconds: 0,
         restTimer: undefined,
-        lastActiveAt: undefined,
         exercises: cleanedExercises,
       }
       await saveSession(completedSession)
@@ -1382,8 +1303,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
-        activeDurationSeconds: commitActiveDuration(session),
-        lastActiveAt: undefined,
       }
 
       setSession(updatedSession)
@@ -1415,7 +1334,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             className="text-white/25 tracking-widest mb-2"
             style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
           >
-            EXERCISE {exerciseIndex + 1} OF {totalExercises} • {routine.name.toUpperCase()} • {formatTime(elapsedMs)}
+            EXERCISE {exerciseIndex + 1} OF {totalExercises} • {routine.name.toUpperCase()}
           </div>
 
           <h1
@@ -1694,8 +1613,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const updatedSession: WorkoutSession = {
         ...session,
         status: "paused",
-        activeDurationSeconds: commitActiveDuration(session),
-        lastActiveAt: undefined,
       }
 
       setSession(updatedSession)
@@ -1704,7 +1621,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       const updatedSession: WorkoutSession = {
         ...session,
         status: "in_progress",
-        lastActiveAt: new Date().toISOString(),
       }
 
       setSession(updatedSession)
@@ -1718,8 +1634,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const updatedSession: WorkoutSession = {
       ...session,
       status: "paused",
-      activeDurationSeconds: commitActiveDuration(session),
-      lastActiveAt: undefined,
       restTimer: persistedRestTimer,
     }
     setSession(updatedSession)
@@ -1741,7 +1655,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("pagehide", handlePageHide)
     }
-  }, [session?.id, session?.status, session?.lastActiveAt, restState])
+  }, [session?.id, session?.status, restState])
 
   const handleTogglePlateCalc = () => {
     const newValue = !showPlateCalc
@@ -1770,8 +1684,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }
 
   const calculatePlates = (weight: number): { plate: number; count: number }[] => {
-    const barWeight = 45
-    const weightPerSide = (weight - barWeight) / 2
+    const weightPerSide = weight / 2
 
     if (weightPerSide <= 0) return []
 

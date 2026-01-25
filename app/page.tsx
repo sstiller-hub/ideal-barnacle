@@ -77,7 +77,6 @@ type CompletedWorkout = {
     totalVolume: number
     completedSets: number
   }
-  duration: number
   exercises: any[]
 }
 
@@ -93,22 +92,6 @@ type PersonalRecord = {
 }
 
 type DayState = "scheduled" | "rest" | "completed" | "activeSession"
-
-function formatElapsed(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, "0")}`
-}
-
-function getSessionElapsedSeconds(session: WorkoutSession | null, now = Date.now()): number {
-  if (!session) return 0
-  const baseSeconds = session.activeDurationSeconds || 0
-  if (session.status !== "in_progress") return baseSeconds
-  if (!session.lastActiveAt) return baseSeconds
-  const lastActiveAtMs = new Date(session.lastActiveAt).getTime()
-  const deltaSeconds = Math.max(0, Math.floor((now - lastActiveAtMs) / 1000))
-  return baseSeconds + deltaSeconds
-}
 
 export default function Home() {
   const router = useRouter()
@@ -128,7 +111,6 @@ export default function Home() {
   const [localOverride, setLocalOverride] = useState(false)
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [uiStateOverride, setUiStateOverride] = useState<DayState | null>(null)
   const [devModeEnabled, setDevModeEnabled] = useState(false)
   const [devModeTapCount, setDevModeTapCount] = useState(0)
@@ -140,19 +122,25 @@ export default function Home() {
   useEffect(() => {
     setRoutines(getRoutines())
     const currentSession = getCurrentInProgressSession()
-    if (currentSession?.startedAt) {
-      const started = new Date(currentSession.startedAt)
-      const today = new Date()
-      started.setHours(0, 0, 0, 0)
-      today.setHours(0, 0, 0, 0)
-      if (started.getTime() !== today.getTime()) {
-        saveCurrentSessionId(null)
-        setSession(null)
-        return
-      }
-    }
     setSession(currentSession)
   }, [])
+
+  const refreshSession = () => {
+    const currentSession = getCurrentInProgressSession()
+    setSession(currentSession)
+  }
+
+  useEffect(() => {
+    if (!session?.startedAt) return
+    const sessionDate = new Date(session.startedAt)
+    sessionDate.setHours(0, 0, 0, 0)
+    setSelectedDate((prev) => {
+      const next = new Date(prev)
+      next.setHours(0, 0, 0, 0)
+      if (next.getTime() === sessionDate.getTime()) return prev
+      return sessionDate
+    })
+  }, [session?.id, session?.startedAt])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
@@ -175,18 +163,6 @@ export default function Home() {
   }, [selectedDate])
 
   useEffect(() => {
-    if (!session) {
-      setElapsedSeconds(0)
-      return
-    }
-    const updateElapsed = () => setElapsedSeconds(getSessionElapsedSeconds(session))
-    updateElapsed()
-    if (session.status !== "in_progress") return
-    const interval = setInterval(updateElapsed, 1000)
-    return () => clearInterval(interval)
-  }, [session?.id, session?.status, session?.lastActiveAt, session?.activeDurationSeconds])
-
-  useEffect(() => {
     loadDataForDate(selectedDate)
   }, [selectedDate])
 
@@ -196,6 +172,7 @@ export default function Home() {
       if (userId) {
         void loadWyzeWeights(userId)
       }
+      refreshSession()
     }
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -203,6 +180,7 @@ export default function Home() {
         if (userId) {
           void loadWyzeWeights(userId)
         }
+        refreshSession()
       }
     }
     window.addEventListener("focus", handleFocus)
@@ -560,21 +538,25 @@ export default function Home() {
   const scheduledWorkoutType = effectiveRestDay
     ? "Rest"
     : scheduleOverride?.workoutType || deriveWorkoutType(scheduledRoutine?.name)
+  const activeWorkoutType =
+    session?.routineName ? deriveWorkoutType(session.routineName) : scheduledWorkoutType
   const actualState =
     uiStateOverride ||
     (workoutForDate
       ? "completed"
-      : effectiveRestDay
-        ? "rest"
-        : session && isToday()
-          ? "activeSession"
+      : session
+        ? "activeSession"
+        : effectiveRestDay
+          ? "rest"
           : "scheduled")
 
   const routineNameById = useMemo(() => new Map(routinePool.map((routine) => [routine.id, routine.name])), [routinePool])
 
   const workoutOptions = routinePool.map((routine) => ({ id: routine.id, name: routine.name }))
 
-  const selectedTitle = scheduledWorkoutType
+  const selectedTitle = actualState === "activeSession" ? activeWorkoutType : scheduledWorkoutType
+  const displayExercises =
+    actualState === "activeSession" && session?.exercises ? session.exercises : scheduledRoutine?.exercises
 
   return (
     <>
@@ -864,21 +846,7 @@ export default function Home() {
                 {isPastDay ? "COMPLETED" : "COMPLETED TODAY"}
               </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div>
-                  <div
-                    className="text-white/20 mb-1"
-                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                  >
-                    DURATION
-                  </div>
-                  <div
-                    className="text-white/90"
-                    style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {formatElapsed(workoutForDate.duration)}
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <div
                     className="text-white/20 mb-1"
@@ -946,10 +914,10 @@ export default function Home() {
           </div>
         )}
 
-        {(actualState === "scheduled" || actualState === "activeSession") && scheduledRoutine && (
+        {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
           <div className="px-5 mb-12">
             <div className="mb-6 space-y-2.5">
-              {scheduledRoutine.exercises.map((exercise, index) => (
+              {displayExercises.map((exercise: any, index: number) => (
                 <div key={exercise.id ?? `${exercise.name}-${index}`} className="flex items-center gap-3" style={{ opacity: 0.35 }}>
                   <div
                     className="text-white/40"
@@ -1014,11 +982,7 @@ export default function Home() {
                 <span className="text-white/90" style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em" }}>
                   {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
                 </span>
-                {actualState === "activeSession" && (
-                  <span className="text-white/30" style={{ fontSize: "10px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
-                    {formatElapsed(elapsedSeconds)}
-                  </span>
-                )}
+                {actualState === "activeSession" && null}
               </div>
             </button>
 

@@ -40,14 +40,6 @@ export default function HistoryPage() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
   }
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return `${hours}h ${mins}m`
-  }
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -110,8 +102,7 @@ export default function HistoryPage() {
                     <p className="text-xs text-muted-foreground">{formatDate(workout.date)}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">{formatDuration(workout.duration)}</div>
-                    <div className="text-xs text-muted-foreground">duration</div>
+                    <div className="text-xs text-muted-foreground">completed</div>
                   </div>
                 </div>
 

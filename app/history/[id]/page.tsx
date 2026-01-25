@@ -33,14 +33,6 @@ export default function WorkoutDetailPage() {
     })
   }
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes} minutes`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return `${hours}h ${mins}m`
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
@@ -84,11 +76,7 @@ export default function WorkoutDetailPage() {
         {/* Summary Stats */}
         <Card className="p-4">
           <h2 className="text-sm font-semibold mb-3 text-muted-foreground">Workout Summary</h2>
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <div className="text-2xl font-bold text-foreground">{formatDuration(workout.duration)}</div>
-              <div className="text-xs text-muted-foreground">Duration</div>
-            </div>
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="text-2xl font-bold text-foreground">{workout.stats.completedSets}</div>
               <div className="text-xs text-muted-foreground">Sets</div>
