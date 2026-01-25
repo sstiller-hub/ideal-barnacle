@@ -1,0 +1,44 @@
+interface AktIconProps {
+  size?: number
+  opacity?: number
+  className?: string
+}
+
+export function AktIcon({ size = 28, opacity = 0.3, className = "" }: AktIconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      opacity={opacity}
+    >
+      <defs>
+        <linearGradient id="akt-bg" x1="0" y1="0" x2="0" y2="64">
+          <stop offset="0%" stopColor="#1a1a2c" />
+          <stop offset="100%" stopColor="#0a0a1c" />
+        </linearGradient>
+      </defs>
+
+      <rect x="0" y="0" width="64" height="64" rx="12" fill="url(#akt-bg)" />
+
+      <rect x="20" y="22" width="24" height="4" rx="2" fill="#FFFFFF" />
+
+      <circle cx="23" cy="28" r="5" fill="#FFFFFF" />
+      <circle cx="21" cy="38" r="6" fill="#FFFFFF" />
+      <circle cx="18" cy="50" r="7" fill="#FFFFFF" />
+      <circle cx="15" cy="63" r="8" fill="#FFFFFF" />
+      <circle cx="12" cy="77" r="9" fill="#FFFFFF" />
+
+      <circle cx="41" cy="28" r="5" fill="#FFFFFF" />
+      <circle cx="43" cy="38" r="6" fill="#FFFFFF" />
+      <circle cx="46" cy="50" r="7" fill="#FFFFFF" />
+      <circle cx="49" cy="63" r="8" fill="#FFFFFF" />
+      <circle cx="52" cy="77" r="9" fill="#FFFFFF" />
+
+      <rect x="19" y="46" width="26" height="5" rx="2.5" fill="#FFFFFF" />
+    </svg>
+  )
+}
