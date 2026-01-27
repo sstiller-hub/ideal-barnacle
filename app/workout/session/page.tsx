@@ -148,9 +148,7 @@ export default function WorkoutSessionPage() {
 
   if (!routine) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading workout...</p>
-      </div>
+      <div className="min-h-screen bg-[#0A0A0C]" />
     )
   }
 

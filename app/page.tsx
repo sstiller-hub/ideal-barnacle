@@ -37,6 +37,7 @@ import {
   type ScheduleOverrideResult,
 } from "@/lib/supabase-schedule-overrides"
 import { deriveWorkoutType } from "@/lib/workout-type"
+import { computeWeekOverWeek } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import {
   ArrowDown,
@@ -91,6 +92,29 @@ type PersonalRecord = {
   chartData?: number[]
 }
 
+type WeeklySummary = {
+  volumeLb: number
+  sessions: number
+  wowPercent: number
+  previousVolumeLb: number
+}
+
+type LastWorkoutSummary = {
+  id: string
+  name: string
+  performedAt: string
+  totalVolumeLb: number
+  prCount: number
+}
+
+type WorkoutPrEvent = {
+  id: string
+  exercise_name: string
+  pr_type: "e1rm" | "volume" | "weight_for_reps"
+  value: number
+  previous_value: number | null
+}
+
 type DayState = "scheduled" | "rest" | "completed" | "activeSession"
 
 export default function Home() {
@@ -116,8 +140,25 @@ export default function Home() {
   const [devModeTapCount, setDevModeTapCount] = useState(0)
   const [devModeTapTimeout, setDevModeTapTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [wyzeWeightSeries, setWyzeWeightSeries] = useState<number[]>([])
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
+  const [lastWorkoutSummary, setLastWorkoutSummary] = useState<LastWorkoutSummary | null>(null)
+  const [lastWorkoutPrs, setLastWorkoutPrs] = useState<WorkoutPrEvent[]>([])
 
   const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
+  const formatShortDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+  const formatVolume = (value: number) => Math.round(value).toLocaleString()
+
+  const getWeekRange = (date: Date) => {
+    const start = new Date(date)
+    start.setHours(0, 0, 0, 0)
+    const day = start.getDay()
+    const diffToMonday = (day + 6) % 7
+    start.setDate(start.getDate() - diffToMonday)
+    const end = new Date(start)
+    end.setDate(start.getDate() + 7)
+    return { start, end }
+  }
 
   useEffect(() => {
     setRoutines(getRoutines())
@@ -171,6 +212,7 @@ export default function Home() {
       loadDataForDate(selectedDate)
       if (userId) {
         void loadWyzeWeights(userId)
+        void loadHomeAnalytics(userId)
       }
       refreshSession()
     }
@@ -179,6 +221,7 @@ export default function Home() {
         loadDataForDate(selectedDate)
         if (userId) {
           void loadWyzeWeights(userId)
+          void loadHomeAnalytics(userId)
         }
         refreshSession()
       }
@@ -222,12 +265,90 @@ export default function Home() {
     setWyzeWeightSeries(series)
   }
 
+  const loadHomeAnalytics = async (targetUserId: string) => {
+    const now = new Date()
+    const { start, end } = getWeekRange(now)
+    const previousStart = new Date(start)
+    previousStart.setDate(previousStart.getDate() - 7)
+    const previousEnd = new Date(start)
+
+    const { data: currentWeek, error: currentWeekError } = await supabase
+      .from("workouts")
+      .select("id, total_volume_lb")
+      .eq("user_id", targetUserId)
+      .gte("performed_at", start.toISOString())
+      .lt("performed_at", end.toISOString())
+
+    if (currentWeekError) return
+
+    const { data: previousWeek, error: previousWeekError } = await supabase
+      .from("workouts")
+      .select("id, total_volume_lb")
+      .eq("user_id", targetUserId)
+      .gte("performed_at", previousStart.toISOString())
+      .lt("performed_at", previousEnd.toISOString())
+
+    if (previousWeekError) return
+
+    const currentVolume =
+      currentWeek?.reduce((sum, row) => sum + (row.total_volume_lb ?? 0), 0) ?? 0
+    const previousVolume =
+      previousWeek?.reduce((sum, row) => sum + (row.total_volume_lb ?? 0), 0) ?? 0
+    const { percent: wowPercent } = computeWeekOverWeek(currentVolume, previousVolume)
+
+    setWeeklySummary({
+      volumeLb: currentVolume,
+      sessions: currentWeek?.length ?? 0,
+      wowPercent,
+      previousVolumeLb: previousVolume,
+    })
+
+    const { data: lastWorkoutData, error: lastWorkoutError } = await supabase
+      .from("workouts")
+      .select("id, name, performed_at, total_volume_lb, pr_count")
+      .eq("user_id", targetUserId)
+      .order("performed_at", { ascending: false })
+      .limit(1)
+
+    if (lastWorkoutError) return
+
+    const lastWorkout = lastWorkoutData?.[0]
+    if (!lastWorkout) {
+      setLastWorkoutSummary(null)
+      setLastWorkoutPrs([])
+      return
+    }
+
+    setLastWorkoutSummary({
+      id: lastWorkout.id,
+      name: lastWorkout.name,
+      performedAt: lastWorkout.performed_at,
+      totalVolumeLb: lastWorkout.total_volume_lb ?? 0,
+      prCount: lastWorkout.pr_count ?? 0,
+    })
+
+    const { data: prsData, error: prsError } = await supabase
+      .from("workout_prs")
+      .select("id, exercise_name, pr_type, value, previous_value")
+      .eq("workout_id", lastWorkout.id)
+      .order("created_at", { ascending: true })
+      .limit(3)
+
+    if (prsError) return
+
+    setLastWorkoutPrs((prsData || []) as WorkoutPrEvent[])
+  }
+
   useEffect(() => {
     if (!userId) {
       setWyzeWeightSeries([])
+      setWeeklySummary(null)
+      setLastWorkoutSummary(null)
+      setLastWorkoutPrs([])
       return
     }
     void loadWyzeWeights(userId)
+    void loadHomeAnalytics(userId)
   }, [userId])
 
   useEffect(() => {
@@ -828,6 +949,155 @@ export default function Home() {
       </div>
 
       <div className="flex-1 overflow-hidden" style={{ paddingBottom: "20px" }}>
+        {weeklySummary && (
+          <div className="px-5 mb-6">
+            <div
+              className="text-white/25 tracking-widest mb-3"
+              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+            >
+              THIS WEEK
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div
+                  className="text-white/20 mb-1"
+                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  VOLUME
+                </div>
+                <div
+                  className="text-white/90"
+                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+                >
+                  {formatVolume(weeklySummary.volumeLb)}
+                </div>
+                <div className="text-white/15" style={{ fontSize: "7px", fontWeight: 400 }}>
+                  lb
+                </div>
+              </div>
+              <div>
+                <div
+                  className="text-white/20 mb-1"
+                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  SESSIONS
+                </div>
+                <div
+                  className="text-white/90"
+                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+                >
+                  {weeklySummary.sessions}
+                </div>
+              </div>
+              <div>
+                <div
+                  className="text-white/20 mb-1"
+                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  WEEK/WEEK
+                </div>
+                <div
+                  className="text-white/90"
+                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+                >
+                  {weeklySummary.wowPercent >= 0 ? "+" : "-"}
+                  {Math.abs(weeklySummary.wowPercent).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {lastWorkoutSummary && (
+          <div className="px-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div
+                className="text-white/25 tracking-widest"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                LAST WORKOUT
+              </div>
+              <div className="text-white/25" style={{ fontSize: "9px", fontWeight: 400 }}>
+                {formatShortDate(lastWorkoutSummary.performedAt)}
+              </div>
+            </div>
+            <div className="text-white/90" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em" }}>
+              {lastWorkoutSummary.name}
+            </div>
+            <div className="flex items-center gap-3 mt-3">
+              <div
+                className="text-white/20"
+                style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                VOLUME
+              </div>
+              <div
+                className="text-white/90"
+                style={{ fontSize: "12px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
+              >
+                {formatVolume(lastWorkoutSummary.totalVolumeLb)} lb
+              </div>
+              {lastWorkoutSummary.prCount > 0 && (
+                <div
+                  style={{
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "999px",
+                    padding: "2px 8px",
+                  }}
+                >
+                  <span className="text-white/60" style={{ fontSize: "9px", fontWeight: 500 }}>
+                    {lastWorkoutSummary.prCount} PRs
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {lastWorkoutSummary && lastWorkoutPrs.length > 0 && (
+          <div className="px-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div
+                className="text-white/25 tracking-widest"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                PRS FROM LAST WORKOUT
+              </div>
+              <button
+                className="flex items-center gap-1 text-white/30 hover:text-white/50 transition-colors duration-200"
+                onClick={() => router.push(`/history/${lastWorkoutSummary.id}`)}
+              >
+                <span style={{ fontSize: "10px", fontWeight: 400 }}>View all PRs</span>
+                <ChevronRightSmall size={11} strokeWidth={1.5} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {lastWorkoutPrs.map((pr) => {
+                const label =
+                  pr.pr_type === "e1rm" ? "e1RM" : pr.pr_type === "volume" ? "Volume" : "Weight"
+                const delta =
+                  pr.previous_value !== null ? pr.value - pr.previous_value : null
+                const displayValue =
+                  pr.pr_type === "volume" ? formatVolume(pr.value) : Math.round(pr.value).toLocaleString()
+                return (
+                  <div key={pr.id} className="flex items-center justify-between">
+                    <div className="text-white/70" style={{ fontSize: "11px", fontWeight: 400 }}>
+                      {pr.exercise_name} • {label} {displayValue} lb
+                    </div>
+                    {delta !== null && (
+                      <div className="text-white/25" style={{ fontSize: "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
+                        {delta >= 0 ? "+" : "-"}
+                        {Math.abs(Math.round(delta))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {actualState === "completed" && workoutForDate && (
           <div className="px-5 mb-12">
             <div

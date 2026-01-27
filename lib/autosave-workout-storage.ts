@@ -2,6 +2,7 @@ export type WorkoutStatus = "in_progress" | "paused" | "completed"
 
 export interface WorkoutSession {
   id: string
+  workoutId?: string
   startedAt: string
   endedAt?: string
   status: WorkoutStatus

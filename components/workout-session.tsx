@@ -41,7 +41,18 @@ import {
   saveSession,
   saveCurrentSessionId,
 } from "@/lib/autosave-workout-storage"
-import { ArrowLeft, AlertCircle, Check, Pause, Play } from "lucide-react"
+import {
+  createWorkoutDraft,
+  markWorkoutError,
+  markWorkoutPending,
+  updateWorkoutDraft,
+  upsertSet as upsertSetDraft,
+  getWorkoutDraft,
+  deleteSet as deleteSetDraft,
+  type SyncState,
+} from "@/lib/workout-draft-storage"
+import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
+import { ArrowLeft, AlertCircle, Check, Pause, Play, Lock } from "lucide-react"
 
 type Exercise = {
   id: string
@@ -68,12 +79,12 @@ type Exercise = {
 }
 
 function extractRestSeconds(notes?: string): number {
-  if (!notes) return 90
+  if (!notes) return 120
   const minutes = notes.match(/rest\s*(\d+)\s*m/i)
   const seconds = notes.match(/rest\s*(\d+)\s*s/i)
   if (minutes) return Number(minutes[1]) * 60
   if (seconds) return Number(seconds[1])
-  return 90
+  return 120
 }
 
 function normalizeExerciseName(name: string): string {
@@ -170,6 +181,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const NOTE_CHAR_LIMIT = 360
+  const weightInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
+  const repsInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
+  const restNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [plateDisplayMode, setPlateDisplayMode] = useState<"per-side" | "total">("per-side")
+  const [plateStartingWeight, setPlateStartingWeight] = useState(0)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [syncState, setSyncState] = useState<SyncState>("draft")
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const hasSyncedDraftRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -177,6 +197,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (stored === null) return
     setProgressiveAutofillEnabled(stored === "true")
   }, [])
+
+  useEffect(() => {
+    ensureWorkoutSync()
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+  }, [])
+
+  useEffect(() => {
+    hasSyncedDraftRef.current = false
+  }, [session?.id])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -191,6 +220,49 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const generateWorkoutId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
     return c?.randomUUID ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  const resolveWorkoutId = (currentSession: WorkoutSession) => {
+    if (currentSession.workoutId && isUuid(currentSession.workoutId)) return currentSession.workoutId
+    if (isUuid(currentSession.id)) return currentSession.id
+    return generateWorkoutId()
+  }
+
+  const touchDraft = async (workoutId: string) => {
+    await updateWorkoutDraft(workoutId, {
+      updated_at_client: Date.now(),
+      sync_state: "draft",
+      last_sync_error: null,
+    })
+  }
+
+  const persistSetDraft = async (
+    workoutId: string,
+    exercise: Exercise,
+    set: Exercise["sets"][number],
+    setIndex: number
+  ) => {
+    if (!set?.id) return
+    await upsertSetDraft(workoutId, {
+      set_id: set.id,
+      workout_id: workoutId,
+      exercise_id: exercise.id,
+      exercise_name: exercise.name,
+      set_index: setIndex,
+      reps: set.reps ?? null,
+      weight: set.weight ?? null,
+      completed: Boolean(set.completed),
+      updated_at_client: Date.now(),
+    })
+  }
+
+  const syncExerciseDraft = async (
+    workoutId: string,
+    exercise: Exercise,
+    sets: Exercise["sets"]
+  ) => {
+    const tasks = sets.map((set, idx) => persistSetDraft(workoutId, exercise, set, idx))
+    await Promise.all(tasks)
   }
 
   const isGhostSet = (set: any) => {
@@ -379,15 +451,22 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           id: currentSession.id || (currentSession as any).sessionId || Date.now().toString(),
           status: normalizedStatus,
           activeDurationSeconds: currentSession.activeDurationSeconds ?? 0,
+          workoutId: currentSession.workoutId,
         }
+
+        const ensuredWorkoutId = resolveWorkoutId(normalizedSession)
+        const sessionWithWorkoutId =
+          normalizedSession.workoutId === ensuredWorkoutId
+            ? normalizedSession
+            : { ...normalizedSession, workoutId: ensuredWorkoutId }
 
         saveCurrentSessionId(normalizedSession.id)
 
         const restTimer =
-          normalizedSession.restTimer && !normalizedSession.restTimer.startedAt
-            ? { ...normalizedSession.restTimer, startedAt: new Date().toISOString() }
-            : normalizedSession.restTimer
-        const hydratedSession = restTimer ? { ...normalizedSession, restTimer } : normalizedSession
+          sessionWithWorkoutId.restTimer && !sessionWithWorkoutId.restTimer.startedAt
+            ? { ...sessionWithWorkoutId.restTimer, startedAt: new Date().toISOString() }
+            : sessionWithWorkoutId.restTimer
+        const hydratedSession = restTimer ? { ...sessionWithWorkoutId, restTimer } : sessionWithWorkoutId
 
         setSession(hydratedSession)
         setExercises(buildExercises(hydratedSession.exercises))
@@ -402,8 +481,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       } else {
         const newSessionId = Date.now().toString()
         const newExercises = buildExercises()
+        const workoutId = generateWorkoutId()
         const newSession: WorkoutSession = {
           id: newSessionId,
+          workoutId,
           routineId: routine.id,
           routineName: routine.name,
           status: "in_progress",
@@ -448,26 +529,122 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }, [isHydrated, session?.id, session?.routineId, routine.id, routine.name])
 
+  useEffect(() => {
+    if (!isHydrated || !session || !userId) return
+    const workoutId = resolveWorkoutId(session)
+    if (session.workoutId !== workoutId) {
+      const updatedSession: WorkoutSession = {
+        ...session,
+        workoutId,
+      }
+      setSession(updatedSession)
+      void saveSession(updatedSession)
+    }
+
+    if (hasSyncedDraftRef.current) return
+    hasSyncedDraftRef.current = true
+
+    const hydrateDraft = async () => {
+      const existing = await getWorkoutDraft(workoutId)
+      if (!existing) {
+        await createWorkoutDraft({
+          workout_id: workoutId,
+          user_id: userId,
+          started_at: session.startedAt,
+          routine_id: routine.id,
+          routine_name: routine.name,
+        })
+      } else {
+        await updateWorkoutDraft(workoutId, {
+          routine_id: routine.id,
+          routine_name: routine.name,
+        })
+      }
+
+      const exercisesToSync = exercises.length > 0 ? exercises : session.exercises || []
+      const syncTasks: Promise<void>[] = []
+      exercisesToSync.forEach((exercise: any) => {
+        if (!exercise?.sets) return
+        syncTasks.push(syncExerciseDraft(workoutId, exercise, exercise.sets))
+      })
+      await Promise.all(syncTasks)
+
+      const draft = await getWorkoutDraft(workoutId)
+      if (draft) {
+        setSyncState(draft.sync_state)
+      }
+    }
+
+    void hydrateDraft()
+  }, [isHydrated, session, userId, exercises, routine.id, routine.name])
+
   const resolvedExerciseIndex = Number.isFinite(Number(session?.currentExerciseIndex))
     ? Number(session?.currentExerciseIndex)
     : 0
-  const currentExerciseIndex = resolvedExerciseIndex
+  const currentExerciseIndex = Math.min(
+    Math.max(resolvedExerciseIndex, 0),
+    Math.max(0, exercises.length - 1)
+  )
   const currentExercise = exercises[currentExerciseIndex]
   const totalExercises = exercises.length
   const firstIncompleteIndex =
     currentExercise?.sets?.findIndex((set: any) => !set.completed) ?? -1
   const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
-  const isResting =
-    Boolean(restState) &&
-    restState?.exerciseIndex === currentExerciseIndex &&
-    typeof restState?.remainingSeconds === "number"
+  const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const allSetsCompleted =
     currentExercise?.sets?.every((set: any) => set.completed && !isSetIncomplete(set)) ?? false
+  const syncTimeLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : null
+  const syncStatusText =
+    syncState === "syncing"
+      ? "Syncing..."
+      : syncState === "synced"
+        ? syncTimeLabel
+          ? `Saved ${syncTimeLabel}`
+          : "Saved"
+        : syncState === "pending" || syncState === "error"
+          ? "Not synced"
+          : "Saved locally"
 
   const formatSeconds = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const scheduleRestNotification = (seconds: number) => {
+    if (typeof window === "undefined") return
+    if (restNotificationTimeoutRef.current) {
+      window.clearTimeout(restNotificationTimeoutRef.current)
+      restNotificationTimeoutRef.current = null
+    }
+    if (!("Notification" in window)) return
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().then((permission) => {
+        if (permission !== "granted") return
+        restNotificationTimeoutRef.current = window.setTimeout(() => {
+          try {
+            new Notification("Rest complete", {
+              body: "Time to start your next set.",
+            })
+          } catch {
+            // ignore notification errors
+          }
+        }, seconds * 1000)
+      })
+      return
+    }
+    if (Notification.permission !== "granted") return
+    restNotificationTimeoutRef.current = window.setTimeout(() => {
+      try {
+        new Notification("Rest complete", {
+          body: "Time to start your next set.",
+        })
+      } catch {
+        // ignore notification errors
+      }
+    }, seconds * 1000)
   }
 
   const restRemainingSeconds = (() => {
@@ -528,7 +705,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const nextWithStart = nextState
       ? {
           ...nextState,
-          startedAt: nextState.startedAt ?? new Date().toISOString(),
+          startedAt: new Date().toISOString(),
         }
       : null
 
@@ -536,6 +713,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       ? new Date(nextWithStart.startedAt).getTime()
       : null
     setRestState(nextWithStart || undefined)
+    setUiNow(Date.now())
+    if (!nextWithStart && restNotificationTimeoutRef.current) {
+      window.clearTimeout(restNotificationTimeoutRef.current)
+      restNotificationTimeoutRef.current = null
+    }
     if (session) {
       const updatedSession: WorkoutSession = {
         ...session,
@@ -561,6 +743,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setIndex: currentSetIndex,
         remainingSeconds: restSeconds,
       })
+      scheduleRestNotification(restSeconds)
     }
   }
 
@@ -581,6 +764,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (!isResting) return
     if (restRemainingSeconds <= 0) {
       void setRestStateAndPersist(null)
+      if (restNotificationTimeoutRef.current) {
+        window.clearTimeout(restNotificationTimeoutRef.current)
+        restNotificationTimeoutRef.current = null
+      }
     }
   }, [isResting, restRemainingSeconds])
 
@@ -588,6 +775,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (currentExercise?.name && typeof window !== "undefined") {
       const savedPref = localStorage.getItem(`plate_viz_${currentExercise.name}`)
       setShowPlateCalc(savedPref !== null ? JSON.parse(savedPref) : true)
+      const savedMode = localStorage.getItem(`plate_mode_${currentExercise.name}`)
+      if (savedMode === "total" || savedMode === "per-side") {
+        setPlateDisplayMode(savedMode)
+      }
+      const savedStarting = localStorage.getItem(`plate_start_${currentExercise.name}`)
+      if (savedStarting) {
+        const parsed = Number(savedStarting)
+        if (!Number.isNaN(parsed) && parsed >= 0) {
+          setPlateStartingWeight(parsed)
+        }
+      } else {
+        setPlateStartingWeight(0)
+      }
     }
   }, [currentExercise?.name])
 
@@ -616,6 +816,28 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   useEffect(() => {
     setInlineNoteDraft(currentExercise?.sessionNote ?? "")
   }, [currentExerciseIndex, currentExercise?.sessionNote])
+
+  useEffect(() => {
+    if (!currentExercise) return
+    if (isResting) return
+    const activeSet = currentExercise.sets[currentSetIndex]
+    if (!activeSet?.id) return
+    const weightNode = weightInputRefs.current.get(activeSet.id)
+    const repsNode = repsInputRefs.current.get(activeSet.id)
+    const shouldFocusReps =
+      typeof activeSet.weight === "number" && activeSet.weight > 0 && (!activeSet.reps || activeSet.reps <= 0)
+    const target = shouldFocusReps ? repsNode : weightNode
+    if (!target) return
+    const timeout = window.setTimeout(() => {
+      try {
+        target.focus()
+        target.select()
+      } catch {
+        // ignore focus errors
+      }
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [currentExerciseIndex, currentSetIndex, isResting, currentExercise?.id])
 
   useEffect(() => {
     if (!session?.remoteSessionId) return
@@ -740,6 +962,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const updateSetData = async (setIndex: number, field: "reps" | "weight", value: number | null) => {
     if (!session) return
+    const workoutId = session.workoutId
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
       if (exerciseIdx !== currentExerciseIndex) {
         return exercise
@@ -775,6 +998,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           isOutlier: flagsResult.flags.includes("rep_outlier"),
           validationFlags: flagsResult.flags,
           isIncomplete: flagsResult.isIncomplete,
+        }
+        if (workoutId) {
+          void persistSetDraft(workoutId, exercise, updatedSet, idx)
+          void touchDraft(workoutId)
         }
         if (session?.remoteSessionId) {
           void upsertSet({
@@ -822,6 +1049,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   ) => {
     if (!session) return
+    const workoutId = session.workoutId
     const shouldAutoRest = options?.startRest ?? true
     let shouldStartRest = false
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
@@ -864,6 +1092,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           validationFlags: flagsResult.flags,
           isOutlier: flagsResult.flags.includes("rep_outlier"),
           isIncomplete: flagsResult.isIncomplete,
+        }
+        if (workoutId) {
+          void persistSetDraft(workoutId, exercise, updatedSet, idx)
+          void touchDraft(workoutId)
         }
         if (session?.remoteSessionId) {
           void upsertSet({
@@ -915,11 +1147,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         setIndex,
         remainingSeconds: restSeconds,
       })
+      scheduleRestNotification(restSeconds)
     }
   }
 
   const addSetToExercise = async (exerciseIndex = currentExerciseIndex) => {
     if (!session) return
+    const workoutId = session.workoutId
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
     const defaults = getDefaultSetValues({
@@ -977,6 +1211,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+    if (workoutId) {
+      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
+      void touchDraft(workoutId)
+    }
     toast("Set added", {
       action: {
         label: "Undo",
@@ -1002,6 +1240,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     silent = false,
   ) => {
     if (!session) return
+    const workoutId = session.workoutId
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
     const removedSet = exercise.sets[setIndex]
@@ -1027,6 +1266,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+    if (workoutId && removedSet?.id) {
+      void deleteSetDraft(workoutId, removedSet.id)
+      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
+      void touchDraft(workoutId)
+    }
     if (!silent && removedSet) {
       toast("Set removed", {
         action: {
@@ -1041,6 +1285,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const restoreSetAtIndex = async (exerciseIndex: number, setIndex: number, setData: any) => {
     if (!session) return
+    const workoutId = session.workoutId
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
     const newSets = [
@@ -1063,10 +1308,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+    if (workoutId) {
+      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
+      void touchDraft(workoutId)
+    }
   }
 
   const removeGhostSetsForExercise = async (exerciseIndex: number) => {
     if (!session) return
+    const workoutId = session.workoutId
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
     const cleanedSets = exercise.sets.filter((set: any) => !isGhostSet(set))
@@ -1082,6 +1332,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
     setSession(updatedSession)
     await saveSession(updatedSession)
+    if (workoutId) {
+      void syncExerciseDraft(workoutId, { ...exercise, sets: cleanedSets }, cleanedSets)
+      void touchDraft(workoutId)
+    }
   }
 
   const toggleEditSetsForExercise = async (exerciseIndex: number, nextValue?: boolean) => {
@@ -1197,6 +1451,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }, 100)
   }
 
+  const retryWorkoutSync = async () => {
+    if (!session?.workoutId) return
+    setSyncState("syncing")
+    const result = await attemptWorkoutSync({ workoutId: session.workoutId })
+    setSyncState(result.status)
+    if (result.status === "synced") {
+      setLastSyncedAt(result.syncedAt ?? new Date().toISOString())
+    }
+  }
+
   const finishWorkout = async () => {
     if (!session) return
     if (isFinishing) return
@@ -1245,7 +1509,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       )
     }, 0)
 
-    const completedWorkoutId = isUuid(session.id) ? session.id : generateWorkoutId()
+    const completedWorkoutId =
+      session.workoutId ?? (isUuid(session.id) ? session.id : generateWorkoutId())
+    const completedAt = new Date().toISOString()
     const completedWorkout = {
       id: completedWorkoutId,
       name: routine.name,
@@ -1278,11 +1544,48 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return
     }
 
+    try {
+      if (userId) {
+        const existingDraft = await getWorkoutDraft(completedWorkoutId)
+        if (!existingDraft) {
+          await createWorkoutDraft({
+            workout_id: completedWorkoutId,
+            user_id: userId,
+            started_at: session.startedAt,
+            routine_id: routine.id,
+            routine_name: routine.name,
+          })
+        }
+        await updateWorkoutDraft(completedWorkoutId, {
+          completed_at: completedAt,
+          routine_id: routine.id,
+          routine_name: routine.name,
+        })
+        await markWorkoutPending(completedWorkoutId)
+        const syncTasks: Promise<void>[] = []
+        cleanedExercises.forEach((exercise: any) => {
+          if (!exercise?.sets) return
+          syncTasks.push(syncExerciseDraft(completedWorkoutId, exercise, exercise.sets))
+        })
+        await Promise.all(syncTasks)
+        setSyncState("syncing")
+        const result = await attemptWorkoutSync({ workoutId: completedWorkoutId })
+        setSyncState(result.status)
+        if (result.status === "synced") {
+          setLastSyncedAt(result.syncedAt ?? new Date().toISOString())
+        }
+      }
+    } catch (error) {
+      console.warn("Workout commit failed", error)
+      await markWorkoutError(completedWorkoutId, "Commit failed")
+      setSyncState("error")
+    }
+
     if (session) {
       const completedSession: WorkoutSession = {
         ...session,
         status: "completed",
-        endedAt: new Date().toISOString(),
+        endedAt: completedAt,
         activeDurationSeconds: 0,
         restTimer: undefined,
         exercises: cleanedExercises,
@@ -1343,6 +1646,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           >
             {exercise.name}
           </h1>
+          <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
+            {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}
+            {isCurrentExercise && exerciseCurrentSetIndex >= 0 && !allSetsRecorded
+              ? ` • NOW: SET ${exerciseCurrentSetIndex + 1}/${exercise.sets.length}`
+              : ""}
+          </div>
 
           {isCurrentExercise && allSetsRecorded && (
             <div
@@ -1362,7 +1671,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="flex flex-col" style={{ gap: isResting ? "16px" : "24px" }}>
           {exercise.sets.map((set, index) => {
             const setKey = set.id ?? `${exercise.id}-${index}`
             const isCurrentSet = isCurrentExercise && index === activeSetIndex
@@ -1373,7 +1682,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !isCurrentExercise
             const lastSet = getMostRecentSetPerformance(exercise.name, index, session?.id)
             const comparison = getSetComparison(set, lastSet)
-            const plates = typeof set.weight === "number" ? calculatePlates(set.weight) : []
+            const plates =
+              typeof set.weight === "number"
+                ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
+                : []
 
             return (
               <div key={setKey}>
@@ -1381,10 +1693,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   className="text-white/30 tracking-widest mb-3"
                   style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
                 >
-                  SET {index + 1} OF {exercise.sets.length}
+                  SET {index + 1}/{exercise.sets.length}
                 </div>
 
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-3" style={{ marginBottom: isResting ? "10px" : "12px" }}>
                   <div className="flex-1">
                     <input
                       type="number"
@@ -1402,6 +1714,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       }}
                       onFocus={() => set.id && handleSetFieldFocus(set.id, "weight")}
                       onBlur={() => set.id && handleSetFieldBlur(set.id, "weight")}
+                      ref={(node) => {
+                        if (set.id) {
+                          weightInputRefs.current.set(set.id, node)
+                        }
+                      }}
                       disabled={set.completed || !isCurrentExercise}
                       placeholder="—"
                       className="w-full transition-all duration-200"
@@ -1411,8 +1728,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           showMissing && missingWeight && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: "16px",
-                        fontSize: "24px",
+                        padding: isResting ? "12px" : "16px",
+                        fontSize: isResting ? "22px" : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1453,6 +1770,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       }}
                       onFocus={() => set.id && handleSetFieldFocus(set.id, "reps")}
                       onBlur={() => set.id && handleSetFieldBlur(set.id, "reps")}
+                      ref={(node) => {
+                        if (set.id) {
+                          repsInputRefs.current.set(set.id, node)
+                        }
+                      }}
                       disabled={set.completed || !isCurrentExercise}
                       placeholder="—"
                       className="w-full transition-all duration-200"
@@ -1462,8 +1784,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           (repCapError || (showMissing && missingReps)) && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: "16px",
-                        fontSize: "24px",
+                        padding: isResting ? "12px" : "16px",
+                        fontSize: isResting ? "22px" : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1490,7 +1812,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
                     style={{
                       width: "56px",
-                      height: "56px",
+                      height: isResting ? "68px" : "76px",
                       background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.03)",
                       border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.15" : "0.1"})`,
                       borderRadius: "2px",
@@ -1498,7 +1820,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     }}
                     type="button"
                   >
-                    <Check size={16} strokeWidth={1.5} style={{ color: set.completed ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)" }} />
+                    <Lock size={16} strokeWidth={1.5} style={{ color: set.completed ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)" }} />
                   </button>
                 </div>
 
@@ -1522,15 +1844,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     </div>
                     {comparison?.status !== "no-history" && (
                       <div
+                        className="flex items-center gap-1.5"
                         style={{
                           fontSize: "9px",
-                          fontWeight: 400,
+                          fontWeight: comparison?.status === "pr" ? 600 : 400,
                           color:
-                            comparison?.status === "progressed"
-                              ? "rgba(255, 255, 255, 0.5)"
-                              : comparison?.status === "recovery"
-                                ? "rgba(255, 255, 255, 0.25)"
-                                : "rgba(255, 255, 255, 0.3)",
+                            comparison?.status === "pr"
+                              ? "rgba(255, 87, 51, 0.9)"
+                              : comparison?.status === "progressed"
+                                ? "rgba(255, 255, 255, 0.5)"
+                                : comparison?.status === "recovery"
+                                  ? "rgba(255, 255, 255, 0.25)"
+                                  : "rgba(255, 255, 255, 0.3)",
+                          letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
                         }}
                       >
                         {comparison?.message}
@@ -1541,6 +1867,78 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
                 {showPlateCalc && isCurrentSet && !set.completed && plates.length > 0 && (
                   <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="transition-all duration-200"
+                          style={{
+                            background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.05)" : "transparent",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "2px",
+                            padding: "3px 6px",
+                          }}
+                          onClick={() => {
+                            setPlateDisplayMode("per-side")
+                            if (currentExercise?.name) {
+                              localStorage.setItem(`plate_mode_${currentExercise.name}`, "per-side")
+                            }
+                          }}
+                          type="button"
+                        >
+                          <span className="text-white/50" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                            PER SIDE
+                          </span>
+                        </button>
+                        <button
+                          className="transition-all duration-200"
+                          style={{
+                            background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.05)" : "transparent",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "2px",
+                            padding: "3px 6px",
+                          }}
+                          onClick={() => {
+                            setPlateDisplayMode("total")
+                            if (currentExercise?.name) {
+                              localStorage.setItem(`plate_mode_${currentExercise.name}`, "total")
+                            }
+                          }}
+                          type="button"
+                        >
+                          <span className="text-white/50" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                            TOTAL
+                          </span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                          START
+                        </span>
+                        <input
+                          type="number"
+                          value={plateStartingWeight || ""}
+                          onChange={(e) => {
+                            const value = Number(e.target.value)
+                            const nextValue = Number.isNaN(value) ? 0 : Math.max(0, value)
+                            setPlateStartingWeight(nextValue)
+                            if (currentExercise?.name) {
+                              localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
+                            }
+                          }}
+                          className="transition-all duration-200"
+                          style={{
+                            width: "48px",
+                            background: "rgba(255, 255, 255, 0.04)",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "2px",
+                            padding: "2px 6px",
+                            fontSize: "9px",
+                            color: "rgba(255, 255, 255, 0.7)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        />
+                      </div>
+                    </div>
                     <div className="flex items-center gap-1 mb-2">
                       {plates.map((plate, plateIndex) => (
                         <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
@@ -1596,7 +1994,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           {plateIndex > 0 && " + "}
                           {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
                         </span>
-                      ))} per side
+                      ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
                     </div>
                   </div>
                 )}
@@ -1683,14 +2081,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }
 
-  const calculatePlates = (weight: number): { plate: number; count: number }[] => {
-    const weightPerSide = weight / 2
+  const calculatePlates = (
+    weight: number,
+    startingWeight: number,
+    mode: "per-side" | "total"
+  ): { plate: number; count: number }[] => {
+    const adjusted = Math.max(0, weight - startingWeight)
+    const plateWeight = mode === "per-side" ? adjusted / 2 : adjusted
 
-    if (weightPerSide <= 0) return []
+    if (plateWeight <= 0) return []
 
     const availablePlates = [45, 35, 25, 10, 5, 2.5]
     const plates: { plate: number; count: number }[] = []
-    let remaining = weightPerSide
+    let remaining = plateWeight
 
     for (const plate of availablePlates) {
       const count = Math.floor(remaining / plate)
@@ -1709,8 +2112,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return { status: "no-history", message: `Last: ${last.weight} × ${last.reps}` }
     }
 
+    const weightIncrease = set.weight - last.weight
+    const repIncrease = set.reps - last.reps
+    if (weightIncrease >= 10 || (weightIncrease === 0 && repIncrease >= 3)) {
+      return { status: "pr", message: "NEW PR!" }
+    }
+
     if (set.weight > last.weight || (set.weight === last.weight && set.reps > last.reps)) {
-      const delta = set.weight > last.weight ? `${set.weight - last.weight} lbs` : `${set.reps - last.reps} reps`
+      const weightDelta = set.weight - last.weight
+      const repsDelta = set.reps - last.reps
+      const delta =
+        weightDelta > 0
+          ? `${weightDelta} lb${weightDelta === 1 ? "" : "s"}`
+          : `${repsDelta} rep${repsDelta === 1 ? "" : "s"}`
       return { status: "progressed", message: `+${delta}` }
     }
 
@@ -1723,20 +2137,128 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   if (!isHydrated || exercises.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading workout...</p>
-      </div>
+      <div className="min-h-screen bg-[#0A0A0C]" />
     )
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "#0A0A0C" }}>
-      <div className="flex-shrink-0 px-5 pt-4 pb-3" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.04)" }}>
+    <div className="flex flex-col" style={{ height: "100dvh", background: "#0A0A0C", position: "relative" }}>
+      <div
+        className="absolute left-5 right-5"
+        style={{
+          top: "0px",
+          marginLeft: "-24px",
+          marginRight: "-24px",
+          background: "rgba(10, 10, 12, 0.92)",
+          border: "1px solid rgba(255, 87, 51, 0.3)",
+          borderRadius: "6px",
+          padding: "8px 12px",
+          backdropFilter: "blur(12px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          zIndex: 20,
+          opacity: isResting ? 1 : 0,
+          transform: isResting ? "translateY(0)" : "translateY(-8px)",
+          transition: "opacity 0.3s ease, transform 0.3s ease",
+          pointerEvents: isResting ? "auto" : "none",
+        }}
+        aria-hidden={!isResting}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="text-white/40"
+            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+          >
+            REST
+          </div>
+          <div
+            className="text-white/90"
+            style={{
+              fontSize: "28px",
+              fontWeight: 400,
+              letterSpacing: "-0.03em",
+              fontVariantNumeric: "tabular-nums",
+              fontFamily: "'Bebas Neue', sans-serif",
+            }}
+          >
+            {formatSeconds(restRemainingSeconds)}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (!isResting || !restState) return
+              const next = restRemainingSeconds + 30
+              void setRestStateAndPersist({
+                ...restState,
+                remainingSeconds: next,
+              })
+              scheduleRestNotification(next)
+            }}
+            className="transition-all duration-200"
+            style={{
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "2px",
+              padding: "6px 10px",
+            }}
+            type="button"
+          >
+            <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "0.04em" }}>
+              +30s
+            </span>
+          </button>
+          <button
+            onClick={() => void setRestStateAndPersist(null)}
+            className="transition-all duration-200"
+            style={{
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "2px",
+              padding: "6px 16px",
+            }}
+            type="button"
+          >
+            <span className="text-white/90" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.04em" }}>
+              Skip
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="flex-shrink-0 px-5 pt-4 pb-3"
+        style={{
+          borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+          marginTop: isResting ? "56px" : "0px",
+          transition: "margin-top 0.3s ease",
+        }}
+      >
         <div className="flex items-center justify-between mb-3">
           <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
             <ArrowLeft size={16} strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-white/30"
+                style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+              >
+                {syncStatusText}
+              </span>
+              {(syncState === "error" || syncState === "pending") && (
+                <button
+                  onClick={retryWorkoutSync}
+                  className="text-white/40 hover:text-white/70 transition-colors"
+                  style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
+                  type="button"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
             <button
               onClick={togglePause}
               className="text-white/30 hover:text-white/60 transition-colors"
@@ -1824,34 +2346,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           padding: "16px 20px",
         }}
       >
-        {isResting ? (
-          <div className="mb-4">
-            <div className="flex items-baseline justify-center gap-3 mb-3">
-              <div className="text-white/20 tracking-widest" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}>
-                REST
-              </div>
-              <div className="text-white/90" style={{ fontSize: "36px", fontWeight: 400, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}>
-                {formatSeconds(restRemainingSeconds)}
-              </div>
-            </div>
-            <button
-              onClick={() => void setRestStateAndPersist(null)}
-              className="w-full transition-all duration-200"
-              style={{
-                background: "transparent",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "2px",
-                padding: "10px",
-              }}
-              type="button"
-            >
-              <span className="text-white/40" style={{ fontSize: "10px", fontWeight: 400 }}>
-                Skip rest
-              </span>
-            </button>
-          </div>
-        ) : null}
-
         <div className="flex items-center gap-3">
           <button
             onClick={() => void goToPreviousExercise()}

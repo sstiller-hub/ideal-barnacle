@@ -17,6 +17,16 @@ import {
 } from "@/lib/google-drive-backup"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft } from "lucide-react"
 import { signInWithGoogle } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
@@ -30,6 +40,7 @@ import {
   parseWyzeFile,
   type WyzeParseResult,
 } from "@/lib/wyze-weight-import"
+import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -54,6 +65,22 @@ export default function SettingsPage() {
   const [isThemeReady, setIsThemeReady] = useState(false)
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const [openSection, setOpenSection] = useState<string | null>(null)
+  const [manualSyncRunning, setManualSyncRunning] = useState(false)
+  const [manualSyncReport, setManualSyncReport] = useState<ManualSyncReport | null>(null)
+  const [manualSyncConfirmOpen, setManualSyncConfirmOpen] = useState(false)
+  const [manualSyncIncludeSynced, setManualSyncIncludeSynced] = useState(false)
+  const [manualSyncForceOverwrite, setManualSyncForceOverwrite] = useState(false)
+  const [manualSyncRetryFailedOnly, setManualSyncRetryFailedOnly] = useState(false)
+  const [manualSyncCandidateCount, setManualSyncCandidateCount] = useState<number | null>(null)
+  const [manualSyncProgress, setManualSyncProgress] = useState<{
+    current: number
+    total: number
+    currentWorkoutId?: string
+    synced: number
+    skipped: number
+    conflicts: number
+    errors: number
+  } | null>(null)
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
@@ -329,6 +356,77 @@ export default function SettingsPage() {
     })
   }
 
+  useEffect(() => {
+    if (openSection !== "account") return
+    let active = true
+    const loadCount = async () => {
+      const { listAllWorkouts } = await import("@/lib/workout-draft-storage")
+      const drafts = await listAllWorkouts()
+      const ids = new Set<string>()
+      drafts.forEach((draft) => {
+        if (draft.sets.length === 0) return
+        if (manualSyncRetryFailedOnly && draft.sync_state !== "error" && draft.sync_state !== "pending") return
+        if (!manualSyncIncludeSynced && draft.sync_state === "synced") return
+        ids.add(draft.workout_id)
+      })
+      getWorkoutHistory().forEach((workout) => {
+        ids.add(workout.id)
+      })
+      if (active) {
+        setManualSyncCandidateCount(ids.size)
+      }
+    }
+    void loadCount()
+    return () => {
+      active = false
+    }
+  }, [openSection, manualSyncIncludeSynced, manualSyncRetryFailedOnly, workouts.length])
+
+  const handleManualSync = async (dryRun: boolean, retryFailedOnlyOverride?: boolean) => {
+    if (!user) {
+      alert("Please sign in to sync.")
+      return
+    }
+    setManualSyncRunning(true)
+    setManualSyncReport(null)
+    setManualSyncProgress(null)
+    setManualSyncConfirmOpen(false)
+    try {
+      const report = await runManualSync({
+        dryRun,
+        includeSynced: manualSyncIncludeSynced,
+        forceOverwrite: manualSyncForceOverwrite,
+        retryFailedOnly: retryFailedOnlyOverride ?? manualSyncRetryFailedOnly,
+        onProgress: (payload) => setManualSyncProgress(payload),
+      })
+      setManualSyncReport(report)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Manual sync failed"
+      setManualSyncReport({
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        dryRun,
+        total: 0,
+        attempted: 0,
+        synced: 0,
+        skipped: 0,
+        conflicts: 0,
+        errors: 1,
+        results: [
+          {
+            workout_id: "unknown",
+            started_at: null,
+            completed_at: null,
+            status: "error",
+            error: message,
+          },
+        ],
+      })
+    } finally {
+      setManualSyncRunning(false)
+    }
+  }
+
   return (
     <div className="min-h-screen glass-scope">
       <div className="sticky top-0 z-10 bg-background border-b p-3 flex items-center justify-between">
@@ -368,6 +466,7 @@ export default function SettingsPage() {
                 <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                   <li>Sign in</li>
                   <li>Cloud Sync</li>
+                  <li>Manual Sync</li>
                   <li>Google Drive Backup</li>
                   <li>Local Backup</li>
                 </ul>
@@ -449,6 +548,113 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              <div>
+                <h2 className="font-bold text-base mb-2">Send all workouts to cloud</h2>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Force upload any workouts saved on this device. This is a recovery tool.
+                </p>
+
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <Button
+                    onClick={() => handleManualSync(true)}
+                    variant="outline"
+                    disabled={!user || manualSyncRunning}
+                  >
+                    Dry run
+                  </Button>
+                  <Button
+                    onClick={() => setManualSyncConfirmOpen(true)}
+                    disabled={!user || manualSyncRunning}
+                  >
+                    {manualSyncRunning ? "Sending..." : "Send now"}
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={manualSyncIncludeSynced}
+                      onChange={(e) => setManualSyncIncludeSynced(e.target.checked)}
+                    />
+                    Include already synced
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={manualSyncRetryFailedOnly}
+                      onChange={(e) => setManualSyncRetryFailedOnly(e.target.checked)}
+                    />
+                    Retry failed only
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={manualSyncForceOverwrite}
+                      onChange={(e) => setManualSyncForceOverwrite(e.target.checked)}
+                    />
+                    Force overwrite
+                  </label>
+                </div>
+
+                <div className="text-xs text-muted-foreground mb-3">
+                  Local workouts queued: {manualSyncCandidateCount ?? 0}
+                </div>
+
+                {manualSyncProgress && manualSyncRunning && (
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Sending {manualSyncProgress.current}/{manualSyncProgress.total} • Synced: {manualSyncProgress.synced} •
+                    Skipped: {manualSyncProgress.skipped} • Conflicts: {manualSyncProgress.conflicts} • Errors:{" "}
+                    {manualSyncProgress.errors}
+                  </div>
+                )}
+
+                {manualSyncReport && (
+                  <div className="rounded-md border border-white/10 p-3 text-xs text-muted-foreground space-y-2">
+                    <div>
+                      Summary: {manualSyncReport.synced} synced, {manualSyncReport.skipped} skipped,{" "}
+                      {manualSyncReport.conflicts} conflicts, {manualSyncReport.errors} errors.
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {manualSyncReport.errors > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleManualSync(false, true)}
+                          disabled={manualSyncRunning}
+                        >
+                          Retry failed only
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (typeof navigator === "undefined" || !navigator.clipboard) return
+                          navigator.clipboard.writeText(JSON.stringify(manualSyncReport, null, 2))
+                        }}
+                      >
+                        Copy report
+                      </Button>
+                    </div>
+                    <details>
+                      <summary className="cursor-pointer">Details</summary>
+                      <div className="mt-2 space-y-2">
+                        {manualSyncReport.results.map((result) => (
+                          <div key={result.workout_id} className="border-t border-white/5 pt-2">
+                            <div>
+                              {result.workout_id} • {result.status}
+                            </div>
+                            {result.message && <div>{result.message}</div>}
+                            {result.error && <div>{result.error}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </div>
+
               {hasGoogleDriveConfig ? (
                 <div>
                   <h2 className="font-bold text-base mb-2">Google Drive Backup</h2>
@@ -504,6 +710,24 @@ export default function SettingsPage() {
             </div>
           )}
         </Card>
+
+        <AlertDialog open={manualSyncConfirmOpen} onOpenChange={setManualSyncConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Send workouts to cloud</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will attempt to upload {manualSyncCandidateCount ?? 0} workouts from this device. If you have multiple
+                devices, conflicts can happen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={manualSyncRunning}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleManualSync(false)} disabled={manualSyncRunning}>
+                Send now
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <Card
           className={`p-4 ${openSection === "appearance" ? "col-span-2 order-first" : ""}`}
