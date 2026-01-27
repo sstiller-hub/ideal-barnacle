@@ -15,7 +15,13 @@ export function AktIcon({ size = 28, opacity = 0.3, className = "" }: AktIconPro
       className={className}
       opacity={opacity}
     >
-      <rect x="0" y="0" width="64" height="64" rx="12" fill="#0A0A0C" />
+      <defs>
+        <linearGradient id="akt-bg" x1="0" y1="0" x2="0" y2="64">
+          <stop offset="0%" stopColor="#1a1a2c" />
+          <stop offset="100%" stopColor="#0a0a1c" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="64" height="64" rx="12" fill="url(#akt-bg)" />
 
       <rect x="20" y="22" width="24" height="4" rx="2" fill="#FFFFFF" />
 
