@@ -425,7 +425,10 @@ export default function Home() {
     const prSourceExercises =
       scheduledRoutine?.exercises || workoutForDate?.exercises || workoutHistory[0]?.exercises || []
     const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
-    const filteredPRs = exerciseNames
+    const sourceNames =
+      userId ? exerciseNames : Array.from(prByExerciseName.keys())
+
+    const filteredPRs = sourceNames
       .map((name: string) => {
         const pr = prByExerciseName.get(name)
         if (!pr) return null
@@ -451,7 +454,7 @@ export default function Home() {
       .filter(Boolean) as PersonalRecord[]
 
     setTodayPRs(filteredPRs)
-  }, [workoutHistory, scheduledRoutine, workoutForDate])
+  }, [workoutHistory, scheduledRoutine, workoutForDate, userId])
 
   const resolveRoutine = (entry: ScheduledWorkout | null | undefined): WorkoutRoutine | null => {
     if (!entry) return null
@@ -665,7 +668,7 @@ export default function Home() {
     uiStateOverride ||
     (workoutForDate
       ? "completed"
-      : session
+      : session && isToday()
         ? "activeSession"
         : effectiveRestDay
           ? "rest"
