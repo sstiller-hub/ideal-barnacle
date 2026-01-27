@@ -16,7 +16,6 @@ import {
   restoreFromFile,
 } from "@/lib/google-drive-backup"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft } from "lucide-react"
+import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft, ChevronUp } from "lucide-react"
 import { signInWithGoogle } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
@@ -64,7 +63,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [isThemeReady, setIsThemeReady] = useState(false)
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
-  const [openSection, setOpenSection] = useState<string | null>(null)
+  const [expandedSections, setExpandedSections] = useState<string[]>(["account"])
   const [manualSyncRunning, setManualSyncRunning] = useState(false)
   const [manualSyncReport, setManualSyncReport] = useState<ManualSyncReport | null>(null)
   const [manualSyncConfirmOpen, setManualSyncConfirmOpen] = useState(false)
@@ -344,20 +343,14 @@ export default function SettingsPage() {
     e.target.value = ""
   }
 
-  const handleSectionToggle = (section: string) => {
-    setOpenSection((prev) => {
-      const next = prev === section ? null : section
-      if (next && typeof window !== "undefined") {
-        requestAnimationFrame(() => {
-          window.scrollTo({ top: 0, behavior: "smooth" })
-        })
-      }
-      return next
-    })
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
+    )
   }
 
   useEffect(() => {
-    if (openSection !== "account") return
+    if (!expandedSections.includes("account")) return
     let active = true
     const loadCount = async () => {
       const { listAllWorkouts } = await import("@/lib/workout-draft-storage")
@@ -380,7 +373,7 @@ export default function SettingsPage() {
     return () => {
       active = false
     }
-  }, [openSection, manualSyncIncludeSynced, manualSyncRetryFailedOnly, workouts.length])
+  }, [expandedSections, manualSyncIncludeSynced, manualSyncRetryFailedOnly, workouts.length])
 
   const handleManualSync = async (dryRun: boolean, retryFailedOnlyOverride?: boolean) => {
     if (!user) {
@@ -428,59 +421,46 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen glass-scope">
-      <div className="sticky top-0 z-10 bg-background border-b p-3 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "0",
-            cursor: "pointer",
-          }}
-          aria-label="Back to home"
-        >
-          <ChevronLeft size={16} strokeWidth={2} />
-          <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
-            Back
-          </span>
-        </button>
-        <h1 className="text-lg font-bold">Settings</h1>
-        <div className="w-6" />
-      </div>
-
-      <div className="p-4 grid grid-cols-2 gap-3">
-        <Card
-          className={`p-4 ${openSection === "account" ? "col-span-2 order-first" : ""}`}
-        >
+    <div className="flex flex-col" style={{ minHeight: "100%", paddingBottom: "40px", background: "#0A0A0C" }}>
+      <div className="px-4 pt-4">
+        <div className="relative flex items-center justify-between mb-8 flex-shrink-0">
           <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "0",
+              cursor: "pointer",
+            }}
             type="button"
-            className="w-full text-left"
-            onClick={() => handleSectionToggle("account")}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account & Sync</div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>Sign in</li>
-                  <li>Cloud Sync</li>
-                  <li>Manual Sync</li>
-                  <li>Google Drive Backup</li>
-                  <li>Local Backup</li>
-                </ul>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  openSection === "account" ? "rotate-180" : ""
-                }`}
-              />
-            </div>
+            <ChevronLeft size={16} strokeWidth={2} />
+            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+              Back
+            </span>
           </button>
+          <h1
+            className="text-white/95 absolute left-1/2 transform -translate-x-1/2"
+            style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.01em" }}
+          >
+            Settings
+          </h1>
+        </div>
 
-          {openSection === "account" && (
-            <div className="mt-4 space-y-4">
+        <div className="space-y-4">
+          <SettingsSection
+            id="account"
+            title="ACCOUNT & SYNC"
+            isExpanded={expandedSections.includes("account")}
+            onToggle={() => toggleSection("account")}
+          >
+            <SettingItem label="Sign in" />
+            <SettingItem label="Cloud Sync" />
+            <SettingItem label="Manual Sync" />
+            <SettingItem label="Google Drive Backup" />
+            <SettingItem label="Local Backup" />
+            <div className="mt-3 space-y-4">
               {user ? (
                 <div>
                   <h2 className="font-bold text-base mb-2">Signed in</h2>
@@ -708,55 +688,17 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          )}
-        </Card>
+          </SettingsSection>
 
-        <AlertDialog open={manualSyncConfirmOpen} onOpenChange={setManualSyncConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Send workouts to cloud</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will attempt to upload {manualSyncCandidateCount ?? 0} workouts from this device. If you have multiple
-                devices, conflicts can happen.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={manualSyncRunning}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleManualSync(false)} disabled={manualSyncRunning}>
-                Send now
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <Card
-          className={`p-4 ${openSection === "appearance" ? "col-span-2 order-first" : ""}`}
+        <SettingsSection
+          id="appearance"
+          title="APPEARANCE & DEFAULTS"
+          isExpanded={expandedSections.includes("appearance")}
+          onToggle={() => toggleSection("appearance")}
         >
-          <button
-            type="button"
-            className="w-full text-left"
-            onClick={() => handleSectionToggle("appearance")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Appearance & Defaults
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>Appearance</li>
-                  <li>Workout Defaults</li>
-                </ul>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  openSection === "appearance" ? "rotate-180" : ""
-                }`}
-              />
-            </div>
-          </button>
-
-          {openSection === "appearance" && (
-            <div className="mt-4 space-y-4">
+          <SettingItem label="Appearance" />
+          <SettingItem label="Workout Defaults" />
+          <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Appearance</h2>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -815,39 +757,19 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
-        </Card>
+          </div>
+        </SettingsSection>
 
-        <Card
-          className={`p-4 ${openSection === "schedule" ? "col-span-2 order-first" : ""}`}
+        <SettingsSection
+          id="schedule"
+          title="SCHEDULE & PROGRAMS"
+          isExpanded={expandedSections.includes("schedule")}
+          onToggle={() => toggleSection("schedule")}
         >
-          <button
-            type="button"
-            className="w-full text-left"
-            onClick={() => handleSectionToggle("schedule")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Schedule & Programs
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>Workout Schedule</li>
-                  <li>Reset Program</li>
-                  <li>Demo Data</li>
-                </ul>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  openSection === "schedule" ? "rotate-180" : ""
-                }`}
-              />
-            </div>
-          </button>
-
-          {openSection === "schedule" && (
-            <div className="mt-4 space-y-4">
+          <SettingItem label="Workout Schedule" />
+          <SettingItem label="Reset Program" />
+          <SettingItem label="Demo Data" />
+          <div className="mt-3 space-y-4">
               <WorkoutScheduleEditor />
 
               <div>
@@ -873,38 +795,20 @@ export default function SettingsPage() {
                   Includes 10 workouts with progressive overload and PRs
                 </p>
               </div>
-            </div>
-          )}
-        </Card>
+          </div>
+        </SettingsSection>
 
-        <Card className={`p-4 ${openSection === "data" ? "col-span-2 order-first" : ""}`}>
-          <button
-            type="button"
-            className="w-full text-left"
-            onClick={() => handleSectionToggle("data")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Data & Integrations
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>Import Historical Data</li>
-                  <li>Import Weight Data</li>
-                  <li>Apple Health Integration</li>
-                  <li>Clear All Data</li>
-                </ul>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  openSection === "data" ? "rotate-180" : ""
-                }`}
-              />
-            </div>
-          </button>
-
-          {openSection === "data" && (
-            <div className="mt-4 space-y-4">
+        <SettingsSection
+          id="data"
+          title="DATA & INTEGRATIONS"
+          isExpanded={expandedSections.includes("data")}
+          onToggle={() => toggleSection("data")}
+        >
+          <SettingItem label="Import Historical Data" />
+          <SettingItem label="Import Weight Data" />
+          <SettingItem label="Apple Health Integration" />
+          <SettingItem label="Clear All Data" />
+          <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Import Historical Data</h2>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -1124,36 +1028,18 @@ export default function SettingsPage() {
                   Clear All Data
                 </Button>
               </div>
-            </div>
-          )}
-        </Card>
+          </div>
+        </SettingsSection>
 
-        <Card className={`p-4 ${openSection === "about" ? "col-span-2 order-first" : ""}`}>
-          <button
-            type="button"
-            className="w-full text-left"
-            onClick={() => handleSectionToggle("about")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  About & Device
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>Install as App</li>
-                  <li>Data Storage</li>
-                </ul>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  openSection === "about" ? "rotate-180" : ""
-                }`}
-              />
-            </div>
-          </button>
-
-          {openSection === "about" && (
-            <div className="mt-4 space-y-4">
+        <SettingsSection
+          id="about"
+          title="ABOUT & DEVICE"
+          isExpanded={expandedSections.includes("about")}
+          onToggle={() => toggleSection("about")}
+        >
+          <SettingItem label="Install as App" />
+          <SettingItem label="Data Storage" />
+          <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Install as App</h2>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -1172,18 +1058,120 @@ export default function SettingsPage() {
                   All workout data is stored locally on your device. Your data never leaves your phone.
                 </p>
               </div>
-            </div>
-          )}
-        </Card>
-
-        <div className="col-span-2 text-[11px] text-muted-foreground text-center">
-          Kova Fit · Made with intention in Boston
+          </div>
+        </SettingsSection>
         </div>
-        <div className="col-span-2 text-[10px] text-muted-foreground text-center">
-          Build: {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev"}
+
+        <AlertDialog open={manualSyncConfirmOpen} onOpenChange={setManualSyncConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Send workouts to cloud</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will attempt to upload {manualSyncCandidateCount ?? 0} workouts from this device. If you have multiple
+                devices, conflicts can happen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={manualSyncRunning}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleManualSync(false)} disabled={manualSyncRunning}>
+                Send now
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <div className="flex-shrink-0 mt-12 space-y-2">
+          <p className="text-white/20 text-center" style={{ fontSize: "10px", fontWeight: 400 }}>
+            Build: dev
+          </p>
         </div>
       </div>
-
     </div>
+  )
+}
+
+function SettingsSection({
+  id,
+  title,
+  children,
+  isExpanded,
+  onToggle,
+}: {
+  id: string
+  title: string
+  children: React.ReactNode
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div
+      style={{
+        background: "rgba(255, 255, 255, 0.02)",
+        border: "1px solid rgba(255, 255, 255, 0.06)",
+        borderRadius: "2px",
+      }}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 transition-colors duration-200 hover:bg-white/[0.01]"
+        style={{
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+        }}
+        type="button"
+      >
+        <span
+          className="text-white/50"
+          style={{
+            fontSize: "11px",
+            fontWeight: 500,
+            letterSpacing: "0.08em",
+            fontFamily: "'Archivo Narrow', sans-serif",
+          }}
+        >
+          {title}
+        </span>
+        <div className="text-white/30">
+          {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div
+          className="px-4 pb-2"
+          style={{
+            borderTop: "1px solid rgba(255, 255, 255, 0.04)",
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SettingItem({ label }: { label: string }) {
+  return (
+    <button
+      className="w-full text-left py-2.5 px-0 transition-colors duration-200 hover:text-white/70"
+      style={{
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+      }}
+      type="button"
+    >
+      <span
+        className="text-white/50"
+        style={{
+          fontSize: "12px",
+          fontWeight: 400,
+          letterSpacing: "0.005em",
+        }}
+      >
+        {label}
+      </span>
+    </button>
   )
 }
