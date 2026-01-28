@@ -21,6 +21,7 @@ import {
   saveCurrentSessionId,
   type WorkoutSession,
 } from "@/lib/autosave-workout-storage"
+import { deleteWorkoutDraft } from "@/lib/workout-draft-storage"
 import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "@/lib/growth-v2-plan"
 import { formatExerciseName } from "@/lib/format-exercise-name"
 import {
@@ -41,7 +42,6 @@ import { computeWeekOverWeek } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import {
   ArrowDown,
-  ArrowLeftRight,
   ArrowUp,
   Settings,
   ChevronLeft,
@@ -169,6 +169,21 @@ export default function Home() {
   const refreshSession = () => {
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
+  }
+
+  const handleDiscardActiveWorkout = async () => {
+    if (!session) return
+    const confirmed = window.confirm("Discard this workout? This will delete the active workout from this device.")
+    if (!confirmed) return
+    const workoutId = session.workoutId || (session.id && /^[0-9a-f-]{36}$/i.test(session.id) ? session.id : null)
+    deleteSetsForSession(session.id)
+    deleteSession(session.id)
+    saveCurrentSessionId(null)
+    if (workoutId) {
+      await deleteWorkoutDraft(workoutId)
+    }
+    setSession(null)
+    loadDataForDate(selectedDate)
   }
 
   useEffect(() => {
@@ -657,7 +672,6 @@ export default function Home() {
     return selected.getTime() < today.getTime()
   }, [selectedDate])
 
-  const isOverridden = scheduleOverride?.isOverride ?? localOverride
   const effectiveRestDay = scheduleOverride?.workout === null ? true : scheduleOverride ? false : baseIsRestDay
   const scheduledWorkoutType = effectiveRestDay
     ? "Rest"
@@ -753,25 +767,6 @@ export default function Home() {
               >
                 SCHEDULED
               </button>
-              {isOverridden && (
-                <div
-                  className="flex items-center gap-1"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "1px",
-                    padding: "2px 5px",
-                  }}
-                >
-                  <ArrowLeftRight size={8} strokeWidth={2} className="text-white/30" />
-                  <span
-                    className="text-white/30"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                  >
-                    OVERRIDDEN
-                  </span>
-                </div>
-              )}
               {actualState === "activeSession" && (
                 <div className="flex items-center gap-1.5">
                   <div
@@ -1258,6 +1253,31 @@ export default function Home() {
                 {actualState === "activeSession" && null}
               </div>
             </button>
+
+            {actualState === "activeSession" && (
+              <button
+                className="w-full mt-3 transition-all duration-200"
+                style={{
+                  background: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "1px",
+                  padding: "12px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent"
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)"
+                }}
+                onClick={handleDiscardActiveWorkout}
+              >
+                <span className="text-white/40" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.02em" }}>
+                  Discard Active Workout
+                </span>
+              </button>
+            )}
 
           </div>
         )}

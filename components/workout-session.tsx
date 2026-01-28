@@ -51,6 +51,7 @@ import {
   upsertSet as upsertSetDraft,
   getWorkoutDraft,
   deleteSet as deleteSetDraft,
+  deleteWorkoutDraft,
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
@@ -2030,6 +2031,23 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }, [session?.id, session?.status, restState])
 
+  const handleDiscardWorkout = async () => {
+    if (!session) return
+    const confirmed = window.confirm("Discard this workout? This will delete the active workout from this device.")
+    if (!confirmed) return
+    const workoutId = session.workoutId ?? (isUuid(session.id) ? session.id : null)
+    deleteSetsForSession(session.id)
+    deleteSession(session.id)
+    saveCurrentSessionId(null)
+    setRestState(undefined)
+    setSession(null)
+    setExercises([])
+    if (workoutId) {
+      await deleteWorkoutDraft(workoutId)
+    }
+    router.push("/")
+  }
+
   const handleTogglePlateCalc = () => {
     const newValue = !showPlateCalc
     setShowPlateCalc(newValue)
@@ -2243,6 +2261,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 Retry
               </button>
             )}
+            <button
+              onClick={handleDiscardWorkout}
+              className="text-white/30 hover:text-white/60 transition-colors"
+              style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
+              type="button"
+            >
+              Discard
+            </button>
           </div>
         </div>
 

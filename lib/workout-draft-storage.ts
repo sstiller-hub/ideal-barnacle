@@ -153,6 +153,12 @@ export async function deleteSet(workoutId: string, setId: string): Promise<void>
   })
 }
 
+export async function deleteWorkoutDraft(workoutId: string): Promise<void> {
+  const db = await getDb()
+  if (!db) return
+  await db.delete(WORKOUT_STORE, workoutId)
+}
+
 export async function markWorkoutPending(workoutId: string): Promise<ActiveWorkoutDraft | null> {
   return updateWorkoutDraft(workoutId, {
     sync_state: "pending",
