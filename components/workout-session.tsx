@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
@@ -52,7 +54,7 @@ import {
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
-import { ArrowLeft, AlertCircle, Check, Pause, Play, Lock } from "lucide-react"
+import { ArrowLeft, AlertCircle, Check } from "lucide-react"
 
 type Exercise = {
   id: string
@@ -184,6 +186,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const weightInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const repsInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const restNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const restNotificationEndsAtRef = useRef<number | null>(null)
   const [plateDisplayMode, setPlateDisplayMode] = useState<"per-side" | "total">("per-side")
   const [plateStartingWeight, setPlateStartingWeight] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
@@ -613,37 +616,45 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
+  const fireRestNotification = async () => {
+    if (typeof window === "undefined") return
+    if (!("Notification" in window)) return
+    if (Notification.permission !== "granted") return
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready
+        await registration.showNotification("Rest complete", {
+          body: "Time to start your next set.",
+        })
+        return
+      } catch {
+        // fall back to in-page notification
+      }
+    }
+    try {
+      new Notification("Rest complete", {
+        body: "Time to start your next set.",
+      })
+    } catch {
+      // ignore notification errors
+    }
+  }
+
   const scheduleRestNotification = (seconds: number) => {
     if (typeof window === "undefined") return
     if (restNotificationTimeoutRef.current) {
       window.clearTimeout(restNotificationTimeoutRef.current)
       restNotificationTimeoutRef.current = null
     }
+    restNotificationEndsAtRef.current = Date.now() + seconds * 1000
     if (!("Notification" in window)) return
     if (Notification.permission === "default") {
-      void Notification.requestPermission().then((permission) => {
-        if (permission !== "granted") return
-        restNotificationTimeoutRef.current = window.setTimeout(() => {
-          try {
-            new Notification("Rest complete", {
-              body: "Time to start your next set.",
-            })
-          } catch {
-            // ignore notification errors
-          }
-        }, seconds * 1000)
-      })
+      void Notification.requestPermission()
       return
     }
     if (Notification.permission !== "granted") return
     restNotificationTimeoutRef.current = window.setTimeout(() => {
-      try {
-        new Notification("Rest complete", {
-          body: "Time to start your next set.",
-        })
-      } catch {
-        // ignore notification errors
-      }
+      void fireRestNotification()
     }, seconds * 1000)
   }
 
@@ -718,6 +729,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       window.clearTimeout(restNotificationTimeoutRef.current)
       restNotificationTimeoutRef.current = null
     }
+    if (!nextWithStart) {
+      restNotificationEndsAtRef.current = null
+    }
     if (session) {
       const updatedSession: WorkoutSession = {
         ...session,
@@ -725,25 +739,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }
       setSession(updatedSession)
       await saveSession(updatedSession)
-    }
-  }
-
-  const handlePrimaryAction = async () => {
-    if (!session || !currentExercise) return
-    if (currentSetIndex < 0 || currentSetIndex >= currentExercise.sets.length) return
-    if (isSetIncomplete(currentExercise.sets[currentSetIndex])) {
-      setValidationTrigger(Date.now())
-      return
-    }
-    await completeSet(currentSetIndex, { startRest: false })
-    const restSeconds = currentExercise.restTime ?? extractRestSeconds(currentExercise.notes)
-    if (restSeconds > 0) {
-      await setRestStateAndPersist({
-        exerciseIndex: currentExerciseIndex,
-        setIndex: currentSetIndex,
-        remainingSeconds: restSeconds,
-      })
-      scheduleRestNotification(restSeconds)
     }
   }
 
@@ -768,8 +763,27 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         window.clearTimeout(restNotificationTimeoutRef.current)
         restNotificationTimeoutRef.current = null
       }
+      restNotificationEndsAtRef.current = null
     }
   }, [isResting, restRemainingSeconds])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return
+      const endsAt = restNotificationEndsAtRef.current
+      if (!endsAt) return
+      if (Date.now() >= endsAt) {
+        void fireRestNotification()
+        restNotificationEndsAtRef.current = null
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility)
+    window.addEventListener("focus", handleVisibility)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility)
+      window.removeEventListener("focus", handleVisibility)
+    }
+  }, [])
 
   useEffect(() => {
     if (currentExercise?.name && typeof window !== "undefined") {
@@ -1388,37 +1402,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     setAddHoldProgress(0)
   }
 
-  const goToNextExercise = async () => {
-    if (!session) return
-    if (currentExerciseIndex < exercises.length - 1) {
-      const newIndex = currentExerciseIndex + 1
-      const updatedSession: WorkoutSession = {
-        ...session,
-        currentExerciseIndex: newIndex,
-      }
-
-      setSession(updatedSession)
-      await saveSession(updatedSession)
-      setValidationTrigger(0)
-    } else {
-      finishWorkout()
-    }
-  }
-
-  const goToPreviousExercise = async () => {
-    if (!session) return
-    if (currentExerciseIndex > 0) {
-      const newIndex = currentExerciseIndex - 1
-      const updatedSession: WorkoutSession = {
-        ...session,
-        currentExerciseIndex: newIndex,
-      }
-
-      setSession(updatedSession)
-      await saveSession(updatedSession)
-    }
-  }
-
   const setExerciseIndex = async (nextIndex: number) => {
     if (!session) return
     if (nextIndex < 0 || nextIndex >= exercises.length) return
@@ -1629,7 +1612,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           paddingLeft: "20px",
           paddingRight: "20px",
           paddingTop: "20px",
-          paddingBottom: "128px",
+          paddingBottom: "120px",
         }}
       >
         <div className="mb-5">
@@ -1646,6 +1629,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           >
             {exercise.name}
           </h1>
+          <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
+            REP RANGE {exercise.targetReps ?? "8-10"}
+          </div>
           <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
             {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}
             {isCurrentExercise && exerciseCurrentSetIndex >= 0 && !allSetsRecorded
@@ -1712,14 +1698,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         if (parsed === null || parsed < 0) return
                         void updateSetData(index, "weight", parsed)
                       }}
-                      onFocus={() => set.id && handleSetFieldFocus(set.id, "weight")}
+                      onFocus={(e) => {
+                        if (set.id) handleSetFieldFocus(set.id, "weight")
+                        handleInputAutoSelect(e)
+                      }}
                       onBlur={() => set.id && handleSetFieldBlur(set.id, "weight")}
                       ref={(node) => {
                         if (set.id) {
                           weightInputRefs.current.set(set.id, node)
                         }
                       }}
-                      disabled={set.completed || !isCurrentExercise}
+                      disabled={!isCurrentExercise}
                       placeholder="—"
                       className="w-full transition-all duration-200"
                       style={{
@@ -1768,14 +1757,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         const clamped = Math.max(REP_MIN, parsed)
                         void updateSetData(index, "reps", clamped)
                       }}
-                      onFocus={() => set.id && handleSetFieldFocus(set.id, "reps")}
+                      onFocus={(e) => {
+                        if (set.id) handleSetFieldFocus(set.id, "reps")
+                        handleInputAutoSelect(e)
+                      }}
                       onBlur={() => set.id && handleSetFieldBlur(set.id, "reps")}
                       ref={(node) => {
                         if (set.id) {
                           repsInputRefs.current.set(set.id, node)
                         }
                       }}
-                      disabled={set.completed || !isCurrentExercise}
+                      disabled={!isCurrentExercise}
                       placeholder="—"
                       className="w-full transition-all duration-200"
                       style={{
@@ -1796,32 +1788,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     />
                     <div className="text-white/25 mt-1.5 text-center" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}>
                       reps
-                    </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      if (!isCurrentExercise) return
-                      if (!set.completed && (isSetIncomplete(set) || repCapError)) {
-                        setValidationTrigger(Date.now())
-                        return
-                      }
-                      void completeSet(index)
-                    }}
-                    disabled={isBlocked}
-                    className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
-                    style={{
-                      width: "56px",
-                      height: isResting ? "68px" : "76px",
-                      background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.03)",
-                      border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.15" : "0.1"})`,
-                      borderRadius: "2px",
-                      opacity: isBlocked ? 0.2 : 1,
-                    }}
-                    type="button"
-                  >
-                    <Lock size={16} strokeWidth={1.5} style={{ color: set.completed ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)" }} />
-                  </button>
+                </div>
+
                 </div>
 
                 {(repCapError || showMissing) && (
@@ -1909,8 +1879,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                             TOTAL
                           </span>
                         </button>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
                           START
                         </span>
@@ -1925,6 +1893,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
                             }
                           }}
+                          onFocus={handleInputAutoSelect}
                           className="transition-all duration-200"
                           style={{
                             width: "48px",
@@ -1932,11 +1901,37 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                             border: "1px solid rgba(255, 255, 255, 0.08)",
                             borderRadius: "2px",
                             padding: "2px 6px",
-                            fontSize: "9px",
+                            fontSize: "16px",
                             color: "rgba(255, 255, 255, 0.7)",
                             fontVariantNumeric: "tabular-nums",
                           }}
                         />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (!isCurrentExercise) return
+                            if (!set.completed && (isSetIncomplete(set) || repCapError)) {
+                              setValidationTrigger(Date.now())
+                              return
+                            }
+                            void completeSet(index)
+                          }}
+                          disabled={!isCurrentExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
+                          className="flex items-center justify-center transition-all duration-200"
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
+                            border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.2" : "0.08"})`,
+                            borderRadius: "2px",
+                            opacity: !isCurrentExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
+                          }}
+                          type="button"
+                          aria-label={set.completed ? "Mark set incomplete" : "Complete set"}
+                        >
+                          <Check size={12} strokeWidth={2} style={{ color: set.completed ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)" }} />
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 mb-2">
@@ -2006,26 +2001,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     )
   }
 
-  const togglePause = async () => {
-    if (session?.status === "in_progress") {
-      const updatedSession: WorkoutSession = {
-        ...session,
-        status: "paused",
-      }
-
-      setSession(updatedSession)
-      await saveSession(updatedSession)
-    } else if (session?.status === "paused") {
-      const updatedSession: WorkoutSession = {
-        ...session,
-        status: "in_progress",
-      }
-
-      setSession(updatedSession)
-      await saveSession(updatedSession)
-    }
-  }
-
   const pauseSession = async () => {
     if (session?.status !== "in_progress") return
     const persistedRestTimer = session.restTimer ?? restState ?? undefined
@@ -2081,6 +2056,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }
 
+  const handleInputAutoSelect = (event: React.FocusEvent<HTMLInputElement>) => {
+    const target = event.currentTarget
+    window.setTimeout(() => {
+      try {
+        target.select()
+      } catch {
+        // ignore selection errors
+      }
+    }, 0)
+  }
+
   const calculatePlates = (
     weight: number,
     startingWeight: number,
@@ -2114,7 +2100,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     const weightIncrease = set.weight - last.weight
     const repIncrease = set.reps - last.reps
-    if (weightIncrease >= 10 || (weightIncrease === 0 && repIncrease >= 3)) {
+    if (weightIncrease >= 10 || (weightIncrease === 0 && repIncrease >= 1)) {
       return { status: "pr", message: "NEW PR!" }
     }
 
@@ -2240,41 +2226,23 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
             <ArrowLeft size={16} strokeWidth={1.5} />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-white/30"
-                style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+          <div className="flex items-center gap-2">
+            <span
+              className="text-white/30"
+              style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+            >
+              {syncStatusText}
+            </span>
+            {(syncState === "error" || syncState === "pending") && (
+              <button
+                onClick={retryWorkoutSync}
+                className="text-white/40 hover:text-white/70 transition-colors"
+                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
+                type="button"
               >
-                {syncStatusText}
-              </span>
-              {(syncState === "error" || syncState === "pending") && (
-                <button
-                  onClick={retryWorkoutSync}
-                  className="text-white/40 hover:text-white/70 transition-colors"
-                  style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
-                  type="button"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-            <button
-              onClick={togglePause}
-              className="text-white/30 hover:text-white/60 transition-colors"
-              type="button"
-              aria-label={session?.status === "in_progress" ? "Pause workout" : "Resume workout"}
-            >
-              {session?.status === "in_progress" ? <Pause size={16} strokeWidth={1.5} /> : <Play size={16} strokeWidth={1.5} />}
-            </button>
-            <button
-              onClick={handleExit}
-              className="text-white/30 hover:text-white/60 transition-colors"
-              style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.04em" }}
-              type="button"
-            >
-              Exit Workout
-            </button>
+                Retry
+              </button>
+            )}
           </div>
         </div>
 
@@ -2315,7 +2283,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="flex-1 flex overflow-x-auto overflow-y-hidden"
-        style={{ scrollSnapType: "x mandatory", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch" }}
+        style={{
+          scrollSnapType: "x mandatory",
+          scrollBehavior: "smooth",
+          WebkitOverflowScrolling: "touch",
+          overflowY: "hidden",
+        }}
       >
         {exercises.map((exercise, index) => (
           <div
@@ -2324,7 +2297,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               scrollSnapAlign: "start",
               width: "100%",
               flexShrink: 0,
-              overflowY: "auto",
+              overflowY: "hidden",
             }}
           >
             {renderExerciseContent(exercise, index)}
@@ -2332,88 +2305,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         ))}
       </div>
 
-      <div
-        className="flex-shrink-0"
-        style={{
-          position: "fixed",
-          bottom: "80px",
-          left: 0,
-          right: 0,
-          maxWidth: "448px",
-          margin: "0 auto",
-          background: "#0A0A0C",
-          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-          padding: "16px 20px",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => void goToPreviousExercise()}
-            disabled={currentExerciseIndex === 0}
-            className="transition-all duration-200"
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-              borderRadius: "2px",
-              padding: "13px 16px",
-              opacity: currentExerciseIndex === 0 ? 0.2 : 1,
-            }}
-            type="button"
-          >
-            <span className="text-white/30" style={{ fontSize: "10px", fontWeight: 400 }}>
-              Previous
-            </span>
-          </button>
-
-          <button
-            onClick={() => void (allSetsCompleted ? goToNextExercise() : handlePrimaryAction())}
-            disabled={!allSetsCompleted && currentSetIndex >= 0 && isSetIncomplete(currentExercise.sets[currentSetIndex])}
-            className="flex-1 transition-all duration-200"
-            style={{
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              borderRadius: "2px",
-              padding: "13px",
-              opacity:
-                !allSetsCompleted && currentSetIndex >= 0 && isSetIncomplete(currentExercise.sets[currentSetIndex]) ? 0.2 : 1,
-            }}
-            type="button"
-          >
-            <span className="text-white/90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.01em" }}>
-              {allSetsCompleted ? (currentExerciseIndex === exercises.length - 1 ? "Finish Workout" : "Next Exercise") : "Complete Set"}
-            </span>
-          </button>
-
-          <button
-            onClick={() => void goToNextExercise()}
-            disabled={currentExerciseIndex === totalExercises - 1}
-            className="transition-all duration-200"
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-              borderRadius: "2px",
-              padding: "13px 16px",
-              opacity: currentExerciseIndex === totalExercises - 1 ? 0.2 : 1,
-            }}
-            type="button"
-          >
-            <span className="text-white/30" style={{ fontSize: "10px", fontWeight: 400 }}>
-              Next
-            </span>
-          </button>
-        </div>
-      </div>
+      <div className="flex-shrink-0" style={{ height: 0 }} />
 
       <div
         className="flex-shrink-0"
         style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: "80px",
-          background: "#0A0A0C",
-          borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+          height: 0,
         }}
       />
     </div>

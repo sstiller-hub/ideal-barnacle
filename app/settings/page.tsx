@@ -433,6 +433,7 @@ export default function SettingsPage() {
               padding: "0",
               cursor: "pointer",
             }}
+            aria-label="Back to home"
             type="button"
           >
             <ChevronLeft size={16} strokeWidth={2} />
