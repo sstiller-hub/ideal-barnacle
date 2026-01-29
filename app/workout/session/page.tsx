@@ -70,7 +70,13 @@ export default function WorkoutSessionPage() {
   if (conflictOpen) {
     return (
       <>
-        <div className="min-h-screen bg-[#0A0A0C]" />
+        <div
+          className="min-h-screen"
+          style={{
+            background: "#0D0D0F",
+            boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          }}
+        />
         <AlertDialog open={conflictOpen} onOpenChange={setConflictOpen}>
           <AlertDialogContent
             className="border-0"
@@ -148,7 +154,13 @@ export default function WorkoutSessionPage() {
 
   if (!routine) {
     return (
-      <div className="min-h-screen bg-[#0A0A0C]" />
+      <div
+        className="min-h-screen"
+        style={{
+          background: "#0D0D0F",
+          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        }}
+      />
     )
   }
 

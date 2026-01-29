@@ -183,6 +183,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const isScrollingProgrammatically = useRef(false)
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
+  const [recentlySaved, setRecentlySaved] = useState(false)
+  const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const NOTE_CHAR_LIMIT = 360
   const weightInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const repsInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
@@ -833,6 +836,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }, [currentExerciseIndex, currentExercise?.sessionNote])
 
   useEffect(() => {
+    if (!session?.startedAt) return
+    const start = new Date(session.startedAt).getTime()
+    const update = () => {
+      const next = Math.max(0, Math.floor((Date.now() - start) / 1000))
+      setElapsedSeconds(next)
+    }
+    update()
+    const interval = window.setInterval(update, 1000)
+    return () => window.clearInterval(interval)
+  }, [session?.startedAt])
+
+  useEffect(() => {
     if (!currentExercise) return
     if (isResting) return
     const activeSet = currentExercise.sets[currentSetIndex]
@@ -1055,6 +1070,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+    signalAutoSaved()
   }
 
   const completeSet = async (
@@ -1152,6 +1168,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     setSession(updatedSession)
     await saveSession(updatedSession)
+    signalAutoSaved()
 
     if (shouldAutoRest && shouldStartRest) {
       const restSeconds =
@@ -1610,34 +1627,31 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         className="flex-shrink-0"
         style={{
           width: "100%",
-          paddingLeft: "20px",
-          paddingRight: "20px",
+          paddingLeft: "0px",
+          paddingRight: "0px",
           paddingTop: "20px",
           paddingBottom: "120px",
         }}
       >
         <div className="mb-5">
-          <div
-            className="text-white/25 tracking-widest mb-2"
-            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
-          >
-            EXERCISE {exerciseIndex + 1} OF {totalExercises} • {routine.name.toUpperCase()}
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className="text-white/25 tracking-widest"
+              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+            >
+              EXERCISE {exerciseIndex + 1} • {routine.name.toUpperCase()} • {formatSeconds(elapsedSeconds)}
+            </div>
           </div>
 
           <h1
             className="text-white/95"
-            style={{ fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: "1", fontFamily: "'Bebas Neue', sans-serif" }}
+            style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: "1", fontFamily: "'Bebas Neue', sans-serif" }}
           >
             {exercise.name}
           </h1>
+
           <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
-            REP RANGE {exercise.targetReps ?? "8-10"}
-          </div>
-          <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
-            {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}
-            {isCurrentExercise && exerciseCurrentSetIndex >= 0 && !allSetsRecorded
-              ? ` • NOW: SET ${exerciseCurrentSetIndex + 1}/${exercise.sets.length}`
-              : ""}
+            {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""} • NOW: SET {activeSetIndex + 1}/{exercise.sets.length}
           </div>
 
           {isCurrentExercise && allSetsRecorded && (
@@ -2012,6 +2026,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
     setSession(updatedSession)
     await saveSession(updatedSession)
+    signalAutoSaved()
   }
 
   useEffect(() => {
@@ -2085,6 +2100,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }, 0)
   }
 
+  const signalAutoSaved = () => {
+    setRecentlySaved(true)
+    if (recentlySavedTimeoutRef.current) {
+      window.clearTimeout(recentlySavedTimeoutRef.current)
+    }
+    recentlySavedTimeoutRef.current = window.setTimeout(() => {
+      setRecentlySaved(false)
+      recentlySavedTimeoutRef.current = null
+    }, 2000)
+  }
+
   const calculatePlates = (
     weight: number,
     startingWeight: number,
@@ -2141,12 +2167,60 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   if (!isHydrated || exercises.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0A0A0C]" />
+      <div
+        className="min-h-screen"
+        style={{
+          background: "#0D0D0F",
+          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        }}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "#0A0A0C", position: "relative" }}>
+    <div
+      className="flex flex-col"
+      style={{
+        height: "100dvh",
+        background: "#0D0D0F",
+        boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        position: "relative",
+        paddingLeft: "20px",
+        paddingRight: "20px",
+        paddingTop: "20px",
+      }}
+    >
+      {recentlySaved && (
+        <div
+          className="flex items-center gap-1.5"
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              background: "rgba(80, 200, 120, 0.6)",
+              animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: "7px",
+              fontWeight: 400,
+              letterSpacing: "0.08em",
+              color: "rgba(80, 200, 120, 0.6)",
+              fontFamily: "'Archivo Narrow', sans-serif",
+            }}
+          >
+            AUTO-SAVED
+          </span>
+        </div>
+      )}
       <div
         className="absolute left-5 right-5"
         style={{
@@ -2236,6 +2310,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         className="flex-shrink-0 px-5 pt-4 pb-3"
         style={{
           borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+          marginLeft: "-20px",
+          marginRight: "-20px",
+          paddingLeft: "20px",
+          paddingRight: "20px",
+          paddingBottom: "12px",
           marginTop: isResting ? "56px" : "0px",
           transition: "margin-top 0.3s ease",
         }}
@@ -2245,12 +2324,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             <ArrowLeft size={16} strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-2">
-            <span
-              className="text-white/30"
-              style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}
-            >
-              {syncStatusText}
-            </span>
             {(syncState === "error" || syncState === "pending") && (
               <button
                 onClick={retryWorkoutSync}
@@ -2261,14 +2334,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 Retry
               </button>
             )}
-            <button
-              onClick={handleDiscardWorkout}
-              className="text-white/30 hover:text-white/60 transition-colors"
-              style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
-              type="button"
-            >
-              Discard
-            </button>
           </div>
         </div>
 
@@ -2333,12 +2398,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
       <div className="flex-shrink-0" style={{ height: 0 }} />
 
-      <div
-        className="flex-shrink-0"
-        style={{
-          height: 0,
-        }}
-      />
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

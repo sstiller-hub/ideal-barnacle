@@ -48,6 +48,7 @@ import {
   ChevronRight,
   ChevronRight as ChevronRightSmall,
 } from "lucide-react"
+import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -139,7 +140,6 @@ export default function Home() {
   const [devModeEnabled, setDevModeEnabled] = useState(false)
   const [devModeTapCount, setDevModeTapCount] = useState(0)
   const [devModeTapTimeout, setDevModeTapTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
-  const [wyzeWeightSeries, setWyzeWeightSeries] = useState<number[]>([])
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [lastWorkoutSummary, setLastWorkoutSummary] = useState<LastWorkoutSummary | null>(null)
   const [lastWorkoutPrs, setLastWorkoutPrs] = useState<WorkoutPrEvent[]>([])
@@ -159,6 +159,37 @@ export default function Home() {
     end.setDate(start.getDate() + 7)
     return { start, end }
   }
+
+  const weeklyVolumes = useMemo(() => {
+    const endBase = new Date()
+    endBase.setHours(23, 59, 59, 999)
+    const volumes: number[] = []
+    for (let i = 6; i >= 0; i -= 1) {
+      const end = new Date(endBase)
+      end.setDate(end.getDate() - i * 7)
+      const start = new Date(end)
+      start.setDate(start.getDate() - 7)
+      const total = workoutHistory.reduce((sum, workout) => {
+        const dateStr = workout?.performed_at ?? workout?.date ?? workout?.performedAt
+        if (!dateStr) return sum
+        const workoutDate = new Date(dateStr)
+        if (workoutDate >= start && workoutDate <= end) {
+          const volume =
+            workout?.total_volume_lb ??
+            workout?.stats?.totalVolume ??
+            workout?.totalVolume ??
+            0
+          return sum + (typeof volume === "number" ? volume : 0)
+        }
+        return sum
+      }, 0)
+      volumes.push(total)
+    }
+    return volumes
+  }, [workoutHistory])
+
+  const currentWeekVolume = weeklyVolumes[weeklyVolumes.length - 1] ?? 0
+  const previousWeekVolume = weeklyVolumes[weeklyVolumes.length - 2] ?? 0
 
   useEffect(() => {
     setRoutines(getRoutines())
@@ -264,22 +295,6 @@ export default function Home() {
     }
   }, [selectedDate, userId])
 
-  const loadWyzeWeights = async (targetUserId: string) => {
-    const { data, error } = await supabase
-      .from("body_weight_entries")
-      .select("weight_lb, measured_at")
-      .eq("user_id", targetUserId)
-      .eq("source", "wyze_import")
-      .order("measured_at", { ascending: true })
-      .limit(30)
-    if (error) return
-    const series =
-      data
-        ?.map((entry) => entry.weight_lb)
-        .filter((value): value is number => typeof value === "number" && !Number.isNaN(value)) ?? []
-    setWyzeWeightSeries(series)
-  }
-
   const loadHomeAnalytics = async (targetUserId: string) => {
     const now = new Date()
     const { start, end } = getWeekRange(now)
@@ -356,13 +371,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!userId) {
-      setWyzeWeightSeries([])
       setWeeklySummary(null)
       setLastWorkoutSummary(null)
       setLastWorkoutPrs([])
       return
     }
-    void loadWyzeWeights(userId)
     void loadHomeAnalytics(userId)
   }, [userId])
 
@@ -468,7 +481,13 @@ export default function Home() {
       })
       .filter(Boolean) as PersonalRecord[]
 
-    setTodayPRs(filteredPRs)
+    const sortedPRs = [...filteredPRs].sort((a, b) => {
+      const aTime = a.achievedAt ? new Date(a.achievedAt).getTime() : 0
+      const bTime = b.achievedAt ? new Date(b.achievedAt).getTime() : 0
+      return bTime - aTime
+    })
+
+    setTodayPRs(sortedPRs)
   }, [workoutHistory, scheduledRoutine, workoutForDate, userId])
 
   const resolveRoutine = (entry: ScheduledWorkout | null | undefined): WorkoutRoutine | null => {
@@ -716,8 +735,14 @@ export default function Home() {
         <Settings size={16} strokeWidth={1.5} />
       </button>
       <main
-        className="relative flex flex-col overflow-hidden bg-[#0A0A0C]"
-        style={{ height: "100dvh", paddingTop: "20px", paddingBottom: "env(safe-area-inset-bottom, 100px)" }}
+        className="relative flex flex-col overflow-hidden"
+        style={{
+          height: "100dvh",
+          paddingTop: "20px",
+          paddingBottom: "env(safe-area-inset-bottom, 100px)",
+          background: "#0D0D0F",
+          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        }}
       >
         {devModeEnabled && (
           <div className="px-5 pb-4 flex-shrink-0">
@@ -1279,63 +1304,61 @@ export default function Home() {
               </button>
             )}
 
-          </div>
-        )}
-
-        <div className="px-5 mt-4">
-          <div
-            className="text-white/25 tracking-widest mb-2"
-            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-          >
-            WEIGHT TREND
-          </div>
-          {wyzeWeightSeries.length > 0 && (
-            <WeightTrendCard
-              currentWeight={wyzeWeightSeries[wyzeWeightSeries.length - 1]}
-              chartData={wyzeWeightSeries}
-              timeframe="30d"
-            />
-          )}
-        </div>
-
-        {todayPRs.length > 0 && (
-          <div className="flex-shrink-0">
-            <div className="px-5 flex items-center justify-between mb-4">
-              <h2
-                className="text-white/25 tracking-widest"
+            <div className="mt-4">
+              <div
+                className="text-white/25 tracking-widest mb-2"
                 style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
               >
-                PERSONAL RECORDS
-              </h2>
-              <button
-                className="flex items-center gap-1 text-white/30 hover:text-white/50 transition-colors duration-200"
-                onClick={() => router.push("/prs")}
-              >
-                <span style={{ fontSize: "10px", fontWeight: 400 }}>View all</span>
-                <ChevronRightSmall size={11} strokeWidth={1.5} />
-              </button>
-            </div>
-
-            <div
-              className="flex gap-3 overflow-x-auto px-5"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-            >
-              {todayPRs.map((pr) => (
-                <PRCard
-                  key={pr.name}
-                  exercise={pr.name}
-                  reps={pr.reps}
-                  weight={pr.weight}
-                  details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
-                  chartData={pr.chartData || []}
-                  trendPct={pr.trendPct ?? undefined}
-                  onClick={pr.workoutId ? () => router.push(`/history/${pr.workoutId}`) : undefined}
-                />
-              ))}
+                TRAINING VOLUME
+              </div>
+              <TrainingVolumeCard
+                currentWeekVolume={currentWeekVolume}
+                previousWeekVolume={previousWeekVolume}
+                chartData={weeklyVolumes}
+                timeframe="7w"
+              />
             </div>
           </div>
         )}
+
       </div>
+
+      {todayPRs.length > 0 && (
+        <div className="flex-shrink-0 pb-6">
+          <div className="px-5 flex items-center justify-between mb-4">
+            <h2
+              className="text-white/25 tracking-widest"
+              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+            >
+              PERSONAL RECORDS
+            </h2>
+            <button
+              className="flex items-center gap-1 text-white/30 hover:text-white/50 transition-colors duration-200"
+              onClick={() => router.push("/prs")}
+            >
+              <span style={{ fontSize: "10px", fontWeight: 400 }}>View all</span>
+              <ChevronRightSmall size={11} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div
+            className="flex gap-3 overflow-x-auto px-5"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+          >
+            {todayPRs.map((pr) => (
+              <PRCard
+                key={pr.name}
+                exercise={pr.name}
+                reps={pr.reps}
+                weight={pr.weight}
+                details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
+                chartData={pr.chartData || []}
+                onClick={pr.workoutId ? () => router.push(`/history/${pr.workoutId}`) : undefined}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
         <AlertDialogContent
@@ -1456,7 +1479,6 @@ function PRCard({
   weight,
   details,
   chartData,
-  trendPct,
   onClick,
 }: {
   exercise: string
@@ -1464,16 +1486,16 @@ function PRCard({
   weight: number
   details: string
   chartData: number[]
-  trendPct?: number
   onClick?: () => void
 }) {
   const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
-  const maxValue = chartSeries.length > 0 ? Math.max(...chartSeries) : 1
-  const minValue = chartSeries.length > 0 ? Math.min(...chartSeries) : 0
-  const range = maxValue - minValue || 1
-  const chartTop = 6
-  const chartBottom = 40
-  const chartHeight = chartBottom - chartTop
+  const safeSeries = chartSeries.length > 0 ? chartSeries : [weight]
+  const formattedData = safeSeries.map((value, index) => ({ index, value }))
+  const currentValue = safeSeries[safeSeries.length - 1]
+  const previousValue = safeSeries[safeSeries.length - 2]
+  const changePercent = previousValue ? Math.round(((currentValue - previousValue) / previousValue) * 100) : 0
+  const isPositive = changePercent > 0
+  const gradientId = `prGradient-${exercise.replace(/\s+/g, "-").toLowerCase()}`
 
   return (
     <button
@@ -1487,9 +1509,9 @@ function PRCard({
           {exercise}
         </div>
 
-        {trendPct && trendPct !== 0 && (
+        {changePercent !== 0 && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            {trendPct > 0 ? (
+            {isPositive ? (
               <ArrowUp size={7} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
             ) : (
               <ArrowDown size={7} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
@@ -1502,7 +1524,7 @@ function PRCard({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {Math.abs(trendPct)}%
+              {Math.abs(changePercent)}%
             </span>
           </div>
         )}
@@ -1531,60 +1553,39 @@ function PRCard({
         </div>
       </div>
 
-      <div className="mb-3" style={{ height: "42px" }}>
-        <svg width="100%" height="100%" viewBox="0 0 100 42" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id={`grad-${exercise.replace(/\s+/g, "-")}`} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.12)" />
-              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
-            </linearGradient>
-          </defs>
-
-          {chartSeries.length > 0 && (
-            <>
-              <path
-                d={`M 0,42 ${chartSeries
-                  .map((value, index) => {
-                    const x = (index / (chartSeries.length - 1)) * 100
-                    const y = chartBottom - ((value - minValue) / range) * chartHeight
-                    return `L ${x},${y}`
-                  })
-                  .join(" ")} L 100,42 Z`}
-                fill={`url(#grad-${exercise.replace(/\s+/g, "-")})`}
-              />
-
-              <path
-                d={`M ${chartSeries
-                  .map((value, index) => {
-                    const x = (index / (chartSeries.length - 1)) * 100
-                    const y = chartBottom - ((value - minValue) / range) * chartHeight
-                    return `${x},${y}`
-                  })
-                  .join(" L ")}`}
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.35)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {chartSeries.length > 1 &&
-                chartSeries.map((value, index) => {
-                  const x = (index / (chartSeries.length - 1)) * 100
-                  const y = chartBottom - ((value - minValue) / range) * chartHeight
-                  return (
-                    <circle
-                      key={`${exercise}-${index}`}
-                      cx={x}
-                      cy={y}
-                      r={index === chartSeries.length - 1 ? 2 : 1}
-                      fill={index === chartSeries.length - 1 ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.25)"}
-                    />
-                  )
-                })}
-            </>
-          )}
-        </svg>
+      <div className="mb-3" style={{ height: "52px" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={formattedData} margin={{ top: 8, right: 0, left: 0, bottom: 8 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.12)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
+              </linearGradient>
+            </defs>
+            <YAxis hide domain={[(dataMin: number) => dataMin - 15, (dataMax: number) => dataMax + 15]} />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="rgba(255, 255, 255, 0.35)"
+              strokeWidth={1.5}
+              fill={`url(#${gradientId})`}
+              dot={(props) => {
+                const { cx, cy, index } = props
+                if (cx === undefined || cy === undefined) return null
+                const isLast = index === formattedData.length - 1
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isLast ? 2 : 1}
+                    fill={isLast ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.25)"}
+                  />
+                )
+              }}
+              activeDot={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="text-white/18" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.01em" }}>
@@ -1594,45 +1595,31 @@ function PRCard({
   )
 }
 
-function WeightTrendCard({
-  currentWeight,
+function TrainingVolumeCard({
+  currentWeekVolume,
+  previousWeekVolume,
   chartData,
   timeframe,
 }: {
-  currentWeight: number
+  currentWeekVolume: number
+  previousWeekVolume: number
   chartData: number[]
   timeframe: string
 }) {
-  const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
-  const maxValue = chartSeries.length > 0 ? Math.max(...chartSeries) : 1
-  const minValue = chartSeries.length > 0 ? Math.min(...chartSeries) : 0
-  const range = maxValue - minValue || 1
-
-  const weekWindow = 7
-  const currentWeekData = chartData.slice(-weekWindow)
-  const previousWeekData = chartData.slice(-weekWindow * 2, -weekWindow)
-  const hasWeekCompare = currentWeekData.length > 0 && previousWeekData.length > 0
-  const currentWeekAvg = hasWeekCompare
-    ? currentWeekData.reduce((sum, val) => sum + val, 0) / currentWeekData.length
-    : 0
-  const previousWeekAvg = hasWeekCompare
-    ? previousWeekData.reduce((sum, val) => sum + val, 0) / previousWeekData.length
-    : 0
-  const weeklyChange = currentWeekAvg - previousWeekAvg
-  const weeklyChangePercent = previousWeekAvg ? (weeklyChange / previousWeekAvg) * 100 : 0
-  const isWeightLoss = weeklyChange < 0
-
-  const currentValue = chartSeries[chartSeries.length - 1]
-  const previousValue = chartSeries[chartSeries.length - 2]
-  const changePercent = previousValue ? Math.round(((currentValue - previousValue) / previousValue) * 100) : 0
-  const isPositive = changePercent > 0
-  const highlightStartIndex = Math.max(0, chartSeries.length - weekWindow)
-  const highlightWidth =
-    chartSeries.length > 1
-      ? ((chartSeries.length - 1 - highlightStartIndex) / (chartSeries.length - 1)) * 100
-      : 100
-  const highlightX =
-    chartSeries.length > 1 ? (highlightStartIndex / (chartSeries.length - 1)) * 100 : 0
+  const formattedData = chartData.map((value, index) => ({ week: index + 1, volume: value }))
+  const delta = currentWeekVolume - previousWeekVolume
+  const percent = previousWeekVolume ? (delta / previousWeekVolume) * 100 : 0
+  const isPositive = delta > 0
+  const arrowColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
+  const valueColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
+  const percentColor = isPositive ? "rgba(255, 87, 51, 0.6)" : "rgba(255, 255, 255, 0.2)"
+  const showWeekCompare = currentWeekVolume > 0 && previousWeekVolume > 0
+  const displayVolume = showWeekCompare ? currentWeekVolume : previousWeekVolume
+  const formatVolumeK = (value: number) => {
+    const abs = Math.abs(value)
+    if (abs >= 1000) return `${(abs / 1000).toFixed(1)}k`
+    return `${abs.toFixed(0)}`
+  }
 
   return (
     <div>
@@ -1648,141 +1635,94 @@ function WeightTrendCard({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {currentWeight}
+            {formatVolumeK(displayVolume)}
           </div>
           <div className="text-white/20" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
             lbs
           </div>
-
-          {changePercent !== 0 && (
-            <div className="flex items-center gap-0.5 ml-1">
-              {isPositive ? (
-                <ArrowUp size={8} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-              ) : (
-                <ArrowDown size={8} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-              )}
-              <span
-                style={{
-                  fontSize: "8px",
-                  fontWeight: 500,
-                  color: "rgba(255, 255, 255, 0.3)",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {Math.abs(changePercent)}%
-              </span>
-            </div>
-          )}
         </div>
-        {hasWeekCompare && (
-          <div className="mt-2 flex items-center gap-2">
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className="text-white/40"
+          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "'Archivo Narrow', sans-serif" }}
+        >
+          {showWeekCompare ? "WEEK/WEEK" : "LAST WEEK"}
+        </div>
+        {showWeekCompare ? (
+          <div className="flex items-center gap-1.5">
+            {isPositive ? (
+              <ArrowUp size={10} strokeWidth={2} style={{ color: arrowColor }} />
+            ) : (
+              <ArrowDown size={10} strokeWidth={2} style={{ color: arrowColor }} />
+            )}
             <div
-              className="text-white/40"
               style={{
-                fontSize: "7px",
-                fontWeight: 500,
-                letterSpacing: "0.16em",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: valueColor,
+                fontVariantNumeric: "tabular-nums",
                 fontFamily: "'Archivo Narrow', sans-serif",
               }}
             >
-              WEEK/WEEK
+              {formatVolumeK(Math.abs(delta))}
             </div>
-            <div className="flex items-center gap-1">
-              {isWeightLoss ? (
-                <ArrowDown size={10} strokeWidth={2.5} style={{ color: "#FF5733" }} />
-              ) : (
-                <ArrowUp size={10} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.25)" }} />
-              )}
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  fontFamily: "'Archivo Narrow', sans-serif",
-                  fontVariantNumeric: "tabular-nums",
-                  color: isWeightLoss ? "#FF5733" : "rgba(255, 255, 255, 0.25)",
-                }}
-              >
-                {Math.abs(weeklyChange).toFixed(1)} lbs
-              </div>
-              <div
-                style={{
-                  fontSize: "9px",
-                  fontWeight: 500,
-                  fontFamily: "'Archivo Narrow', sans-serif",
-                  fontVariantNumeric: "tabular-nums",
-                  color: isWeightLoss ? "rgba(255, 87, 51, 0.6)" : "rgba(255, 255, 255, 0.2)",
-                }}
-              >
-                ({Math.abs(weeklyChangePercent).toFixed(1)}%)
-              </div>
+            <div
+              style={{
+                fontSize: "9px",
+                fontWeight: 500,
+                color: percentColor,
+                fontVariantNumeric: "tabular-nums",
+                fontFamily: "'Archivo Narrow', sans-serif",
+              }}
+            >
+              ({Math.abs(percent).toFixed(1)}%)
             </div>
+          </div>
+        ) : (
+          <div
+            className="text-white/25"
+            style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+          >
+            {formatVolumeK(previousWeekVolume)} lbs
           </div>
         )}
       </div>
 
-      <div style={{ height: "48px", width: "100%" }}>
-        <svg width="100%" height="100%" viewBox="0 0 100 48" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="grad-weight" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.08)" />
-              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
-            </linearGradient>
-          </defs>
-
-          {chartSeries.length > 0 && (
-            <rect
-              x={highlightX}
-              y="0"
-              width={highlightWidth}
-              height="48"
-              fill="rgba(255, 87, 51, 0.03)"
+      <div style={{ height: "56px", width: "100%" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={formattedData} margin={{ top: 5, right: 0, left: -4, bottom: 5 }}>
+            <defs>
+              <linearGradient id="volumeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.08)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
+              </linearGradient>
+            </defs>
+            <YAxis hide domain={[(dataMin: number) => dataMin - 5000, (dataMax: number) => dataMax + 5000]} />
+            <Area
+              type="monotone"
+              dataKey="volume"
+              stroke="rgba(255, 255, 255, 0.3)"
+              strokeWidth={1.5}
+              fill="url(#volumeGradient)"
+              dot={(props) => {
+                const { cx, cy, index } = props
+                if (cx === undefined || cy === undefined) return null
+                return (
+                  <circle
+                    key={`vol-dot-${index}`}
+                    cx={cx}
+                    cy={cy}
+                    r={2.5}
+                    fill="rgba(255, 255, 255, 0.25)"
+                  />
+                )
+              }}
+              activeDot={false}
             />
-          )}
-
-          {chartSeries.length > 0 &&
-            chartSeries.map((_, index) => {
-              if (index === 0 || index % weekWindow !== 0) return null
-              const x = (index / (chartSeries.length - 1)) * 100
-              return (
-                <line
-                  key={`week-${index}`}
-                  x1={x}
-                  x2={x}
-                  y1="0"
-                  y2="48"
-                  stroke="rgba(255, 255, 255, 0.06)"
-                  strokeWidth="0.5"
-                  strokeDasharray="2,2"
-                />
-              )
-            })}
-
-          <path
-            d={`M 0,48 ${chartSeries
-              .map((value, index) => {
-                const x = (index / (chartSeries.length - 1)) * 100
-                const y = 48 - ((value - minValue) / range) * 38
-                return `L ${x},${y}`
-              })
-              .join(" ")} L 100,48 Z`}
-            fill="url(#grad-weight)"
-          />
-
-          <path
-            d={`M ${chartSeries
-              .map((value, index) => {
-                const x = (index / (chartSeries.length - 1)) * 100
-                const y = 48 - ((value - minValue) / range) * 38
-                return `${x},${y}`
-              })
-              .join(" L ")}`}
-            fill="none"
-            stroke="rgba(255, 255, 255, 0.25)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )

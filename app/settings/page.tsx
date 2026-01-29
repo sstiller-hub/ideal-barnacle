@@ -421,7 +421,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "100%", paddingBottom: "40px", background: "#0A0A0C" }}>
+    <div
+      className="flex flex-col"
+      style={{
+        minHeight: "100%",
+        paddingBottom: "40px",
+        background: "#0D0D0F",
+        boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+      }}
+    >
       <div className="px-4 pt-4">
         <div className="relative flex items-center justify-between mb-8 flex-shrink-0">
           <button
