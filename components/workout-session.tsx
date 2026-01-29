@@ -600,6 +600,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const allSetsCompleted =
     currentExercise?.sets?.every((set: any) => set.completed && !isSetIncomplete(set)) ?? false
+  const allExercisesCompleted = exercises.every(
+    (exercise) => exercise.sets?.every((set: any) => set.completed && !isSetIncomplete(set))
+  )
   const syncTimeLabel = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : null
@@ -2334,6 +2337,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 Retry
               </button>
             )}
+            <button
+              onClick={() => {
+                if (!allExercisesCompleted) return
+                void finishWorkout()
+              }}
+              className="text-white/50 hover:text-white/80 transition-colors"
+              style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em" }}
+              type="button"
+              disabled={!allExercisesCompleted}
+            >
+              FINISH
+            </button>
           </div>
         </div>
 

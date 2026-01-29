@@ -257,7 +257,6 @@ export default function Home() {
     const handleFocus = () => {
       loadDataForDate(selectedDate)
       if (userId) {
-        void loadWyzeWeights(userId)
         void loadHomeAnalytics(userId)
       }
       refreshSession()
@@ -266,7 +265,6 @@ export default function Home() {
       if (document.visibilityState === "visible") {
         loadDataForDate(selectedDate)
         if (userId) {
-          void loadWyzeWeights(userId)
           void loadHomeAnalytics(userId)
         }
         refreshSession()
@@ -1575,6 +1573,7 @@ function PRCard({
                 const isLast = index === formattedData.length - 1
                 return (
                   <circle
+                    key={`pr-dot-${exercise}-${index}`}
                     cx={cx}
                     cy={cy}
                     r={isLast ? 2 : 1}

@@ -34,11 +34,6 @@ import { useTheme } from "next-themes"
 import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
 import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
-import {
-  buildWyzeEntries,
-  parseWyzeFile,
-  type WyzeParseResult,
-} from "@/lib/wyze-weight-import"
 import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
 
 export default function SettingsPage() {
@@ -53,12 +48,6 @@ export default function SettingsPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [wyzeParseResult, setWyzeParseResult] = useState<WyzeParseResult | null>(null)
-  const [wyzeImporting, setWyzeImporting] = useState(false)
-  const [wyzeImportStatus, setWyzeImportStatus] = useState<string>("")
-  const [wyzeEntries, setWyzeEntries] = useState<
-    Array<{ id: string; measured_at: string; weight_lb: number | null; weight_kg: number | null; source: string }>
-  >([])
   const hasGoogleDriveConfig = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   const { theme, setTheme } = useTheme()
   const [isThemeReady, setIsThemeReady] = useState(false)
@@ -108,23 +97,6 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const loadWyzeEntries = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("body_weight_entries")
-      .select("id, measured_at, weight_lb, weight_kg, source")
-      .eq("user_id", userId)
-      .eq("source", "wyze_import")
-      .order("measured_at", { ascending: false })
-      .limit(50)
-    if (error) return
-    setWyzeEntries(data ?? [])
-  }
-
-  useEffect(() => {
-    if (!user?.id) return
-    void loadWyzeEntries(user.id)
-  }, [user?.id])
-
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
@@ -152,79 +124,6 @@ export default function SettingsPage() {
       })
     } finally {
       setImporting(false)
-    }
-  }
-
-  const handleWyzeFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (!selectedFile) return
-    setWyzeImportStatus("")
-    setWyzeParseResult(null)
-    try {
-      const result = await parseWyzeFile(selectedFile)
-      setWyzeParseResult(result)
-    } catch (error) {
-      setWyzeParseResult({
-        rows: [],
-        totalRows: 0,
-        validRows: 0,
-        skippedRows: 0,
-        range: null,
-        errors: ["Unable to parse file."],
-      })
-    }
-  }
-
-  const handleWyzeImport = async () => {
-    if (!wyzeParseResult || !user?.id) return
-    setWyzeImporting(true)
-    setWyzeImportStatus("")
-    try {
-      if (wyzeParseResult.rows.length === 0) {
-        setWyzeImportStatus("No valid rows to import.")
-        return
-      }
-      const entries = await buildWyzeEntries(user.id, wyzeParseResult.rows)
-      const dedupedMap = new Map(entries.map((entry) => [entry.source_row_id, entry]))
-      const dedupedEntries = Array.from(dedupedMap.values())
-      const { error } = await supabase
-        .from("body_weight_entries")
-        .upsert(dedupedEntries, { onConflict: "user_id,source,source_row_id" })
-      if (error) {
-        const detail = [error.message, error.details, error.hint].filter(Boolean).join(" • ")
-        setWyzeImportStatus(detail ? `Import failed: ${detail}` : "Import failed.")
-        return
-      }
-      const duplicateCount = entries.length - dedupedEntries.length
-      const suffix = duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ""
-      setWyzeImportStatus(`Imported ${dedupedEntries.length} rows.${suffix}`)
-      await loadWyzeEntries(user.id)
-    } finally {
-      setWyzeImporting(false)
-    }
-  }
-
-  const handleDeleteWyzeEntry = async (entryId: string) => {
-    if (!user?.id) return
-    const { error } = await supabase
-      .from("body_weight_entries")
-      .delete()
-      .eq("id", entryId)
-      .eq("user_id", user.id)
-    if (!error) {
-      setWyzeEntries((prev) => prev.filter((entry) => entry.id !== entryId))
-    }
-  }
-
-  const handleDeleteAllWyzeEntries = async () => {
-    if (!user?.id) return
-    const { error } = await supabase
-      .from("body_weight_entries")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("source", "wyze_import")
-    if (!error) {
-      setWyzeEntries([])
     }
   }
 
@@ -814,7 +713,6 @@ export default function SettingsPage() {
           onToggle={() => toggleSection("data")}
         >
           <SettingItem label="Import Historical Data" />
-          <SettingItem label="Import Weight Data" />
           <SettingItem label="Apple Health Integration" />
           <SettingItem label="Clear All Data" />
           <div className="mt-3 space-y-4">
@@ -884,135 +782,6 @@ export default function SettingsPage() {
                         </ul>
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Import Weight Data (Wyze)</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upload a Wyze Scale export to import body weight entries. Imported rows are labeled and read only.
-                </p>
-
-                <div className="space-y-3">
-                  <input
-                    type="file"
-                    accept=".csv,.xlsx"
-                    onChange={handleWyzeFileChange}
-                    className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
-                  />
-
-                  <Button
-                    onClick={handleWyzeImport}
-                    disabled={!wyzeParseResult || wyzeImporting || !user?.id}
-                    className="w-full"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {wyzeImporting ? "Importing..." : "Import Wyze Weights"}
-                  </Button>
-                  {!user?.id && (
-                    <div className="text-xs text-muted-foreground">
-                      Sign in to import weights.
-                    </div>
-                  )}
-                </div>
-
-                {wyzeParseResult && (
-                  <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-xs">
-                        <span>Total rows</span>
-                        <span className="font-semibold">{wyzeParseResult.totalRows}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg text-xs">
-                        <span>Valid rows</span>
-                        <span className="font-semibold text-green-600">{wyzeParseResult.validRows}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg text-xs">
-                        <span>Skipped rows</span>
-                        <span className="font-semibold text-yellow-600">{wyzeParseResult.skippedRows}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-xs">
-                        <span>Date range</span>
-                        <span className="font-semibold">
-                          {wyzeParseResult.range
-                            ? `${new Date(wyzeParseResult.range.start).toLocaleDateString()} → ${new Date(
-                                wyzeParseResult.range.end,
-                              ).toLocaleDateString()}`
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {wyzeParseResult.errors.length > 0 && (
-                      <div className="p-2 bg-red-500/10 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <XCircle className="w-4 h-4 text-red-600" />
-                          <span className="text-sm font-medium text-red-600">Errors</span>
-                        </div>
-                        <ul className="space-y-1 text-xs text-red-600">
-                          {wyzeParseResult.errors.map((error, idx) => (
-                            <li key={idx}>• {error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {wyzeImportStatus && (
-                      <div className="text-xs text-muted-foreground">{wyzeImportStatus}</div>
-                    )}
-
-                    {wyzeParseResult.rows.length > 0 && (
-                      <div className="rounded-lg border border-border/60 overflow-hidden">
-                        <div className="bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
-                          Preview (first 20 rows)
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                          {wyzeParseResult.rows.slice(0, 20).map((row, idx) => (
-                            <div key={`${row.measuredAt}-${idx}`} className="px-3 py-2 text-xs border-t border-border/40">
-                              <div className="flex items-center justify-between">
-                                <span>{new Date(row.measuredAt).toLocaleString()}</span>
-                              <span className="font-semibold">{row.weightLb.toFixed(1)} lb</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {wyzeEntries.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Imported (Wyze)
-                      </span>
-                      <Button variant="ghost" size="sm" onClick={handleDeleteAllWyzeEntries}>
-                        Delete all
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {wyzeEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs"
-                        >
-                          <div className="flex flex-col">
-                            <span>{new Date(entry.measured_at).toLocaleString()}</span>
-                            <span className="text-muted-foreground">Imported (Wyze)</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold">
-                              {Number(entry.weight_lb ?? entry.weight_kg ?? 0).toFixed(1)} lb
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteWyzeEntry(entry.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
