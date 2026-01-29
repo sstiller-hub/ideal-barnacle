@@ -1302,23 +1302,24 @@ export default function Home() {
               </button>
             )}
 
-            <div className="mt-4">
-              <div
-                className="text-white/25 tracking-widest mb-2"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-              >
-                TRAINING VOLUME
-              </div>
-              <TrainingVolumeCard
-                currentWeekVolume={currentWeekVolume}
-                previousWeekVolume={previousWeekVolume}
-                chartData={weeklyVolumes}
-                timeframe="7w"
-              />
-            </div>
           </div>
         )}
 
+      </div>
+
+      <div className="px-5 mt-2 flex-shrink-0">
+        <div
+          className="text-white/25 tracking-widest mb-2"
+          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+        >
+          TRAINING VOLUME
+        </div>
+        <TrainingVolumeCard
+          currentWeekVolume={currentWeekVolume}
+          previousWeekVolume={previousWeekVolume}
+          chartData={weeklyVolumes}
+          timeframe="7w"
+        />
       </div>
 
       {todayPRs.length > 0 && (
