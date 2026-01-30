@@ -931,12 +931,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   ),
                 })
 
+            const resolvedCompleted = row.completed ?? existingSet?.completed ?? false
             const nextSet = {
               ...(existingSet ?? {}),
               id: row.id,
               reps: mergedReps,
               weight: mergedWeight,
-              completed: row.completed,
+              completed: resolvedCompleted,
               validationFlags: row.validation_flags ?? flagsResult.flags,
               isIncomplete: flagsResult.isIncomplete ?? false,
               isOutlier: (row.validation_flags ?? flagsResult.flags)?.includes?.("rep_outlier"),
@@ -1630,14 +1631,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         className="flex-shrink-0"
         style={{
           width: "100%",
-          paddingLeft: "0px",
-          paddingRight: "0px",
-          paddingTop: "20px",
+          paddingLeft: "20px",
+          paddingRight: "20px",
+          paddingTop: "12px",
           paddingBottom: "120px",
         }}
       >
-        <div className="mb-5">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <div
               className="text-white/25 tracking-widest"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
@@ -1653,7 +1654,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             {exercise.name}
           </h1>
 
-          <div className="text-white/20 mt-2" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}>
+          {exercise.targetReps && (
+            <div
+              className="text-white/20 mt-1.5"
+              style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}
+            >
+              REP RANGE {exercise.targetReps}
+            </div>
+          )}
+
+          <div
+            className="text-white/20"
+            style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif", marginTop: exercise.targetReps ? "4px" : "6px" }}
+          >
             {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""} • NOW: SET {activeSetIndex + 1}/{exercise.sets.length}
           </div>
 
@@ -2310,22 +2323,50 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       </div>
 
       <div
-        className="flex-shrink-0 px-5 pt-4 pb-3"
+        className="flex-shrink-0 pt-2 pb-2"
         style={{
-          borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
-          marginLeft: "-20px",
-          marginRight: "-20px",
-          paddingLeft: "20px",
-          paddingRight: "20px",
           paddingBottom: "12px",
-          marginTop: isResting ? "56px" : "0px",
+          marginTop: isResting ? "48px" : "0px",
           transition: "margin-top 0.3s ease",
         }}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between gap-3">
           <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
             <ArrowLeft size={16} strokeWidth={1.5} />
           </button>
+
+          <div className="flex items-center justify-center gap-1.5 flex-1">
+            {exercises.map((exercise, index) => {
+              const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
+              const isCurrent = index === currentExerciseIndex
+              return (
+                <button
+                  key={exercise.id}
+                  onClick={() => void setExerciseIndex(index)}
+                  className="relative"
+                  style={{
+                    width: isCurrent ? "16px" : "4px",
+                    height: "4px",
+                    background: isCurrent
+                      ? "rgba(255, 255, 255, 0.4)"
+                      : isComplete
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : "rgba(255, 255, 255, 0.12)",
+                    borderRadius: "2px",
+                    transition: "all 0.3s ease",
+                  }}
+                  type="button"
+                >
+                  {isComplete && !isCurrent && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ transform: "scale(0.6)" }}>
+                      <Check size={4} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
           <div className="flex items-center gap-2">
             {(syncState === "error" || syncState === "pending") && (
               <button
@@ -2352,36 +2393,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-1.5">
-          {exercises.map((exercise, index) => {
-            const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
-            const isCurrent = index === currentExerciseIndex
-            return (
-              <button
-                key={exercise.id}
-                onClick={() => void setExerciseIndex(index)}
-                className="relative"
-                style={{
-                  width: isCurrent ? "16px" : "4px",
-                  height: "4px",
-                  background: isCurrent
-                    ? "rgba(255, 255, 255, 0.4)"
-                    : isComplete
-                      ? "rgba(255, 255, 255, 0.25)"
-                      : "rgba(255, 255, 255, 0.12)",
-                  borderRadius: "2px",
-                  transition: "all 0.3s ease",
-                }}
-                type="button"
-              >
-                {isComplete && !isCurrent && (
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ transform: "scale(0.6)" }}>
-                    <Check size={4} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                  </div>
-                )}
-              </button>
-            )
-          })}
+        <div style={{ marginTop: "12px", display: "flex", justifyContent: "center" }}>
+          <div
+            style={{
+              height: "1px",
+              background: "rgba(255, 255, 255, 0.04)",
+              width: "160px",
+            }}
+          />
         </div>
       </div>
 

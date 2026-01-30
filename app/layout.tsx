@@ -13,14 +13,14 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 // Added PWA metadata and viewport configuration
 export const metadata: Metadata = {
-  title: "Kova Fit",
+  title: "Akt",
   description: "Track workouts, monitor progress, and hit new PRs",
   generator: "v0.app",
-  applicationName: "Kova Fit",
+  applicationName: "Akt",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Kova Fit",
+    title: "Akt",
   },
   formatDetection: {
     telephone: false,

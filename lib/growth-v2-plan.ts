@@ -124,10 +124,11 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
       }),
       ex({
         id: "legs2-leg-ext-light",
-        name: "Leg Extension (light)",
+        name: "Single-Leg Leg Extension (light)",
         type: "strength",
         targetSets: 2,
         targetReps: "12-15",
+        targetWeight: 70,
       }),
       ex({ id: "legs2-calf", name: "Standing / Machine Calf Raise", type: "strength", targetSets: 4, targetReps: "10-12" }),
       ex({ id: "legs2-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" }),
