@@ -303,10 +303,15 @@ export function getMostRecentSetPerformance(
 
     if (exercise) {
       const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
-      if (validSets.length > setIndex) {
+      if (validSets.length > 0) {
+        const bestSet = validSets.reduce((best, current) => {
+          const bestVolume = (best.weight ?? 0) * (best.reps ?? 0)
+          const currentVolume = (current.weight ?? 0) * (current.reps ?? 0)
+          return currentVolume >= bestVolume ? current : best
+        }, validSets[0])
         return {
-          weight: validSets[setIndex].weight ?? 0,
-          reps: validSets[setIndex].reps ?? 0,
+          weight: bestSet.weight ?? 0,
+          reps: bestSet.reps ?? 0,
         }
       }
     }

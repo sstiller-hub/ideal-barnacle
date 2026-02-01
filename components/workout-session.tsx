@@ -274,7 +274,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const isGhostSet = (set: any) => {
     const repsEmpty = set.reps === null || set.reps === undefined || set.reps === 0
-    const weightEmpty = set.weight === null || set.weight === undefined || set.weight === 0
+    const weightEmpty = set.weight === null || set.weight === undefined
     return !set.completed && repsEmpty && weightEmpty
   }
 
@@ -1516,11 +1516,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     const completedWorkoutId =
       session.workoutId ?? (isUuid(session.id) ? session.id : generateWorkoutId())
-    const completedAt = new Date().toISOString()
+    const completedAtDate = new Date()
+    const completedAt = completedAtDate.toISOString()
+    const localDateForDisplay = new Date(completedAtDate)
+    localDateForDisplay.setHours(12, 0, 0, 0)
     const completedWorkout = {
       id: completedWorkoutId,
       name: routine.name,
-      date: new Date(session?.startedAt!).toISOString(),
+      date: localDateForDisplay.toISOString(),
       exercises: cleanedExercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,
@@ -1638,13 +1641,35 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         }}
       >
         <div className="mb-3">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center justify-between gap-3 mb-1">
             <div
               className="text-white/25 tracking-widest"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
             >
               EXERCISE {exerciseIndex + 1} • {routine.name.toUpperCase()} • {formatSeconds(elapsedSeconds)}
             </div>
+            <button
+              onClick={() => {
+                if (!isCurrentExercise) return
+                handleTogglePlateCalc()
+              }}
+              className="transition-all duration-200"
+              style={{
+                background: showPlateCalc ? "rgba(255, 255, 255, 0.04)" : "transparent",
+                border: `1px solid rgba(255, 255, 255, ${showPlateCalc ? "0.12" : "0.06"})`,
+                borderRadius: "2px",
+                padding: "2px 6px",
+              }}
+              type="button"
+              aria-pressed={showPlateCalc}
+            >
+              <span
+                className={showPlateCalc ? "text-white/70" : "text-white/30"}
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.08em" }}
+              >
+                PLATES
+              </span>
+            </button>
           </div>
 
           <h1
@@ -1873,8 +1898,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         <button
                           className="transition-all duration-200"
                           style={{
-                            background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.05)" : "transparent",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.04)" : "transparent",
+                            border: `1px solid rgba(255, 255, 255, ${plateDisplayMode === "per-side" ? "0.12" : "0.06"})`,
                             borderRadius: "2px",
                             padding: "3px 6px",
                           }}
@@ -1886,15 +1911,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           }}
                           type="button"
                         >
-                          <span className="text-white/50" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                          <span
+                            className={plateDisplayMode === "per-side" ? "text-white/70" : "text-white/30"}
+                            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}
+                          >
                             PER SIDE
                           </span>
                         </button>
                         <button
                           className="transition-all duration-200"
                           style={{
-                            background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.05)" : "transparent",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.04)" : "transparent",
+                            border: `1px solid rgba(255, 255, 255, ${plateDisplayMode === "total" ? "0.12" : "0.06"})`,
                             borderRadius: "2px",
                             padding: "3px 6px",
                           }}
@@ -1906,7 +1934,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           }}
                           type="button"
                         >
-                          <span className="text-white/50" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                          <span
+                            className={plateDisplayMode === "total" ? "text-white/70" : "text-white/30"}
+                            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}
+                          >
                             TOTAL
                           </span>
                         </button>
