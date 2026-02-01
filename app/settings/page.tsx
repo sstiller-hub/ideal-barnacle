@@ -171,6 +171,19 @@ export default function SettingsPage() {
     }, 100)
   }
 
+  const handleFixWorkoutDate = () => {
+    const targetId = "0a4113eb-74cd-438e-97ed-e256c1d5582d"
+    const history = getWorkoutHistory()
+    const now = new Date()
+    now.setHours(12, 0, 0, 0)
+    const updated = history.map((workout) =>
+      workout.id === targetId ? { ...workout, date: now.toISOString() } : workout
+    )
+    localStorage.setItem("workout_history", JSON.stringify(updated))
+    setWorkouts(updated)
+    alert("Workout date updated for today.")
+  }
+
   const handleSeedDemoData = () => {
     const confirmed = confirm("This will replace all existing data with demo data. Are you sure?")
     if (!confirmed) return
@@ -795,6 +808,16 @@ export default function SettingsPage() {
                   Export to Apple Health
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">{workouts.length} workouts ready to export</p>
+              </div>
+
+              <div>
+                <h2 className="font-bold text-base mb-2">Fix Workout Date</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Updates a specific workout to today in local history.
+                </p>
+                <Button onClick={handleFixWorkoutDate} className="w-full" variant="secondary">
+                  Fix Date for Today
+                </Button>
               </div>
 
               <div>
