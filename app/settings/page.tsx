@@ -154,30 +154,27 @@ export default function SettingsPage() {
     setBarcodeUploading(true)
     setBarcodeStatus("")
     try {
-      const ext = file.name.split(".").pop() || "png"
-      const path = `barcodes/${user.id}/barcode.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from("user-assets")
-        .upload(path, file, { upsert: true, contentType: file.type })
-      if (uploadError) {
-        setBarcodeStatus(`Upload failed: ${uploadError.message}`)
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) {
+        setBarcodeStatus("Sign in to upload.")
         return
       }
-      const { error: profileError } = await supabase
-        .from("user_profiles")
-        .upsert(
-          {
-            user_id: user.id,
-            gym_barcode_path: path,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        )
-      if (profileError) {
-        setBarcodeStatus(`Profile update failed: ${profileError.message}`)
+      const formData = new FormData()
+      formData.append("file", file)
+      const response = await fetch("/api/barcode/upload", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        setBarcodeStatus(`Upload failed: ${payload?.error || "Upload failed"}`)
         return
       }
-      setBarcodePath(path)
+      setBarcodePath(payload?.path ?? null)
       setBarcodeStatus("Barcode uploaded.")
     } finally {
       setBarcodeUploading(false)
