@@ -160,7 +160,7 @@ export default function SettingsPage() {
         .from("user-assets")
         .upload(path, file, { upsert: true, contentType: file.type })
       if (uploadError) {
-        setBarcodeStatus(uploadError.message)
+        setBarcodeStatus(`Upload failed: ${uploadError.message}`)
         return
       }
       const { error: profileError } = await supabase
@@ -174,7 +174,7 @@ export default function SettingsPage() {
           { onConflict: "user_id" }
         )
       if (profileError) {
-        setBarcodeStatus(profileError.message)
+        setBarcodeStatus(`Profile update failed: ${profileError.message}`)
         return
       }
       setBarcodePath(path)
