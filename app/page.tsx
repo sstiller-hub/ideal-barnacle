@@ -143,6 +143,10 @@ export default function Home() {
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [lastWorkoutSummary, setLastWorkoutSummary] = useState<LastWorkoutSummary | null>(null)
   const [lastWorkoutPrs, setLastWorkoutPrs] = useState<WorkoutPrEvent[]>([])
+  const [barcodeVisible, setBarcodeVisible] = useState(false)
+  const [barcodeUrl, setBarcodeUrl] = useState<string | null>(null)
+  const [barcodeLoading, setBarcodeLoading] = useState(false)
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
 
   const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
   const formatShortDate = (dateStr: string) =>
@@ -200,6 +204,42 @@ export default function Home() {
   const refreshSession = () => {
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
+  }
+
+  const revealBarcode = async () => {
+    if (barcodeVisible) {
+      setBarcodeVisible(false)
+      setBarcodeUrl(null)
+      setBarcodeError(null)
+      return
+    }
+    setBarcodeLoading(true)
+    setBarcodeError(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) {
+        setBarcodeError("Sign in to view.")
+        return
+      }
+      const response = await fetch("/api/barcode", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        setBarcodeError(payload?.error || "Barcode unavailable.")
+        return
+      }
+      setBarcodeUrl(payload.url)
+      setBarcodeVisible(true)
+    } catch {
+      setBarcodeError("Barcode unavailable.")
+    } finally {
+      setBarcodeLoading(false)
+    }
   }
 
   const handleDiscardActiveWorkout = async () => {
@@ -1305,6 +1345,50 @@ export default function Home() {
           </div>
         )}
 
+      </div>
+
+      <div className="px-5 mt-4 flex-shrink-0">
+        <div
+          className="text-white/25 tracking-widest mb-2"
+          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+        >
+          GYM BARCODE
+        </div>
+        <button
+          onClick={revealBarcode}
+          className="w-full text-left transition-all duration-200"
+          style={{
+            background: "rgba(255, 255, 255, 0.02)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            borderRadius: "2px",
+            padding: "12px",
+          }}
+          type="button"
+        >
+          {barcodeVisible && barcodeUrl ? (
+            <div className="flex items-center justify-center">
+              <img
+                src={barcodeUrl}
+                alt="Gym barcode"
+                style={{ maxHeight: "96px", width: "100%", objectFit: "contain" }}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-white/50" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
+                {barcodeLoading ? "Loading barcode..." : "Tap to reveal"}
+              </span>
+              <span className="text-white/25" style={{ fontSize: "10px", fontWeight: 400 }}>
+                Protected
+              </span>
+            </div>
+          )}
+          {barcodeError && (
+            <div className="text-white/30 mt-2" style={{ fontSize: "10px", fontWeight: 400 }}>
+              {barcodeError}
+            </div>
+          )}
+        </button>
       </div>
 
       <div className="px-5 mt-2 flex-shrink-0">
