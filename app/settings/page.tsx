@@ -155,7 +155,7 @@ export default function SettingsPage() {
     setBarcodeStatus("")
     try {
       const ext = file.name.split(".").pop() || "png"
-      const path = `barcodes/${user.id}.${ext}`
+      const path = `barcodes/${user.id}/barcode.${ext}`
       const { error: uploadError } = await supabase.storage
         .from("user-assets")
         .upload(path, file, { upsert: true, contentType: file.type })
