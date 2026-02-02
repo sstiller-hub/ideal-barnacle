@@ -16,7 +16,15 @@ export async function POST(request: Request) {
 
   const userId = authData.user.id
   const formData = await request.formData()
-  const file = formData.get("file")
+  let file = formData.get("file")
+  if (!(file instanceof File)) {
+    for (const value of formData.values()) {
+      if (value instanceof File) {
+        file = value
+        break
+      }
+    }
+  }
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing file" }, { status: 400 })

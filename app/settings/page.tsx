@@ -151,6 +151,10 @@ export default function SettingsPage() {
       setBarcodeStatus("Sign in to upload.")
       return
     }
+    if (!file || file.size === 0) {
+      setBarcodeStatus("No file selected.")
+      return
+    }
     setBarcodeUploading(true)
     setBarcodeStatus("")
     try {
