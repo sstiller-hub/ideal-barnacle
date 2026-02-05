@@ -261,6 +261,9 @@ export default function Home() {
     if (!session?.startedAt) return
     const sessionDate = new Date(session.startedAt)
     sessionDate.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (sessionDate.getTime() !== today.getTime()) return
     setSelectedDate((prev) => {
       const next = new Date(prev)
       next.setHours(0, 0, 0, 0)
