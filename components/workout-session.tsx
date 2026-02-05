@@ -1747,6 +1747,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
                 : []
 
+            const ariaLabel =
+              isCurrentSet && canEditExercise
+                ? set.completed
+                  ? "Mark Set Incomplete"
+                  : "Complete Set"
+                : `Toggle Set ${index + 1}`
+
             return (
               <div key={setKey}>
                 <div
@@ -1886,7 +1893,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
                       }}
                       type="button"
-                      aria-label={set.completed ? "Mark set incomplete" : "Complete set"}
+                      aria-label={ariaLabel}
                     >
                       <Check size={12} strokeWidth={2} style={{ color: set.completed ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)" }} />
                     </button>
