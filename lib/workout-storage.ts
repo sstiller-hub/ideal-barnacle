@@ -302,16 +302,18 @@ export function getMostRecentSetPerformance(
     const exercise = workout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)
 
     if (exercise) {
-      const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
-      if (validSets.length > 0) {
-        const bestSet = validSets.reduce((best, current) => {
-          const bestVolume = (best.weight ?? 0) * (best.reps ?? 0)
-          const currentVolume = (current.weight ?? 0) * (current.reps ?? 0)
-          return currentVolume >= bestVolume ? current : best
-        }, validSets[0])
+      const targetSet = exercise.sets[setIndex]
+      if (targetSet && isSetEligibleForStats(targetSet)) {
         return {
-          weight: bestSet.weight ?? 0,
-          reps: bestSet.reps ?? 0,
+          weight: targetSet.weight ?? 0,
+          reps: targetSet.reps ?? 0,
+        }
+      }
+      const fallback = [...exercise.sets].reverse().find((set) => isSetEligibleForStats(set))
+      if (fallback) {
+        return {
+          weight: fallback.weight ?? 0,
+          reps: fallback.reps ?? 0,
         }
       }
     }

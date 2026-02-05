@@ -355,6 +355,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           reps: progressiveDefaults.reps ?? baseDefaults.reps,
           weight: progressiveDefaults.weight ?? baseDefaults.weight,
         }
+        if (defaults.reps === null && defaults.weight === 0) {
+          defaults.reps = REP_MIN
+        }
 
         const warmupDefaults = (() => {
           const lastWorkout = normalizedHistory.find((workout) =>
@@ -995,10 +998,19 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }, [session?.remoteSessionId])
 
   const updateSetData = async (setIndex: number, field: "reps" | "weight", value: number | null) => {
+    return updateSetDataForExercise(currentExerciseIndex, setIndex, field, value)
+  }
+
+  const updateSetDataForExercise = async (
+    exerciseIndex: number,
+    setIndex: number,
+    field: "reps" | "weight",
+    value: number | null
+  ) => {
     if (!session) return
     const workoutId = session.workoutId
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== currentExerciseIndex) {
+      if (exerciseIdx !== exerciseIndex) {
         return exercise
       }
 
@@ -1081,14 +1093,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     setIndex: number,
     options?: {
       startRest?: boolean
+      exerciseIndex?: number
     }
   ) => {
     if (!session) return
     const workoutId = session.workoutId
-    const shouldAutoRest = options?.startRest ?? true
+    const targetExerciseIndex = options?.exerciseIndex ?? currentExerciseIndex
+    const shouldAutoRest = options?.startRest ?? targetExerciseIndex === currentExerciseIndex
     let shouldStartRest = false
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== currentExerciseIndex) {
+      if (exerciseIdx !== targetExerciseIndex) {
         return exercise
       }
 
@@ -1198,8 +1212,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       targetWeight: exercise.targetWeight,
     })
     const prevSet = exercise.sets[exercise.sets.length - 1]
-    const nextReps = prevSet?.reps ?? defaults.reps
+    let nextReps = prevSet?.reps ?? defaults.reps
     const nextWeight = prevSet?.weight ?? defaults.weight
+    if (nextReps === null && nextWeight === 0) {
+      nextReps = REP_MIN
+    }
     const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
       workout.exercises
         .filter((ex: any) => ex.name === exercise.name)
@@ -1624,6 +1641,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const renderExerciseContent = (exercise: Exercise, exerciseIndex: number) => {
     const isCurrentExercise = exerciseIndex === currentExerciseIndex
+    const canEditExercise = isCurrentExercise || exerciseIndex < currentExerciseIndex
     const exerciseCurrentSetIndex = exercise.sets.findIndex((set) => !set.completed)
     const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
     const allSetsRecorded = exercise.sets.every((set) => set.completed && !isSetIncomplete(set))
@@ -1721,7 +1739,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const missingWeight = isMissingWeight(set.weight)
             const missingReps = isMissingReps(set.reps)
             const showMissing = Boolean(validationTrigger) && isCurrentExercise && (missingWeight || missingReps)
-            const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !isCurrentExercise
+            const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !canEditExercise
             const lastSet = getMostRecentSetPerformance(exercise.name, index, session?.id)
             const comparison = getSetComparison(set, lastSet)
             const plates =
@@ -1744,16 +1762,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       type="number"
                       value={set.weight ?? ""}
                       onChange={(e) => {
-                        if (!isCurrentExercise) return
+                        if (!canEditExercise) return
                         const raw = e.target.value
                         if (!raw.trim()) {
-                          void updateSetData(index, "weight", null)
-                          return
-                        }
-                        const parsed = parseNumber(raw)
-                        if (parsed === null || parsed < 0) return
-                        void updateSetData(index, "weight", parsed)
-                      }}
+          void updateSetDataForExercise(exerciseIndex, index, "weight", null)
+          return
+        }
+        const parsed = parseNumber(raw)
+        if (parsed === null || parsed < 0) return
+        void updateSetDataForExercise(exerciseIndex, index, "weight", parsed)
+      }}
                       onFocus={(e) => {
                         if (set.id) handleSetFieldFocus(set.id, "weight")
                         handleInputAutoSelect(e)
@@ -1764,8 +1782,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           weightInputRefs.current.set(set.id, node)
                         }
                       }}
-                      disabled={!isCurrentExercise}
-                      placeholder="—"
+                      disabled={!canEditExercise}
+      placeholder="—"
                       className="w-full transition-all duration-200"
                       style={{
                         background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
@@ -1793,26 +1811,26 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       type="number"
                       value={set.reps ?? ""}
                       onChange={(e) => {
-                        if (!isCurrentExercise) return
+                        if (!canEditExercise) return
                         const raw = e.target.value
                         if (!raw.trim()) {
-                          setRepCapErrors((prev) => {
-                            if (!setKey) return prev
-                            return { ...prev, [setKey]: false }
-                          })
-                          void updateSetData(index, "reps", null)
-                          return
-                        }
-                        const parsed = parseNumber(raw)
-                        if (parsed === null) return
-                        if (parsed > REP_MAX) {
-                          setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
-                          return
-                        }
-                        setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
-                        const clamped = Math.max(REP_MIN, parsed)
-                        void updateSetData(index, "reps", clamped)
-                      }}
+          setRepCapErrors((prev) => {
+            if (!setKey) return prev
+            return { ...prev, [setKey]: false }
+          })
+          void updateSetDataForExercise(exerciseIndex, index, "reps", null)
+          return
+        }
+        const parsed = parseNumber(raw)
+        if (parsed === null) return
+        if (parsed > REP_MAX) {
+          setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
+          return
+        }
+        setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+        const clamped = Math.max(REP_MIN, parsed)
+        void updateSetDataForExercise(exerciseIndex, index, "reps", clamped)
+      }}
                       onFocus={(e) => {
                         if (set.id) handleSetFieldFocus(set.id, "reps")
                         handleInputAutoSelect(e)
@@ -1823,8 +1841,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           repsInputRefs.current.set(set.id, node)
                         }
                       }}
-                      disabled={!isCurrentExercise}
-                      placeholder="—"
+                      disabled={!canEditExercise}
+      placeholder="—"
                       className="w-full transition-all duration-200"
                       style={{
                         background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
@@ -1844,10 +1862,35 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     />
                     <div className="text-white/25 mt-1.5 text-center" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}>
                       reps
+                    </div>
                   </div>
 
-                </div>
-
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={() => {
+                        if (!canEditExercise) return
+                        if (!set.completed && (isSetIncomplete(set) || repCapError)) {
+                          setValidationTrigger(Date.now())
+                          return
+                        }
+                        void completeSet(index, { exerciseIndex, startRest: isCurrentExercise })
+                      }}
+                      disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
+                      className="flex items-center justify-center transition-all duration-200"
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
+                        border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.2" : "0.08"})`,
+                        borderRadius: "2px",
+                        opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
+                      }}
+                      type="button"
+                      aria-label={set.completed ? "Mark set incomplete" : "Complete set"}
+                    >
+                      <Check size={12} strokeWidth={2} style={{ color: set.completed ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)" }} />
+                    </button>
+                  </div>
                 </div>
 
                 {(repCapError || showMissing) && (
@@ -1969,32 +2012,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           }}
                         />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (!isCurrentExercise) return
-                            if (!set.completed && (isSetIncomplete(set) || repCapError)) {
-                              setValidationTrigger(Date.now())
-                              return
-                            }
-                            void completeSet(index)
-                          }}
-                          disabled={!isCurrentExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
-                          className="flex items-center justify-center transition-all duration-200"
-                          style={{
-                            width: "28px",
-                            height: "28px",
-                            background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
-                            border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.2" : "0.08"})`,
-                            borderRadius: "2px",
-                            opacity: !isCurrentExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
-                          }}
-                          type="button"
-                          aria-label={set.completed ? "Mark set incomplete" : "Complete set"}
-                        >
-                          <Check size={12} strokeWidth={2} style={{ color: set.completed ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)" }} />
-                        </button>
-                      </div>
+                      <div />
                     </div>
                     <div className="flex items-center gap-1 mb-2">
                       {plates.map((plate, plateIndex) => (

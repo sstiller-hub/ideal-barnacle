@@ -65,6 +65,10 @@ function getMaxRepsAtWeight(sets: WorkoutSetRow[], weight: number) {
   )
 }
 
+function normalizeExerciseName(name: string) {
+  return name.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
 export default function WorkoutSummaryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -178,12 +182,12 @@ export default function WorkoutSummaryPage() {
 
     const exercisesByKey = new Map<string, SummaryExercise>()
     exercises.forEach((ex) => {
-      exercisesByKey.set(ex.exercise_id || ex.name, ex)
+      exercisesByKey.set(normalizeExerciseName(ex.name), ex)
     })
 
     const baselineByKey = new Map<string, SummaryExercise>()
     baselineExercises?.forEach((ex) => {
-      baselineByKey.set(ex.exercise_id || ex.name, ex)
+      baselineByKey.set(normalizeExerciseName(ex.name), ex)
     })
 
     let totalVolume = 0
@@ -214,7 +218,7 @@ export default function WorkoutSummaryPage() {
 
       const bestSet = validSets.length > 0 ? getBestSet(validSets) : null
 
-      const baseline = baselineByKey.get(exercise.exercise_id || exercise.name)
+      const baseline = baselineByKey.get(normalizeExerciseName(exercise.name))
       const baselineValidSets = baseline
         ? baseline.sets.filter((set) =>
             isSetEligibleForStats({

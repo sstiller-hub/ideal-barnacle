@@ -447,11 +447,6 @@ export default function Home() {
     >()
     const prTimelineByExercise = new Map<string, Array<{ weight: number; achievedAt: string }>>()
 
-    const getExerciseVolume = (exercise: any) =>
-      exercise.sets
-        .filter((s: any) => s.completed && s.weight > 0 && s.reps > 0)
-        .reduce((sum: number, s: any) => sum + s.weight * s.reps, 0)
-
     const sortedHistory = [...workoutHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     )
@@ -498,22 +493,13 @@ export default function Home() {
       .map((name: string) => {
         const pr = prByExerciseName.get(name)
         if (!pr) return null
-        const volumes = workoutHistory
-          .map((workout) => {
-            const exercise = workout.exercises.find((ex: any) => normalizeExerciseName(ex.name) === name)
-            if (!exercise) return null
-            const volume = getExerciseVolume(exercise)
-            return volume > 0 ? volume : null
-          })
-          .filter((v: number | null): v is number => v !== null)
-
         const timeline = prTimelineByExercise.get(name) ?? []
         const last = timeline[timeline.length - 1]
         const prev = timeline[timeline.length - 2]
         const trendPct =
           prev && prev.weight > 0 ? Math.round(((last.weight - prev.weight) / prev.weight) * 100) : null
 
-        const chartData = volumes.slice(0, 7).reverse()
+        const chartData = timeline.slice(-7).map((entry) => entry.weight)
 
         return { ...pr, trendPct, chartData }
       })
@@ -1436,6 +1422,7 @@ export default function Home() {
                 weight={pr.weight}
                 details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
                 chartData={pr.chartData || []}
+                trendPct={pr.trendPct}
                 onClick={pr.workoutId ? () => router.push(`/history/${pr.workoutId}`) : undefined}
               />
             ))}
@@ -1562,6 +1549,7 @@ function PRCard({
   weight,
   details,
   chartData,
+  trendPct,
   onClick,
 }: {
   exercise: string
@@ -1569,15 +1557,14 @@ function PRCard({
   weight: number
   details: string
   chartData: number[]
+  trendPct?: number | null
   onClick?: () => void
 }) {
   const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
   const safeSeries = chartSeries.length > 0 ? chartSeries : [weight]
   const formattedData = safeSeries.map((value, index) => ({ index, value }))
-  const currentValue = safeSeries[safeSeries.length - 1]
-  const previousValue = safeSeries[safeSeries.length - 2]
-  const changePercent = previousValue ? Math.round(((currentValue - previousValue) / previousValue) * 100) : 0
-  const isPositive = changePercent > 0
+  const changePercent = typeof trendPct === "number" ? trendPct : null
+  const isPositive = (changePercent ?? 0) > 0
   const gradientId = `prGradient-${exercise.replace(/\s+/g, "-").toLowerCase()}`
 
   return (
@@ -1592,7 +1579,7 @@ function PRCard({
           {exercise}
         </div>
 
-        {changePercent !== 0 && (
+        {changePercent !== null && changePercent !== 0 && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {isPositive ? (
               <ArrowUp size={7} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
