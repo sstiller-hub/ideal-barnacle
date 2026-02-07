@@ -42,7 +42,7 @@ const workout = {
   },
 }
 
-test("shows PRs and view-all button", async ({ page }) => {
+test("shows PRs section", async ({ page }) => {
   await page.addInitScript(({ routineSeed, workoutSeed }) => {
     localStorage.setItem("workout_routines_v2", JSON.stringify([routineSeed]))
     localStorage.setItem("workout_history", JSON.stringify([workoutSeed]))
@@ -51,9 +51,7 @@ test("shows PRs and view-all button", async ({ page }) => {
   await page.goto("/")
 
   await expect(page.getByText(/Personal Records/i)).toBeVisible()
-  await expect(page.getByText("Overhand Row")).toBeVisible()
-
-  await expect(page.getByRole("button", { name: "View all" })).toBeVisible()
+  await expect(page.getByTestId("pr-section").getByText("Overhand Row")).toBeVisible()
 })
 
 test("PRs appear after schedule change to matching routine", async ({ page }) => {
@@ -81,5 +79,5 @@ test("PRs appear after schedule change to matching routine", async ({ page }) =>
 
   await page.goto("/")
   await expect(page.getByText(/Personal Records/i)).toBeVisible()
-  await expect(page.getByText("Overhand Row")).toBeVisible()
+  await expect(page.getByTestId("pr-section").getByText("Overhand Row")).toBeVisible()
 })

@@ -1392,7 +1392,7 @@ export default function Home() {
       </div>
 
       {todayPRs.length > 0 && (
-        <div className="flex-shrink-0 pb-6">
+        <div className="flex-shrink-0 pb-6" data-testid="pr-section">
           <div className="px-5 flex items-center justify-between mb-4">
             <h2
               className="text-white/25 tracking-widest"
