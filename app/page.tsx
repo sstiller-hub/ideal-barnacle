@@ -758,7 +758,7 @@ export default function Home() {
         className="fixed z-[60] text-white/25 hover:text-white/50 transition-colors duration-200"
         style={{
           top: "24px",
-          right: "12px",
+          right: "calc(16px + env(safe-area-inset-right, 0px))",
           background: "transparent",
           border: "none",
           padding: "8px",
@@ -1171,7 +1171,7 @@ export default function Home() {
                 background: "rgba(255, 255, 255, 0.02)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
                 borderRadius: "1px",
-                padding: "16px",
+                padding: isCompactExerciseList ? "12px" : "16px",
               }}
             >
               <div
@@ -1181,7 +1181,7 @@ export default function Home() {
                 {isPastDay ? "COMPLETED" : "COMPLETED TODAY"}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4" style={{ marginBottom: isCompactExerciseList ? "12px" : "24px" }}>
                 <div>
                   <div
                     className="text-white/20 mb-1"
@@ -1221,7 +1221,7 @@ export default function Home() {
                   background: "rgba(255, 255, 255, 0.03)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
                   borderRadius: "1px",
-                  padding: "11px",
+                  padding: isCompactExerciseList ? "9px" : "11px",
                 }}
                 onClick={() => router.push(`/history/${workoutForDate.id}`)}
                 onMouseEnter={(e) => {

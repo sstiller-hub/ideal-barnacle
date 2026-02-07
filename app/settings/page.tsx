@@ -926,11 +926,6 @@ export default function SettingsPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <div className="flex-shrink-0 mt-12 space-y-2">
-          <p className="text-white/20 text-center" style={{ fontSize: "10px", fontWeight: 400 }}>
-            Build: dev
-          </p>
-        </div>
       </div>
     </div>
   )
