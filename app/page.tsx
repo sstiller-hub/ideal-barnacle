@@ -749,6 +749,7 @@ export default function Home() {
     actualState === "activeSession" && session?.exercises
       ? session.exercises
       : workoutForDate?.exercises || scheduledRoutine?.exercises
+  const isCompactExerciseList = (displayExercises?.length ?? 0) >= 9
 
   return (
     <>
@@ -806,7 +807,13 @@ export default function Home() {
             </div>
           </div>
         )}
-        <div className="relative z-50 px-5 pb-8 flex-shrink-0">
+        <div
+          className="relative z-50 px-5 pb-8 flex-shrink-0"
+          style={{
+            background: "#0D0D0F",
+            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
+          }}
+        >
         <div className="flex items-start justify-between gap-4">
           <div className="relative flex-shrink-0">
             <div className="flex items-center gap-2 mb-1">
@@ -1233,24 +1240,41 @@ export default function Home() {
             </div>
 
             {displayExercises && displayExercises.length > 0 && (
-              <div className="mb-6 space-y-2.5">
+              <div className="mb-6 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
                 {displayExercises.map((exercise: any, index: number) => (
-                  <div key={exercise.id ?? `${exercise.name}-${index}`} className="flex items-center gap-3" style={{ opacity: 0.6 }}>
+                  <div
+                    key={exercise.id ?? `${exercise.name}-${index}`}
+                    className="flex items-center gap-3"
+                    style={{ opacity: 0.6, gap: isCompactExerciseList ? "6px" : undefined }}
+                  >
                     <div
                       className="text-white/40"
-                      style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", minWidth: "12px" }}
+                      style={{
+                        fontSize: isCompactExerciseList ? "8px" : "9px",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                        minWidth: "12px",
+                      }}
                     >
                       {index + 1}
                     </div>
                     <div
                       className="text-white/90 flex-1"
-                      style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.005em" }}
+                      style={{
+                        fontSize: isCompactExerciseList ? "10px" : "11px",
+                        fontWeight: 400,
+                        letterSpacing: "0.005em",
+                      }}
                     >
                       {exercise.name}
                     </div>
                     <div
                       className="text-white/30"
-                      style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.01em" }}
+                      style={{
+                        fontSize: isCompactExerciseList ? "8px" : "9px",
+                        fontWeight: 400,
+                        letterSpacing: "0.01em",
+                      }}
                     >
                       {exercise.targetSets ?? exercise.sets?.length ?? 0} sets
                     </div>
@@ -1271,24 +1295,41 @@ export default function Home() {
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
           <div className="px-5 mb-12">
-            <div className="mb-6 space-y-2.5">
+            <div className="mb-6 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
               {displayExercises.map((exercise: any, index: number) => (
-                <div key={exercise.id ?? `${exercise.name}-${index}`} className="flex items-center gap-3" style={{ opacity: 0.35 }}>
+                <div
+                  key={exercise.id ?? `${exercise.name}-${index}`}
+                  className="flex items-center gap-3"
+                  style={{ opacity: 0.35, gap: isCompactExerciseList ? "6px" : undefined }}
+                >
                   <div
                     className="text-white/40"
-                    style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", minWidth: "12px" }}
+                    style={{
+                      fontSize: isCompactExerciseList ? "8px" : "9px",
+                      fontWeight: 500,
+                      fontVariantNumeric: "tabular-nums",
+                      minWidth: "12px",
+                    }}
                   >
                     {index + 1}
                   </div>
                   <div
                     className="text-white/90 flex-1"
-                    style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.005em" }}
+                    style={{
+                      fontSize: isCompactExerciseList ? "10px" : "11px",
+                      fontWeight: 400,
+                      letterSpacing: "0.005em",
+                    }}
                   >
                     {exercise.name}
                   </div>
                   <div
                     className="text-white/30"
-                    style={{ fontSize: "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                    style={{
+                      fontSize: isCompactExerciseList ? "8px" : "9px",
+                      fontWeight: 400,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
                   >
                     {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
                   </div>
