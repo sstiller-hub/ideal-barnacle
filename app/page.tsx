@@ -746,7 +746,9 @@ export default function Home() {
 
   const selectedTitle = actualState === "activeSession" ? activeWorkoutType : scheduledWorkoutType
   const displayExercises =
-    actualState === "activeSession" && session?.exercises ? session.exercises : scheduledRoutine?.exercises
+    actualState === "activeSession" && session?.exercises
+      ? session.exercises
+      : workoutForDate?.exercises || scheduledRoutine?.exercises
 
   return (
     <>
@@ -771,7 +773,7 @@ export default function Home() {
         className="relative flex flex-col overflow-hidden"
         style={{
           height: "100dvh",
-          paddingTop: "20px",
+          paddingTop: "max(env(safe-area-inset-top, 0px), 8px)",
           paddingBottom: "env(safe-area-inset-bottom, 100px)",
           background: "#0D0D0F",
           boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
@@ -1230,9 +1232,9 @@ export default function Home() {
               </button>
             </div>
 
-            {workoutForDate.exercises && workoutForDate.exercises.length > 0 && (
+            {displayExercises && displayExercises.length > 0 && (
               <div className="mb-6 space-y-2.5">
-                {workoutForDate.exercises.map((exercise: any, index: number) => (
+                {displayExercises.map((exercise: any, index: number) => (
                   <div key={exercise.id ?? `${exercise.name}-${index}`} className="flex items-center gap-3" style={{ opacity: 0.6 }}>
                     <div
                       className="text-white/40"
