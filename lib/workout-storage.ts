@@ -43,7 +43,7 @@ const STORAGE_KEY = "workout_history"
 import { evaluateWorkoutPRs } from "./pr-evaluation"
 import { savePRs } from "./pr-storage"
 import type { EvaluatedPR } from "./pr-types"
-import { isSetEligibleForStats } from "./set-validation"
+import { isSetEligibleForStats, isValidNumber } from "./set-validation"
 import { formatExerciseName } from "./format-exercise-name"
 
 export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
@@ -310,6 +310,47 @@ export function getMostRecentSetPerformance(
         }
       }
       const fallback = [...exercise.sets].reverse().find((set) => isSetEligibleForStats(set))
+      if (fallback) {
+        return {
+          weight: fallback.weight ?? 0,
+          reps: fallback.reps ?? 0,
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+export function getMostRecentCompletedSetPerformance(
+  exerciseName: string,
+  setIndex: number,
+  excludeSessionId?: string,
+): { weight: number; reps: number } | null {
+  const history = getWorkoutHistory()
+  const normalizedName = normalizeExerciseName(exerciseName)
+
+  for (const workout of history) {
+    if (excludeSessionId && workout.id === excludeSessionId) continue
+
+    const exercise = workout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)
+
+    if (exercise) {
+      const targetSet = exercise.sets[setIndex]
+      const isCompletedSet =
+        targetSet &&
+        targetSet.completed &&
+        isValidNumber(targetSet.weight) &&
+        isValidNumber(targetSet.reps)
+      if (isCompletedSet) {
+        return {
+          weight: targetSet.weight ?? 0,
+          reps: targetSet.reps ?? 0,
+        }
+      }
+      const fallback = [...exercise.sets]
+        .reverse()
+        .find((set) => set.completed && isValidNumber(set.weight) && isValidNumber(set.reps))
       if (fallback) {
         return {
           weight: fallback.weight ?? 0,

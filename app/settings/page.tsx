@@ -48,9 +48,6 @@ export default function SettingsPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [barcodeUploading, setBarcodeUploading] = useState(false)
-  const [barcodeStatus, setBarcodeStatus] = useState<string>("")
-  const [barcodePath, setBarcodePath] = useState<string | null>(null)
   const hasGoogleDriveConfig = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   const { theme, setTheme } = useTheme()
   const [isThemeReady, setIsThemeReady] = useState(false)
@@ -100,22 +97,6 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  useEffect(() => {
-    if (!user?.id) {
-      setBarcodePath(null)
-      return
-    }
-    supabase
-      .from("user_profiles")
-      .select("gym_barcode_path")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) return
-        setBarcodePath(data?.gym_barcode_path ?? null)
-      })
-  }, [user?.id])
-
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
@@ -143,45 +124,6 @@ export default function SettingsPage() {
       })
     } finally {
       setImporting(false)
-    }
-  }
-
-  const handleBarcodeUpload = async (file: File) => {
-    if (!user?.id) {
-      setBarcodeStatus("Sign in to upload.")
-      return
-    }
-    if (!file || file.size === 0) {
-      setBarcodeStatus("No file selected.")
-      return
-    }
-    setBarcodeUploading(true)
-    setBarcodeStatus("")
-    try {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (!token) {
-        setBarcodeStatus("Sign in to upload.")
-        return
-      }
-      const formData = new FormData()
-      formData.append("file", file)
-      const response = await fetch("/api/barcode/upload", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        setBarcodeStatus(`Upload failed: ${payload?.error || "Upload failed"}`)
-        return
-      }
-      setBarcodePath(payload?.path ?? null)
-      setBarcodeStatus("Barcode uploaded.")
-    } finally {
-      setBarcodeUploading(false)
     }
   }
 
@@ -866,29 +808,6 @@ export default function SettingsPage() {
                   Export to Apple Health
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">{workouts.length} workouts ready to export</p>
-              </div>
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Gym Barcode</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upload a barcode image. It is stored privately and shown only after tap to reveal.
-                </p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    void handleBarcodeUpload(file)
-                    e.currentTarget.value = ""
-                  }}
-                  className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
-                  disabled={!user?.id || barcodeUploading}
-                />
-                <div className="text-xs text-muted-foreground mt-2">
-                  {barcodeUploading ? "Uploading..." : barcodePath ? "Barcode on file." : "No barcode uploaded."}
-                </div>
-                {barcodeStatus && <div className="text-xs text-muted-foreground mt-1">{barcodeStatus}</div>}
               </div>
 
               <div>

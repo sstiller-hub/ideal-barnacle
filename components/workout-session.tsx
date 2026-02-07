@@ -8,6 +8,7 @@ import type { WorkoutRoutine } from "@/lib/routine-storage"
 import {
   getExerciseHistory,
   getLatestPerformance,
+  getMostRecentCompletedSetPerformance,
   getMostRecentSetPerformance,
   getWorkoutHistory,
   saveWorkout,
@@ -378,13 +379,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           return { reps: firstEligible.reps, weight: firstEligible.weight }
         })()
 
-        const defaultFlags = getSetFlags({
-          reps: defaults.reps,
-          weight: defaults.weight,
-          targetReps,
-          historyReps,
-        })
-
         const warmupSets: Array<{
           id: string
           reps: number | null
@@ -425,15 +419,26 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           completed: false,
           sets: isWarmup
             ? warmupSets
-            : Array.from({ length: targetSets }, () => ({
-                id: generateSetId(),
-                reps: defaults.reps,
-                weight: defaults.weight,
-                completed: false,
-                isOutlier: defaultFlags.flags.includes("rep_outlier"),
-                validationFlags: defaultFlags.flags,
-                isIncomplete: defaultFlags.isIncomplete,
-              })),
+            : Array.from({ length: targetSets }, (_, setIndex) => {
+                const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, session?.id)
+                const nextReps = lastSet?.reps ?? defaults.reps
+                const nextWeight = lastSet?.weight ?? defaults.weight
+                const flagsResult = getSetFlags({
+                  reps: nextReps,
+                  weight: nextWeight,
+                  targetReps,
+                  historyReps,
+                })
+                return {
+                  id: generateSetId(),
+                  reps: nextReps,
+                  weight: nextWeight,
+                  completed: false,
+                  isOutlier: flagsResult.flags.includes("rep_outlier"),
+                  validationFlags: flagsResult.flags,
+                  isIncomplete: flagsResult.isIncomplete,
+                }
+              }),
           previousPerformance,
         }
       })
@@ -1645,6 +1650,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const exerciseCurrentSetIndex = exercise.sets.findIndex((set) => !set.completed)
     const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
     const allSetsRecorded = exercise.sets.every((set) => set.completed && !isSetIncomplete(set))
+    const isCompactSets = showPlateCalc && exercise.sets.length >= 4
 
     return (
       <div
@@ -1731,7 +1737,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           )}
         </div>
 
-        <div className="flex flex-col" style={{ gap: isResting ? "16px" : "24px" }}>
+        <div
+          className="flex flex-col"
+          style={{ gap: isResting ? (isCompactSets ? "12px" : "16px") : isCompactSets ? "16px" : "24px" }}
+        >
           {exercise.sets.map((set, index) => {
             const setKey = set.id ?? `${exercise.id}-${index}`
             const isCurrentSet = isCurrentExercise && index === activeSetIndex
@@ -1740,7 +1749,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const missingReps = isMissingReps(set.reps)
             const showMissing = Boolean(validationTrigger) && isCurrentExercise && (missingWeight || missingReps)
             const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !canEditExercise
-            const lastSet = getMostRecentSetPerformance(exercise.name, index, session?.id)
+            const lastSet = getMostRecentCompletedSetPerformance(exercise.name, index, session?.id)
             const comparison = getSetComparison(set, lastSet)
             const plates =
               typeof set.weight === "number"
@@ -1763,7 +1772,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   SET {index + 1}/{exercise.sets.length}
                 </div>
 
-                <div className="flex items-center gap-3 mb-3" style={{ marginBottom: isResting ? "10px" : "12px" }}>
+                <div
+                  className="flex items-center gap-3 mb-3"
+                  style={{ marginBottom: isResting ? (isCompactSets ? "6px" : "10px") : isCompactSets ? "8px" : "12px" }}
+                >
                   <div className="flex-1">
                     <input
                       type="number"
@@ -1798,8 +1810,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           showMissing && missingWeight && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: isResting ? "12px" : "16px",
-                        fontSize: isResting ? "22px" : "24px",
+                        padding: isResting ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "10px" : "16px",
+                        fontSize: isResting ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "20px" : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1808,7 +1820,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         textAlign: "center",
                       }}
                     />
-                    <div className="text-white/25 mt-1.5 text-center" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}>
+                    <div
+                      className="text-white/25 mt-1.5 text-center"
+                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+                    >
                       lbs
                     </div>
                   </div>
@@ -1857,8 +1872,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           (repCapError || (showMissing && missingReps)) && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: isResting ? "12px" : "16px",
-                        fontSize: isResting ? "22px" : "24px",
+                        padding: isResting ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "10px" : "16px",
+                        fontSize: isResting ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "20px" : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1867,7 +1882,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         textAlign: "center",
                       }}
                     />
-                    <div className="text-white/25 mt-1.5 text-center" style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.04em" }}>
+                    <div
+                      className="text-white/25 mt-1.5 text-center"
+                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+                    >
                       reps
                     </div>
                   </div>
@@ -1914,8 +1932,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 )}
 
                 {lastSet && typeof set.weight === "number" && typeof set.reps === "number" && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="text-white/20" style={{ fontSize: "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
+                  <div className="flex items-center gap-2 mb-3" style={{ marginBottom: isCompactSets ? "8px" : "12px" }}>
+                    <div
+                      className="text-white/20"
+                      style={{ fontSize: isCompactSets ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                    >
                       Last: {lastSet.weight} × {lastSet.reps}
                     </div>
                     {comparison?.status !== "no-history" && (
@@ -1942,8 +1963,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 )}
 
                 {showPlateCalc && isCurrentSet && !set.completed && plates.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="mb-3" style={{ marginBottom: isCompactSets ? "6px" : "12px" }}>
+                    <div
+                      className="flex items-center justify-between mb-2"
+                      style={{ marginBottom: isCompactSets ? "4px" : "8px" }}
+                    >
                       <div className="flex items-center gap-2">
                         <button
                           className="transition-all duration-200"
@@ -2008,12 +2032,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           onFocus={handleInputAutoSelect}
                           className="transition-all duration-200"
                           style={{
-                            width: "48px",
+                            width: isCompactSets ? "40px" : "48px",
                             background: "rgba(255, 255, 255, 0.04)",
                             border: "1px solid rgba(255, 255, 255, 0.08)",
                             borderRadius: "2px",
                             padding: "2px 6px",
-                            fontSize: "16px",
+                            fontSize: isCompactSets ? "14px" : "16px",
                             color: "rgba(255, 255, 255, 0.7)",
                             fontVariantNumeric: "tabular-nums",
                           }}
@@ -2021,56 +2045,61 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       </div>
                       <div />
                     </div>
-                    <div className="flex items-center gap-1 mb-2">
-                      {plates.map((plate, plateIndex) => (
-                        <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
-                          {Array.from({ length: plate.count }).map((_, countIndex) => {
-                            const getPlateColor = () => {
-                              if (plate.plate === 45) return "rgba(220, 80, 80, 0.5)"
-                              if (plate.plate === 35) return "rgba(80, 120, 220, 0.5)"
-                              if (plate.plate === 25) return "rgba(80, 200, 120, 0.5)"
-                              if (plate.plate === 10) return "rgba(230, 180, 80, 0.5)"
-                              if (plate.plate === 5) return "rgba(220, 220, 220, 0.5)"
-                              return "rgba(120, 120, 120, 0.5)"
-                            }
+                    {!isCompactSets && (
+                      <div className="flex items-center gap-1 mb-2" style={{ marginBottom: "8px" }}>
+                        {plates.map((plate, plateIndex) => (
+                          <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
+                            {Array.from({ length: plate.count }).map((_, countIndex) => {
+                              const getPlateColor = () => {
+                                if (plate.plate === 45) return "rgba(220, 80, 80, 0.5)"
+                                if (plate.plate === 35) return "rgba(80, 120, 220, 0.5)"
+                                if (plate.plate === 25) return "rgba(80, 200, 120, 0.5)"
+                                if (plate.plate === 10) return "rgba(230, 180, 80, 0.5)"
+                                if (plate.plate === 5) return "rgba(220, 220, 220, 0.5)"
+                                return "rgba(120, 120, 120, 0.5)"
+                              }
 
-                            const getPlateHeight = () => {
-                              if (plate.plate === 45) return 32
-                              if (plate.plate === 35) return 28
-                              if (plate.plate === 25) return 24
-                              if (plate.plate === 10) return 18
-                              if (plate.plate === 5) return 14
-                              return 10
-                            }
+                              const getPlateHeight = () => {
+                                if (plate.plate === 45) return 32
+                                if (plate.plate === 35) return 28
+                                if (plate.plate === 25) return 24
+                                if (plate.plate === 10) return 18
+                                if (plate.plate === 5) return 14
+                                return 10
+                              }
 
-                            return (
-                              <div
-                                key={`${setKey}-${plateIndex}-${countIndex}`}
-                                style={{
-                                  width: "6px",
-                                  height: `${getPlateHeight()}px`,
-                                  background: getPlateColor(),
-                                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                                  borderRadius: "1px",
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))}
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "4px",
-                          background: "rgba(160, 160, 160, 0.4)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                          borderRadius: "1px",
-                          marginLeft: "2px",
-                        }}
-                      />
-                    </div>
+                              return (
+                                <div
+                                  key={`${setKey}-${plateIndex}-${countIndex}`}
+                                  style={{
+                                    width: "6px",
+                                    height: `${getPlateHeight()}px`,
+                                    background: getPlateColor(),
+                                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                                    borderRadius: "1px",
+                                  }}
+                                />
+                              )
+                            })}
+                          </div>
+                        ))}
+                        <div
+                          style={{
+                            width: "32px",
+                            height: "4px",
+                            background: "rgba(160, 160, 160, 0.4)",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "1px",
+                            marginLeft: "2px",
+                          }}
+                        />
+                      </div>
+                    )}
 
-                    <div className="text-white/20" style={{ fontSize: "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
+                    <div
+                      className="text-white/20"
+                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                    >
                       {plates.map((plate, plateIndex) => (
                         <span key={`${setKey}-plate-${plateIndex}`}>
                           {plateIndex > 0 && " + "}
