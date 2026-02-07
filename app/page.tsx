@@ -40,6 +40,8 @@ import {
 import { deriveWorkoutType } from "@/lib/workout-type"
 import { computeWeekOverWeek } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
+import { isSetEligibleForStats } from "@/lib/set-validation"
+import { getPrExcludedExercises } from "@/lib/pr-exclusions"
 import {
   ArrowDown,
   ArrowUp,
@@ -138,6 +140,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null)
   const [uiStateOverride, setUiStateOverride] = useState<DayState | null>(null)
   const [devModeEnabled, setDevModeEnabled] = useState(false)
+  const [prExcludedNames, setPrExcludedNames] = useState<string[]>([])
   const [devModeTapCount, setDevModeTapCount] = useState(0)
   const [devModeTapTimeout, setDevModeTapTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
@@ -174,12 +177,15 @@ export default function Home() {
         if (!dateStr) return sum
         const workoutDate = new Date(dateStr)
         if (workoutDate >= start && workoutDate <= end) {
-          const volume =
-            workout?.total_volume_lb ??
-            workout?.stats?.totalVolume ??
-            workout?.totalVolume ??
-            0
-          return sum + (typeof volume === "number" ? volume : 0)
+          const exercises = Array.isArray(workout?.exercises) ? workout.exercises : []
+          const volume = exercises.reduce((acc: number, ex: any) => {
+            const sets = Array.isArray(ex?.sets) ? ex.sets : []
+            const exVolume = sets
+              .filter((set: any) => isSetEligibleForStats(set))
+              .reduce((setSum: number, set: any) => setSum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+            return acc + exVolume
+          }, 0)
+          return sum + volume
         }
         return sum
       }, 0)
@@ -195,6 +201,15 @@ export default function Home() {
     setRoutines(getRoutines())
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
+    setPrExcludedNames(getPrExcludedExercises())
+  }, [])
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPrExcludedNames(getPrExcludedExercises())
+    }
+    window.addEventListener("pr-exclusions:updated", handleUpdate)
+    return () => window.removeEventListener("pr-exclusions:updated", handleUpdate)
   }, [])
 
   const refreshSession = () => {
@@ -409,6 +424,7 @@ export default function Home() {
       }
     >()
     const prTimelineByExercise = new Map<string, Array<{ weight: number; achievedAt: string }>>()
+    const volumeTimelineByExercise = new Map<string, Array<{ volume: number; achievedAt: string }>>()
 
     const sortedHistory = [...workoutHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -443,30 +459,60 @@ export default function Home() {
             { weight: maxWeight, achievedAt: workout.date },
           ])
         }
+
+        const volume = exercise.sets
+          .filter((s: any) => s.completed && s.weight > 0 && s.reps > 0)
+          .reduce((sum: number, s: any) => sum + s.weight * s.reps, 0)
+        if (volume > 0) {
+          const volumeTimeline = volumeTimelineByExercise.get(key) ?? []
+          volumeTimelineByExercise.set(key, [
+            ...volumeTimeline,
+            { volume, achievedAt: workout.date },
+          ])
+        }
       })
     })
 
+    const growthV2Names = new Set(
+      GROWTH_V2_ROUTINES.flatMap((routine) =>
+        routine.exercises.map((exercise: any) => normalizeExerciseName(exercise.name))
+      )
+    )
+    const excludedPrExercises = new Set(
+      ["side crunch", "decline bench knee raise", ...prExcludedNames].map(normalizeExerciseName)
+    )
     const prSourceExercises =
       scheduledRoutine?.exercises || workoutForDate?.exercises || workoutHistory[0]?.exercises || []
     const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
-    const sourceNames =
-      userId ? exerciseNames : Array.from(prByExerciseName.keys())
+    const rawSourceNames = userId ? exerciseNames : Array.from(prByExerciseName.keys())
+    const sourceNames = rawSourceNames.filter(
+      (name) =>
+        growthV2Names.has(name) &&
+        !excludedPrExercises.has(name) &&
+        !name.includes("side crunch") &&
+        !name.includes("decline bench knee raise")
+    )
 
     const filteredPRs = sourceNames
       .map((name: string) => {
         const pr = prByExerciseName.get(name)
         if (!pr) return null
-        const timeline = prTimelineByExercise.get(name) ?? []
-        const last = timeline[timeline.length - 1]
-        const prev = timeline[timeline.length - 2]
+        const volumeTimeline = volumeTimelineByExercise.get(name) ?? []
+        const last = volumeTimeline[volumeTimeline.length - 1]
+        const prev = volumeTimeline[volumeTimeline.length - 2]
         const trendPct =
-          prev && prev.weight > 0 ? Math.round(((last.weight - prev.weight) / prev.weight) * 100) : null
+          prev && prev.volume > 0 ? Math.round(((last.volume - prev.volume) / prev.volume) * 100) : null
 
-        const chartData = timeline.slice(-7).map((entry) => entry.weight)
+        const chartData = volumeTimeline.slice(-7).map((entry) => entry.volume)
 
         return { ...pr, trendPct, chartData }
       })
-      .filter(Boolean) as PersonalRecord[]
+      .filter(
+        (pr) =>
+          pr &&
+          !normalizeExerciseName(pr.name).includes("side crunch") &&
+          !normalizeExerciseName(pr.name).includes("decline bench knee raise")
+      ) as PersonalRecord[]
 
     const sortedPRs = [...filteredPRs].sort((a, b) => {
       const aTime = a.achievedAt ? new Date(a.achievedAt).getTime() : 0
@@ -1183,6 +1229,33 @@ export default function Home() {
                 </span>
               </button>
             </div>
+
+            {workoutForDate.exercises && workoutForDate.exercises.length > 0 && (
+              <div className="mb-6 space-y-2.5">
+                {workoutForDate.exercises.map((exercise: any, index: number) => (
+                  <div key={exercise.id ?? `${exercise.name}-${index}`} className="flex items-center gap-3" style={{ opacity: 0.6 }}>
+                    <div
+                      className="text-white/40"
+                      style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", minWidth: "12px" }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div
+                      className="text-white/90 flex-1"
+                      style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.005em" }}
+                    >
+                      {exercise.name}
+                    </div>
+                    <div
+                      className="text-white/30"
+                      style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.01em" }}
+                    >
+                      {exercise.targetSets ?? exercise.sets?.length ?? 0} sets
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1303,12 +1376,19 @@ export default function Home() {
         >
           TRAINING VOLUME
         </div>
-        <TrainingVolumeCard
-          currentWeekVolume={currentWeekVolume}
-          previousWeekVolume={previousWeekVolume}
-          chartData={weeklyVolumes}
-          timeframe="7w"
-        />
+        <button
+          className="w-full text-left transition-all duration-200"
+          onClick={() => router.push("/volume")}
+          style={{ background: "transparent", padding: 0 }}
+          type="button"
+        >
+          <TrainingVolumeCard
+            currentWeekVolume={currentWeekVolume}
+            previousWeekVolume={previousWeekVolume}
+            chartData={weeklyVolumes}
+            timeframe="7w"
+          />
+        </button>
       </div>
 
       {todayPRs.length > 0 && (
@@ -1320,13 +1400,6 @@ export default function Home() {
             >
               PERSONAL RECORDS
             </h2>
-            <button
-              className="flex items-center gap-1 text-white/30 hover:text-white/50 transition-colors duration-200"
-              onClick={() => router.push("/prs")}
-            >
-              <span style={{ fontSize: "10px", fontWeight: 400 }}>View all</span>
-              <ChevronRightSmall size={11} strokeWidth={1.5} />
-            </button>
           </div>
 
           <div
@@ -1342,7 +1415,7 @@ export default function Home() {
                 details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
                 chartData={pr.chartData || []}
                 trendPct={pr.trendPct}
-                onClick={pr.workoutId ? () => router.push(`/history/${pr.workoutId}`) : undefined}
+                onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
               />
             ))}
           </div>

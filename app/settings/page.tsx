@@ -35,6 +35,7 @@ import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
 import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
 import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
+import { getPrExcludedExercises, setPrExcludedExercises } from "@/lib/pr-exclusions"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -69,6 +70,8 @@ export default function SettingsPage() {
     conflicts: number
     errors: number
   } | null>(null)
+  const [prExclusionInput, setPrExclusionInput] = useState("")
+  const [prExclusionSaved, setPrExclusionSaved] = useState(false)
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
@@ -83,6 +86,8 @@ export default function SettingsPage() {
     const stored = localStorage.getItem("progressive_autofill_enabled")
     if (stored === null) return
     setProgressiveAutofillEnabled(stored === "true")
+    const exclusions = getPrExcludedExercises()
+    setPrExclusionInput(exclusions.join(", "))
   }, [])
 
   useEffect(() => {
@@ -134,6 +139,17 @@ export default function SettingsPage() {
     }
     downloadHealthExport(workouts)
     alert("Workout data exported! You can now import this file into the Apple Health app.")
+  }
+
+  const handleSavePrExclusions = () => {
+    const parsed = prExclusionInput
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+    setPrExcludedExercises(parsed)
+    setPrExclusionSaved(true)
+    window.dispatchEvent(new Event("pr-exclusions:updated"))
+    window.setTimeout(() => setPrExclusionSaved(false), 2000)
   }
 
   const handleClearAllData = () => {
@@ -808,6 +824,23 @@ export default function SettingsPage() {
                   Export to Apple Health
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">{workouts.length} workouts ready to export</p>
+              </div>
+
+              <div>
+                <h2 className="font-bold text-base mb-2">PR Exclusions</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Comma-separated list of exercises to hide from PR cards.
+                </p>
+                <textarea
+                  value={prExclusionInput}
+                  onChange={(e) => setPrExclusionInput(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Side Crunch, Decline Bench Knee Raise"
+                />
+                <Button onClick={handleSavePrExclusions} className="w-full mt-3" variant="secondary">
+                  {prExclusionSaved ? "Saved" : "Save Exclusions"}
+                </Button>
               </div>
 
               <div>

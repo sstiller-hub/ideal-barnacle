@@ -177,17 +177,10 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
     exercises: [
       ex({
         id: "sa-shoulder-press-hi",
-        name: "Technogym Plate-Loaded Shoulder Press (higher angle)",
+        name: "Technogym Plate-Loaded Shoulder Press",
         type: "strength",
-        targetSets: 2,
-        targetReps: "6-8",
-      }),
-      ex({
-        id: "sa-shoulder-press-lo",
-        name: "Technogym Plate-Loaded Shoulder Press (lower angle)",
-        type: "strength",
-        targetSets: 2,
-        targetReps: "8-10",
+        targetSets: 4,
+        targetReps: "6-10",
       }),
       ex({ id: "sa-incline-press", name: "Incline Machine Chest Press", type: "strength", targetSets: 3, targetReps: "8-10" }),
       ex({
