@@ -873,6 +873,7 @@ export default function SettingsPage() {
         >
           <SettingItem label="Install as App" />
           <SettingItem label="Data Storage" />
+          <SettingItem label="Version" />
           <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Install as App</h2>
@@ -890,6 +891,17 @@ export default function SettingsPage() {
                 <h2 className="font-bold text-base mb-2">Data Storage</h2>
                 <p className="text-sm text-muted-foreground">
                   All workout data is stored locally on your device. Your data never leaves your phone.
+                </p>
+              </div>
+              <div>
+                <h2 className="font-bold text-base mb-2">Version</h2>
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="app-version"
+                >
+                  {process.env.NEXT_PUBLIC_APP_VERSION ||
+                    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ||
+                    "dev"}
                 </p>
               </div>
           </div>
