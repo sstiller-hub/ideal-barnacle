@@ -32,7 +32,7 @@ test("starts rest timer after completing a set", async ({ page }) => {
   await weightInput.fill("100")
   await repsInput.fill("8")
 
-  await page.getByRole("button", { name: /complete set/i }).click()
+  await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
   const skipRest = page.getByText(/skip/i)
   await expect(skipRest).toBeVisible()
 
@@ -62,7 +62,7 @@ test("rest timer persists after reload", async ({ page }) => {
   await weightInput.fill("100")
   await repsInput.fill("8")
 
-  await page.getByRole("button", { name: /complete set/i }).click()
+  await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
   await expect(page.getByText(/skip/i)).toBeVisible()
   await page.waitForFunction(() => {
     try {
