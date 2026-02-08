@@ -99,7 +99,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
     updatedAt: nowIso(),
     exercises: [
       ex({ id: "legs2-seated-ham", name: "Seated Hamstring Curl", type: "strength", targetSets: 3, targetReps: "8-10" }),
-      ex({ id: "legs2-hip-thrust", name: "Booty Builder Hip Thrust", type: "strength", targetSets: 4, targetReps: "6-10" }),
+      ex({ id: "legs2-hip-thrust", name: "Hip Thrust", type: "strength", targetSets: 4, targetReps: "6-10" }),
       ex({
         id: "legs2-belt-rdl",
         name: "Belt Squat RDL",

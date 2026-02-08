@@ -123,7 +123,6 @@ type DayState = "scheduled" | "rest" | "completed" | "activeSession"
 export default function Home() {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [routines, setRoutines] = useState<WorkoutRoutine[]>([])
   const [routinePool, setRoutinePool] = useState<WorkoutRoutine[]>([])
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([])
   const [scheduledRoutine, setScheduledRoutine] = useState<WorkoutRoutine | null>(null)
@@ -135,7 +134,6 @@ export default function Home() {
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [scheduleOverride, setScheduleOverrideState] = useState<ScheduleOverrideResult | undefined>(undefined)
-  const [localOverride, setLocalOverride] = useState(false)
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [uiStateOverride, setUiStateOverride] = useState<DayState | null>(null)
@@ -198,7 +196,6 @@ export default function Home() {
   const previousWeekVolume = weeklyVolumes[weeklyVolumes.length - 2] ?? 0
 
   useEffect(() => {
-    setRoutines(getRoutines())
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
     setPrExcludedNames(getPrExcludedExercises())
@@ -537,7 +534,6 @@ export default function Home() {
     setWorkoutHistory(history)
 
     const allRoutines = getRoutines()
-    setRoutines(allRoutines)
     const pool = allRoutines.length > 0 ? allRoutines : GROWTH_V2_ROUTINES
     setRoutinePool(pool)
 
@@ -584,7 +580,6 @@ export default function Home() {
     const resolvedRestDay = restDay || !nextRoutine
     setBaseScheduledRoutine(nextRoutine)
     setBaseIsRestDay(resolvedRestDay)
-    setLocalOverride(manualSchedule !== undefined)
   }
 
   const handleStartWorkout = (routineId: string) => {
@@ -630,11 +625,9 @@ export default function Home() {
         const cleared = await clearScheduleOverride(selectedDate)
         if (cleared) {
           setScheduleOverrideState(undefined)
-          setLocalOverride(false)
         }
       } else {
         removeScheduledWorkout(selectedDate)
-        setLocalOverride(false)
         loadDataForDate(selectedDate)
         window.dispatchEvent(new Event("schedule:updated"))
       }
@@ -656,17 +649,15 @@ export default function Home() {
           isOverride: true,
           workoutType: deriveWorkoutType(routineName),
         })
-        setLocalOverride(false)
-      }
-    } else {
-      if (workout) {
-        setScheduledWorkout(selectedDate, workout)
+        }
       } else {
-        setRestDay(selectedDate)
-      }
-      setLocalOverride(true)
-      loadDataForDate(selectedDate)
-      window.dispatchEvent(new Event("schedule:updated"))
+        if (workout) {
+          setScheduledWorkout(selectedDate, workout)
+        } else {
+          setRestDay(selectedDate)
+        }
+        loadDataForDate(selectedDate)
+        window.dispatchEvent(new Event("schedule:updated"))
     }
     setShowWorkoutPicker(false)
   }

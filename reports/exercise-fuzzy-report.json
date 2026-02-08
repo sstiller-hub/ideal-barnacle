@@ -1,0 +1,20 @@
+{
+  "userId": "5eef3bfd-d598-4a20-aa66-5bedaebcb376",
+  "csvPath": "/Users/samstiller/projects/ideal-barnacle/public/akt_import_FINAL.csv",
+  "generatedAt": "2026-02-07T02:32:13.962Z",
+  "csvUniqueNames": 89,
+  "csvUniqueNormalized": 71,
+  "dbUniqueNames": 70,
+  "dbUniqueNormalized": 70,
+  "missingNormalizedCount": 1,
+  "fuzzyMatchCount": 0,
+  "fuzzyMatches": [],
+  "missingDetails": [
+    {
+      "normalized": "seated machine shoulder press",
+      "names": [
+        "Seated Machine Shoulder Press"
+      ]
+    }
+  ]
+}

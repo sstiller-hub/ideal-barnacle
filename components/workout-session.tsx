@@ -182,7 +182,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingProgrammatically = useRef(false)
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollRafRef = useRef<number | null>(null)
+  const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const [recentlySaved, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -198,6 +199,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [syncState, setSyncState] = useState<SyncState>("draft")
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
   const hasSyncedDraftRef = useRef(false)
+  const sessionRef = useRef<WorkoutSession | null>(null)
+  const exercisesRef = useRef<any[]>([])
+  const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
+  const currentExerciseIndexRef = useRef(0)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -214,6 +219,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   useEffect(() => {
     hasSyncedDraftRef.current = false
   }, [session?.id])
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
+    exercisesRef.current = exercises
+  }, [exercises])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -600,6 +613,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     Math.max(resolvedExerciseIndex, 0),
     Math.max(0, exercises.length - 1)
   )
+  useEffect(() => {
+    currentExerciseIndexRef.current = currentExerciseIndex
+    setUiExerciseIndex(currentExerciseIndex)
+  }, [currentExerciseIndex])
   const currentExercise = exercises[currentExerciseIndex]
   const totalExercises = exercises.length
   const firstIncompleteIndex =
@@ -837,7 +854,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     const timeout = window.setTimeout(() => {
       isScrollingProgrammatically.current = false
-    }, 500)
+    }, 400)
 
     return () => window.clearTimeout(timeout)
   }, [currentExerciseIndex])
@@ -1461,21 +1478,31 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }
 
   const handleScroll = () => {
-    if (isScrollingProgrammatically.current) return
+    const container = scrollContainerRef.current
+    if (!container) return
 
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current)
+    if (isScrollingProgrammatically.current) {
+      isScrollingProgrammatically.current = false
     }
 
-    scrollTimeoutRef.current = setTimeout(() => {
-      const container = scrollContainerRef.current
-      if (!container) return
+    if (scrollRafRef.current) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null
       const pageWidth = container.offsetWidth || 1
-      const newIndex = Math.round(container.scrollLeft / pageWidth)
-      if (newIndex === currentExerciseIndex) return
+      const nextIndex = Math.round(container.scrollLeft / pageWidth)
+      if (nextIndex !== uiExerciseIndex) {
+        setUiExerciseIndex(nextIndex)
+      }
 
-      void setExerciseIndex(newIndex)
-    }, 100)
+      if (scrollSettleTimeoutRef.current) {
+        clearTimeout(scrollSettleTimeoutRef.current)
+      }
+      scrollSettleTimeoutRef.current = window.setTimeout(() => {
+        if (nextIndex !== currentExerciseIndexRef.current) {
+          void setExerciseIndex(nextIndex)
+        }
+      }, 120)
+    })
   }
 
   const retryWorkoutSync = async () => {
@@ -1749,6 +1776,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const missingReps = isMissingReps(set.reps)
             const showMissing = Boolean(validationTrigger) && isCurrentExercise && (missingWeight || missingReps)
             const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !canEditExercise
+            const isCompactCompleted = set.completed
             const lastSet = getMostRecentCompletedSetPerformance(exercise.name, index, session?.id)
             const comparison = getSetComparison(set, lastSet)
             const plates =
@@ -1810,8 +1838,36 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           showMissing && missingWeight && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: isResting ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "10px" : "16px",
-                        fontSize: isResting ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "20px" : "24px",
+                        padding: isCompactCompleted
+                          ? isResting
+                            ? isCompactSets
+                              ? "6px"
+                              : "8px"
+                            : isCompactSets
+                              ? "7px"
+                              : "10px"
+                          : isResting
+                            ? isCompactSets
+                              ? "8px"
+                              : "12px"
+                            : isCompactSets
+                              ? "10px"
+                              : "16px",
+                        fontSize: isCompactCompleted
+                          ? isResting
+                            ? isCompactSets
+                              ? "14px"
+                              : "16px"
+                            : isCompactSets
+                              ? "15px"
+                              : "18px"
+                          : isResting
+                            ? isCompactSets
+                              ? "18px"
+                              : "22px"
+                            : isCompactSets
+                              ? "20px"
+                              : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1822,7 +1878,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     />
                     <div
                       className="text-white/25 mt-1.5 text-center"
-                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+                      style={{
+                        fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
+                        fontWeight: 400,
+                        letterSpacing: "0.04em",
+                        marginTop: isCompactCompleted ? "4px" : "6px",
+                      }}
                     >
                       lbs
                     </div>
@@ -1872,8 +1933,36 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           (repCapError || (showMissing && missingReps)) && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
                         })`,
                         borderRadius: "2px",
-                        padding: isResting ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "10px" : "16px",
-                        fontSize: isResting ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "20px" : "24px",
+                        padding: isCompactCompleted
+                          ? isResting
+                            ? isCompactSets
+                              ? "6px"
+                              : "8px"
+                            : isCompactSets
+                              ? "7px"
+                              : "10px"
+                          : isResting
+                            ? isCompactSets
+                              ? "8px"
+                              : "12px"
+                            : isCompactSets
+                              ? "10px"
+                              : "16px",
+                        fontSize: isCompactCompleted
+                          ? isResting
+                            ? isCompactSets
+                              ? "14px"
+                              : "16px"
+                            : isCompactSets
+                              ? "15px"
+                              : "18px"
+                          : isResting
+                            ? isCompactSets
+                              ? "18px"
+                              : "22px"
+                            : isCompactSets
+                              ? "20px"
+                              : "24px",
                         fontWeight: 500,
                         letterSpacing: "-0.02em",
                         color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -1884,7 +1973,12 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     />
                     <div
                       className="text-white/25 mt-1.5 text-center"
-                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, letterSpacing: "0.04em" }}
+                      style={{
+                        fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
+                        fontWeight: 400,
+                        letterSpacing: "0.04em",
+                        marginTop: isCompactCompleted ? "4px" : "6px",
+                      }}
                     >
                       reps
                     </div>
@@ -2045,56 +2139,57 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       </div>
                       <div />
                     </div>
-                    {!isCompactSets && (
-                      <div className="flex items-center gap-1 mb-2" style={{ marginBottom: "8px" }}>
-                        {plates.map((plate, plateIndex) => (
-                          <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
-                            {Array.from({ length: plate.count }).map((_, countIndex) => {
-                              const getPlateColor = () => {
-                                if (plate.plate === 45) return "rgba(220, 80, 80, 0.5)"
-                                if (plate.plate === 35) return "rgba(80, 120, 220, 0.5)"
-                                if (plate.plate === 25) return "rgba(80, 200, 120, 0.5)"
-                                if (plate.plate === 10) return "rgba(230, 180, 80, 0.5)"
-                                if (plate.plate === 5) return "rgba(220, 220, 220, 0.5)"
-                                return "rgba(120, 120, 120, 0.5)"
-                              }
+                    <div
+                      className="flex items-center gap-1 mb-2"
+                      style={{ marginBottom: isCompactSets ? "4px" : "8px" }}
+                    >
+                      {plates.map((plate, plateIndex) => (
+                        <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
+                          {Array.from({ length: plate.count }).map((_, countIndex) => {
+                            const getPlateColor = () => {
+                              if (plate.plate === 45) return "rgba(220, 80, 80, 0.5)"
+                              if (plate.plate === 35) return "rgba(80, 120, 220, 0.5)"
+                              if (plate.plate === 25) return "rgba(80, 200, 120, 0.5)"
+                              if (plate.plate === 10) return "rgba(230, 180, 80, 0.5)"
+                              if (plate.plate === 5) return "rgba(220, 220, 220, 0.5)"
+                              return "rgba(120, 120, 120, 0.5)"
+                            }
 
-                              const getPlateHeight = () => {
-                                if (plate.plate === 45) return 32
-                                if (plate.plate === 35) return 28
-                                if (plate.plate === 25) return 24
-                                if (plate.plate === 10) return 18
-                                if (plate.plate === 5) return 14
-                                return 10
-                              }
+                            const getPlateHeight = () => {
+                              if (plate.plate === 45) return isCompactSets ? 20 : 32
+                              if (plate.plate === 35) return isCompactSets ? 18 : 28
+                              if (plate.plate === 25) return isCompactSets ? 16 : 24
+                              if (plate.plate === 10) return isCompactSets ? 12 : 18
+                              if (plate.plate === 5) return isCompactSets ? 10 : 14
+                              return isCompactSets ? 8 : 10
+                            }
 
-                              return (
-                                <div
-                                  key={`${setKey}-${plateIndex}-${countIndex}`}
-                                  style={{
-                                    width: "6px",
-                                    height: `${getPlateHeight()}px`,
-                                    background: getPlateColor(),
-                                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                                    borderRadius: "1px",
-                                  }}
-                                />
-                              )
-                            })}
-                          </div>
-                        ))}
-                        <div
-                          style={{
-                            width: "32px",
-                            height: "4px",
-                            background: "rgba(160, 160, 160, 0.4)",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
-                            borderRadius: "1px",
-                            marginLeft: "2px",
-                          }}
-                        />
-                      </div>
-                    )}
+                            return (
+                              <div
+                                key={`${setKey}-${plateIndex}-${countIndex}`}
+                                style={{
+                                  width: isCompactSets ? "5px" : "6px",
+                                  height: `${getPlateHeight()}px`,
+                                  background: getPlateColor(),
+                                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                                  borderRadius: "1px",
+                                }}
+                              />
+                            )
+                          })}
+                        </div>
+                      ))}
+                      <div
+                        style={{
+                          width: isCompactSets ? "24px" : "32px",
+                          height: isCompactSets ? "3px" : "4px",
+                          background: "rgba(160, 160, 160, 0.4)",
+                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                          borderRadius: "1px",
+                          marginLeft: "2px",
+                        }}
+                      />
+                    </div>
 
                     <div
                       className="text-white/20"
@@ -2118,12 +2213,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }
 
   const pauseSession = async () => {
-    if (session?.status !== "in_progress") return
-    const persistedRestTimer = session.restTimer ?? restState ?? undefined
+    const baseSession = sessionRef.current
+    if (baseSession?.status !== "in_progress") return
+    const persistedRestTimer = baseSession.restTimer ?? restState ?? undefined
     const updatedSession: WorkoutSession = {
-      ...session,
+      ...baseSession,
       status: "paused",
       restTimer: persistedRestTimer,
+      exercises: exercisesRef.current.length > 0 ? exercisesRef.current : baseSession.exercises,
     }
     setSession(updatedSession)
     await saveSession(updatedSession)
@@ -2423,7 +2520,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           <div className="flex items-center justify-center gap-1.5 flex-1">
             {exercises.map((exercise, index) => {
               const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
-              const isCurrent = index === currentExerciseIndex
+              const isCurrent = index === uiExerciseIndex
               return (
                 <button
                   key={exercise.id}

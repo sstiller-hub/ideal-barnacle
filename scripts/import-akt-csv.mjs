@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 
 const CSV_PATH = process.argv[2] || "/Users/samstiller/Downloads/akt_import_FINAL.csv"
 const USER_ID = process.argv[3] || "5eef3bfd-d598-4a20-aa66-5bedaebcb376"
+const NO_OVERWRITE = process.argv.includes("--no-overwrite")
 
 const readEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) return {}
@@ -277,6 +278,7 @@ let createdExercises = 0
 let insertedSets = 0
 let updatedSets = 0
 let skippedDuplicates = 0
+let skippedExisting = 0
 let processedWorkouts = 0
 const totalWorkouts = grouped.size
 
@@ -340,6 +342,10 @@ for (const [key, sessionRows] of grouped.entries()) {
           skippedDuplicates += 1
           continue
         }
+        if (NO_OVERWRITE) {
+          skippedExisting += 1
+          continue
+        }
         await withRetry(`update set ${exercise.id}#${row.setIndex}`, async () => {
           const res = await supabase
             .from("workout_sets")
@@ -384,4 +390,10 @@ for (const [key, sessionRows] of grouped.entries()) {
 }
 
 console.log("Import complete")
-console.log(JSON.stringify({ createdWorkouts, createdExercises, insertedSets, updatedSets, skippedDuplicates }, null, 2))
+console.log(
+  JSON.stringify(
+    { createdWorkouts, createdExercises, insertedSets, updatedSets, skippedDuplicates, skippedExisting },
+    null,
+    2
+  )
+)
