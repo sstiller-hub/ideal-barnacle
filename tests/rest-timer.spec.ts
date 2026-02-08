@@ -32,8 +32,8 @@ test("starts rest timer after completing a set", async ({ page }) => {
   await weightInput.fill("100")
   await repsInput.fill("8")
 
-  await page.getByRole("button", { name: "Complete Set" }).click()
-  const skipRest = page.getByText("Skip")
+  await page.getByRole("button", { name: /complete set/i }).click()
+  const skipRest = page.getByText(/skip/i)
   await expect(skipRest).toBeVisible()
 
   const pill = page.locator("text=/^\\d+:\\d{2}$/").first()
@@ -62,8 +62,8 @@ test("rest timer persists after reload", async ({ page }) => {
   await weightInput.fill("100")
   await repsInput.fill("8")
 
-  await page.getByRole("button", { name: "Complete Set" }).click()
-  await expect(page.getByText("Skip")).toBeVisible()
+  await page.getByRole("button", { name: /complete set/i }).click()
+  await expect(page.getByText(/skip/i)).toBeVisible()
   await page.waitForFunction(() => {
     try {
       const sessions = JSON.parse(localStorage.getItem("workoutSessions") || "[]")
@@ -80,7 +80,7 @@ test("rest timer persists after reload", async ({ page }) => {
   }))
   const outputPath = test.info().outputPath("rest-timer-storage.json")
   fs.writeFileSync(outputPath, JSON.stringify(storageSnapshot, null, 2))
-  await expect(page.getByText("Skip")).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText(/skip/i)).toBeVisible({ timeout: 15000 })
 
   const pill = page.locator("text=/^\\d+:\\d{2}$/").first()
   const initial = (await pill.textContent()) || ""

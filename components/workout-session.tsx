@@ -2854,6 +2854,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                 opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
                               }}
                               type="button"
+                              aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
                             >
                               {set.completed ? (
                                 <Check size={16} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.8)" }} />
