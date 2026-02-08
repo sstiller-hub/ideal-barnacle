@@ -83,12 +83,12 @@ type Exercise = {
 }
 
 function extractRestSeconds(notes?: string): number {
-  if (!notes) return 120
+  if (!notes) return 90
   const minutes = notes.match(/rest\s*(\d+)\s*m/i)
   const seconds = notes.match(/rest\s*(\d+)\s*s/i)
   if (minutes) return Number(minutes[1]) * 60
   if (seconds) return Number(seconds[1])
-  return 120
+  return 90
 }
 
 function normalizeExerciseName(name: string): string {
@@ -160,7 +160,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [focusedInput, setFocusedInput] = useState<string | null>(null)
   const [editSetsByExerciseId, setEditSetsByExerciseId] = useState<Record<string, boolean>>({})
   const [addHoldProgress, setAddHoldProgress] = useState(0)
-  const addHoldTimeoutRef = useRef<number | null>(null)
+  const addHoldTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const addHoldRafRef = useRef<number | null>(null)
   const addHoldStartRef = useRef<number | null>(null)
   const [uiNow, setUiNow] = useState(() => Date.now())
@@ -696,7 +696,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const scheduleRestNotification = (seconds: number) => {
     if (typeof window === "undefined") return
     if (restNotificationTimeoutRef.current) {
-      window.clearTimeout(restNotificationTimeoutRef.current)
+      clearTimeout(restNotificationTimeoutRef.current)
       restNotificationTimeoutRef.current = null
     }
     restNotificationEndsAtRef.current = Date.now() + seconds * 1000
@@ -706,7 +706,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return
     }
     if (Notification.permission !== "granted") return
-    restNotificationTimeoutRef.current = window.setTimeout(() => {
+    restNotificationTimeoutRef.current = setTimeout(() => {
       void fireRestNotification()
     }, seconds * 1000)
   }
@@ -779,7 +779,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     setRestState(nextWithStart || undefined)
     setUiNow(Date.now())
     if (!nextWithStart && restNotificationTimeoutRef.current) {
-      window.clearTimeout(restNotificationTimeoutRef.current)
+      clearTimeout(restNotificationTimeoutRef.current)
       restNotificationTimeoutRef.current = null
     }
     if (!nextWithStart) {
@@ -813,7 +813,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (restRemainingSeconds <= 0) {
       void setRestStateAndPersist(null)
       if (restNotificationTimeoutRef.current) {
-        window.clearTimeout(restNotificationTimeoutRef.current)
+        clearTimeout(restNotificationTimeoutRef.current)
         restNotificationTimeoutRef.current = null
       }
       restNotificationEndsAtRef.current = null
@@ -1453,7 +1453,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const start = Date.now()
     addHoldStartRef.current = start
     setAddHoldProgress(0)
-    addHoldTimeoutRef.current = window.setTimeout(() => {
+    addHoldTimeoutRef.current = setTimeout(() => {
       addHoldTimeoutRef.current = null
       addHoldStartRef.current = null
       setAddHoldProgress(0)
@@ -1473,7 +1473,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   const cancelAddHold = () => {
     if (addHoldTimeoutRef.current) {
-      window.clearTimeout(addHoldTimeoutRef.current)
+      clearTimeout(addHoldTimeoutRef.current)
       addHoldTimeoutRef.current = null
     }
     if (addHoldRafRef.current) {
@@ -1518,7 +1518,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
       }
-      scrollSettleTimeoutRef.current = window.setTimeout(() => {
+      scrollSettleTimeoutRef.current = setTimeout(() => {
         if (nextIndex !== currentExerciseIndexRef.current) {
           void setExerciseIndex(nextIndex)
         }
@@ -2318,9 +2318,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const signalAutoSaved = () => {
     setRecentlySaved(true)
     if (recentlySavedTimeoutRef.current) {
-      window.clearTimeout(recentlySavedTimeoutRef.current)
+      clearTimeout(recentlySavedTimeoutRef.current)
     }
-    recentlySavedTimeoutRef.current = window.setTimeout(() => {
+    recentlySavedTimeoutRef.current = setTimeout(() => {
       setRecentlySaved(false)
       recentlySavedTimeoutRef.current = null
     }, 2000)

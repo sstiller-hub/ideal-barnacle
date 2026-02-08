@@ -66,7 +66,7 @@ function uuid() {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function isUuid(value: string | undefined | null): boolean {
+function isUuid(value: string | undefined | null): value is string {
   if (!value) return false
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
@@ -391,14 +391,18 @@ export async function pullSupabaseToLocal() {
   if (typeof window !== "undefined") {
     const local = getWorkoutHistory() as CompletedWorkout[]
     const byId = new Map<string, CompletedWorkout | WorkoutPayload>()
-    local.forEach((w) => byId.set(w.id, w))
-    cloudWorkouts.forEach((w) => byId.set(w.id, w))
-
-    const merged = Array.from(byId.values()).sort((a, b) => {
-      const ad = new Date(a.date || a.performed_at || 0).getTime()
-      const bd = new Date(b.date || b.performed_at || 0).getTime()
-      return bd - ad
+    local.forEach((w) => {
+      if (w.id) byId.set(w.id, w)
     })
+    cloudWorkouts.forEach((w) => {
+      if (w.id) byId.set(w.id, w)
+    })
+
+    const getWorkoutTime = (workout: CompletedWorkout | WorkoutPayload) => {
+      const date = "performed_at" in workout ? workout.performed_at : workout.date
+      return new Date(date ?? 0).getTime()
+    }
+    const merged = Array.from(byId.values()).sort((a, b) => getWorkoutTime(b) - getWorkoutTime(a))
 
     localStorage.setItem("workout_history", JSON.stringify(merged))
   }

@@ -93,16 +93,20 @@ export function getWorkoutHistory(): CompletedWorkout[] {
   }
   let didMigrate = false
 
-  const normalized = history.map((workout) => {
+  const normalized: CompletedWorkout[] = history.map((workout) => {
     if (
       workout.durationUnit === "minutes" &&
       typeof workout.duration === "number" &&
       workout.duration > 0
     ) {
       didMigrate = true
-      return { ...workout, duration: workout.duration * 60, durationUnit: "seconds" }
+      return {
+        ...workout,
+        duration: workout.duration * 60,
+        durationUnit: "seconds",
+      } as CompletedWorkout
     }
-    return workout
+    return workout as CompletedWorkout
   })
 
   if (didMigrate) {

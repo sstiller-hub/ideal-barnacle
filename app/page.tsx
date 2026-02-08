@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { getWorkoutHistory } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { getRoutines } from "@/lib/routine-storage"
 import {
   deleteSession,
@@ -73,17 +73,6 @@ type WorkoutRoutine = {
   exercises: any[]
 }
 
-type CompletedWorkout = {
-  id: string
-  name: string
-  date: string
-  stats: {
-    totalVolume: number
-    completedSets: number
-  }
-  exercises: any[]
-}
-
 type PersonalRecord = {
   name: string
   weight: number
@@ -91,8 +80,8 @@ type PersonalRecord = {
   workoutId?: string
   workoutName?: string
   achievedAt?: string
-  trendPct?: number | null
-  chartData?: number[]
+  trendPct: number | null
+  chartData: number[]
 }
 
 type WeeklySummary = {
@@ -124,7 +113,7 @@ export default function Home() {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [routinePool, setRoutinePool] = useState<WorkoutRoutine[]>([])
-  const [workoutHistory, setWorkoutHistory] = useState<any[]>([])
+  const [workoutHistory, setWorkoutHistory] = useState<CompletedWorkout[]>([])
   const [scheduledRoutine, setScheduledRoutine] = useState<WorkoutRoutine | null>(null)
   const [baseScheduledRoutine, setBaseScheduledRoutine] = useState<WorkoutRoutine | null>(null)
   const [baseIsRestDay, setBaseIsRestDay] = useState(false)
@@ -171,7 +160,7 @@ export default function Home() {
       const start = new Date(end)
       start.setDate(start.getDate() - 7)
       const total = workoutHistory.reduce((sum, workout) => {
-        const dateStr = workout?.performed_at ?? workout?.date ?? workout?.performedAt
+        const dateStr = workout.date
         if (!dateStr) return sum
         const workoutDate = new Date(dateStr)
         if (workoutDate >= start && workoutDate <= end) {
@@ -482,8 +471,9 @@ export default function Home() {
       scheduledRoutine?.exercises || workoutForDate?.exercises || workoutHistory[0]?.exercises || []
     const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
     const rawSourceNames = userId ? exerciseNames : Array.from(prByExerciseName.keys())
-    const sourceNames = rawSourceNames.filter(
-      (name) =>
+    const sourceNames: string[] = rawSourceNames.filter(
+      (name): name is string =>
+        typeof name === "string" &&
         growthV2Names.has(name) &&
         !excludedPrExercises.has(name) &&
         !name.includes("side crunch") &&
@@ -504,12 +494,14 @@ export default function Home() {
 
         return { ...pr, trendPct, chartData }
       })
-      .filter(
-        (pr) =>
-          pr &&
-          !normalizeExerciseName(pr.name).includes("side crunch") &&
-          !normalizeExerciseName(pr.name).includes("decline bench knee raise")
-      ) as PersonalRecord[]
+      .filter((pr): pr is PersonalRecord => {
+        if (!pr) return false
+        const normalized = normalizeExerciseName(pr.name)
+        return (
+          !normalized.includes("side crunch") &&
+          !normalized.includes("decline bench knee raise")
+        )
+      })
 
     const sortedPRs = [...filteredPRs].sort((a, b) => {
       const aTime = a.achievedAt ? new Date(a.achievedAt).getTime() : 0
@@ -1667,13 +1659,14 @@ function PRCard({
               fill={`url(#${gradientId})`}
               dot={(props) => {
                 const { cx, cy, index } = props
-                if (cx === undefined || cy === undefined) return null
+                const safeCx = typeof cx === "number" ? cx : 0
+                const safeCy = typeof cy === "number" ? cy : 0
                 const isLast = index === formattedData.length - 1
                 return (
                   <circle
                     key={`pr-dot-${exercise}-${index}`}
-                    cx={cx}
-                    cy={cy}
+                    cx={safeCx}
+                    cy={safeCy}
                     r={isLast ? 2 : 1}
                     fill={isLast ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.25)"}
                   />
@@ -1805,12 +1798,13 @@ function TrainingVolumeCard({
               fill="url(#volumeGradient)"
               dot={(props) => {
                 const { cx, cy, index } = props
-                if (cx === undefined || cy === undefined) return null
+                const safeCx = typeof cx === "number" ? cx : 0
+                const safeCy = typeof cy === "number" ? cy : 0
                 return (
                   <circle
                     key={`vol-dot-${index}`}
-                    cx={cx}
-                    cy={cy}
+                    cx={safeCx}
+                    cy={safeCy}
                     r={2.5}
                     fill="rgba(255, 255, 255, 0.25)"
                   />

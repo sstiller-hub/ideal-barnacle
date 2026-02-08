@@ -80,11 +80,13 @@ const loadStore = (): NextSessionNotesStore => {
   try {
     const parsed = JSON.parse(raw)
     if (Array.isArray(parsed)) {
-      const notes = parsed.map(hydrateNote).filter((note): note is NextSessionNote => Boolean(note))
+      const notes = (parsed as Array<Partial<NextSessionNote>>)
+        .map(hydrateNote)
+        .filter((note): note is NextSessionNote => Boolean(note))
       return { version: STORAGE_VERSION, notes }
     }
     if (parsed?.version === STORAGE_VERSION && Array.isArray(parsed.notes)) {
-      const notes = parsed.notes
+      const notes = (parsed.notes as Array<Partial<NextSessionNote>>)
         .map(hydrateNote)
         .filter((note): note is NextSessionNote => Boolean(note))
       return { version: STORAGE_VERSION, notes }
@@ -240,4 +242,3 @@ export const listNextNotesForRoutine = (routineId?: string, routineName?: string
   const store = loadStore()
   return store.notes.filter((note) => note.key.startsWith(routineKey) && !note.clearedAt)
 }
-

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
 import {
   computeBestE1rmSet,
@@ -23,10 +23,11 @@ type WorkoutSetRow = {
 }
 
 export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const workoutId = params.id
+  const { id } = await params
+  const workoutId = id
   const supabase = getSupabaseAdmin()
 
   const authHeader = request.headers.get("authorization") || ""
