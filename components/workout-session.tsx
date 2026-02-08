@@ -157,6 +157,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
   const [validationTrigger, setValidationTrigger] = useState(0)
+  const [focusedInput, setFocusedInput] = useState<string | null>(null)
   const [editSetsByExerciseId, setEditSetsByExerciseId] = useState<Record<string, boolean>>({})
   const [addHoldProgress, setAddHoldProgress] = useState(0)
   const addHoldTimeoutRef = useRef<number | null>(null)
@@ -641,6 +642,26 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         : syncState === "pending" || syncState === "error"
           ? "Not synced"
           : "Saved locally"
+
+  const totalVolume = exercises.reduce((sum: number, exercise: any) => {
+    const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+    const volume = sets.reduce((acc: number, set: any) => {
+      if (!set?.completed) return acc
+      if (typeof set.weight !== "number" || typeof set.reps !== "number") return acc
+      return acc + set.weight * set.reps
+    }, 0)
+    return sum + volume
+  }, 0)
+
+  const totalSetsCompleted = exercises.reduce((sum: number, exercise: any) => {
+    const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+    return sum + sets.filter((set: any) => set?.completed).length
+  }, 0)
+
+  const totalSets = exercises.reduce((sum: number, exercise: any) => {
+    const count = typeof exercise?.targetSets === "number" ? exercise.targetSets : exercise?.sets?.length ?? 0
+    return sum + count
+  }, 0)
 
   const formatSeconds = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -1707,7 +1728,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               className="transition-all duration-200"
               style={{
                 background: showPlateCalc ? "rgba(255, 255, 255, 0.04)" : "transparent",
-                border: `1px solid rgba(255, 255, 255, ${showPlateCalc ? "0.12" : "0.06"})`,
+                border: "none",
                 borderRadius: "2px",
                 padding: "2px 6px",
               }}
@@ -1834,9 +1855,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       className="w-full transition-all duration-200"
                       style={{
                         background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
-                        border: `1px solid rgba(255, 255, 255, ${
-                          showMissing && missingWeight && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
-                        })`,
+                        border: "none",
                         borderRadius: "2px",
                         padding: isCompactCompleted
                           ? isResting
@@ -1929,9 +1948,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       className="w-full transition-all duration-200"
                       style={{
                         background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
-                        border: `1px solid rgba(255, 255, 255, ${
-                          (repCapError || (showMissing && missingReps)) && !set.completed ? "0.25" : set.completed ? "0.06" : "0.1"
-                        })`,
+                        border: "none",
                         borderRadius: "2px",
                         padding: isCompactCompleted
                           ? isResting
@@ -2000,7 +2017,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         width: "28px",
                         height: "28px",
                         background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
-                        border: `1px solid rgba(255, 255, 255, ${set.completed ? "0.2" : "0.08"})`,
+                        border: "none",
                         borderRadius: "2px",
                         opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
                       }}
@@ -2041,7 +2058,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           fontWeight: comparison?.status === "pr" ? 600 : 400,
                           color:
                             comparison?.status === "pr"
-                              ? "rgba(255, 87, 51, 0.9)"
+                              ? "rgba(255, 255, 255, 0.9)"
                               : comparison?.status === "progressed"
                                 ? "rgba(255, 255, 255, 0.5)"
                                 : comparison?.status === "recovery"
@@ -2067,7 +2084,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           className="transition-all duration-200"
                           style={{
                             background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.04)" : "transparent",
-                            border: `1px solid rgba(255, 255, 255, ${plateDisplayMode === "per-side" ? "0.12" : "0.06"})`,
+                            border: "none",
                             borderRadius: "2px",
                             padding: "3px 6px",
                           }}
@@ -2090,7 +2107,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           className="transition-all duration-200"
                           style={{
                             background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.04)" : "transparent",
-                            border: `1px solid rgba(255, 255, 255, ${plateDisplayMode === "total" ? "0.12" : "0.06"})`,
+                            border: "none",
                             borderRadius: "2px",
                             padding: "3px 6px",
                           }}
@@ -2128,7 +2145,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           style={{
                             width: isCompactSets ? "40px" : "48px",
                             background: "rgba(255, 255, 255, 0.04)",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            border: "none",
                             borderRadius: "2px",
                             padding: "2px 6px",
                             fontSize: isCompactSets ? "14px" : "16px",
@@ -2377,147 +2394,154 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   return (
     <div
-      className="flex flex-col"
+      className="flex flex-col relative overflow-hidden"
       style={{
         height: "100dvh",
         background: "#0D0D0F",
-        boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
-        position: "relative",
-        paddingLeft: "20px",
-        paddingRight: "20px",
-        paddingTop: "20px",
       }}
     >
-      {recentlySaved && (
+      <div className="relative z-10" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
+        {isResting && (
+          <div
+            className="absolute left-5 right-5 transition-all duration-200"
+            style={{
+              top: "0px",
+              marginLeft: "-24px",
+              marginRight: "-24px",
+              background: "rgba(10, 10, 12, 0.95)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "2px",
+              padding: "12px 16px",
+              backdropFilter: "blur(20px)",
+              zIndex: 20,
+            }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div
+                  className="text-white/50"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  REST
+                </div>
+                <div
+                  className="text-white/95"
+                  style={{
+                    fontSize: "32px",
+                    fontWeight: 400,
+                    letterSpacing: "-0.03em",
+                    fontVariantNumeric: "tabular-nums",
+                    fontFamily: "'Bebas Neue', sans-serif",
+                  }}
+                >
+                  {formatSeconds(restRemainingSeconds)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!isResting || !restState) return
+                    const next = restRemainingSeconds + 30
+                    void setRestStateAndPersist({
+                      ...restState,
+                      remainingSeconds: next,
+                    })
+                    scheduleRestNotification(next)
+                  }}
+                  className="transition-colors duration-150 hover:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "none",
+                    borderRadius: "2px",
+                    padding: "8px 12px",
+                  }}
+                  type="button"
+                >
+                  <span className="text-white/90" style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.04em" }}>
+                    +30s
+                  </span>
+                </button>
+                <button
+                  onClick={() => void setRestStateAndPersist(null)}
+                  className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "none",
+                    borderRadius: "2px",
+                    padding: "8px 18px",
+                  }}
+                  type="button"
+                >
+                  <span className="text-white/95" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em" }}>
+                    SKIP
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
-          className="flex items-center gap-1.5"
+          className="flex-shrink-0 pt-2 pb-2"
           style={{
-            position: "absolute",
-            top: "16px",
-            right: "20px",
+            paddingBottom: "12px",
+            marginTop: isResting ? "64px" : "0px",
+            transition: "margin-top 0.2s ease",
           }}
         >
-          <div
-            style={{
-              width: "4px",
-              height: "4px",
-              borderRadius: "50%",
-              background: "rgba(80, 200, 120, 0.6)",
-              animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-            }}
-          />
-          <span
-            style={{
-              fontSize: "7px",
-              fontWeight: 400,
-              letterSpacing: "0.08em",
-              color: "rgba(80, 200, 120, 0.6)",
-              fontFamily: "'Archivo Narrow', sans-serif",
-            }}
-          >
-            AUTO-SAVED
-          </span>
-        </div>
-      )}
-      <div
-        className="absolute left-5 right-5"
-        style={{
-          top: "0px",
-          marginLeft: "-24px",
-          marginRight: "-24px",
-          background: "rgba(10, 10, 12, 0.92)",
-          border: "1px solid rgba(255, 87, 51, 0.3)",
-          borderRadius: "6px",
-          padding: "8px 12px",
-          backdropFilter: "blur(12px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          zIndex: 20,
-          opacity: isResting ? 1 : 0,
-          transform: isResting ? "translateY(0)" : "translateY(-8px)",
-          transition: "opacity 0.3s ease, transform 0.3s ease",
-          pointerEvents: isResting ? "auto" : "none",
-        }}
-        aria-hidden={!isResting}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="text-white/40"
-            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
-          >
-            REST
-          </div>
-          <div
-            className="text-white/90"
-            style={{
-              fontSize: "28px",
-              fontWeight: 400,
-              letterSpacing: "-0.03em",
-              fontVariantNumeric: "tabular-nums",
-              fontFamily: "'Bebas Neue', sans-serif",
-            }}
-          >
-            {formatSeconds(restRemainingSeconds)}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              if (!isResting || !restState) return
-              const next = restRemainingSeconds + 30
-              void setRestStateAndPersist({
-                ...restState,
-                remainingSeconds: next,
-              })
-              scheduleRestNotification(next)
-            }}
-            className="transition-all duration-200"
-            style={{
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              borderRadius: "2px",
-              padding: "6px 10px",
-            }}
-            type="button"
-          >
-            <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "0.04em" }}>
-              +30s
-            </span>
-          </button>
-          <button
-            onClick={() => void setRestStateAndPersist(null)}
-            className="transition-all duration-200"
-            style={{
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              borderRadius: "2px",
-              padding: "6px 16px",
-            }}
-            type="button"
-          >
-            <span className="text-white/90" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.04em" }}>
-              Skip
-            </span>
-          </button>
-        </div>
-      </div>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
+              <ArrowLeft size={18} strokeWidth={1.5} />
+            </button>
 
-      <div
-        className="flex-shrink-0 pt-2 pb-2"
-        style={{
-          paddingBottom: "12px",
-          marginTop: isResting ? "48px" : "0px",
-          transition: "margin-top 0.3s ease",
-        }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
-            <ArrowLeft size={16} strokeWidth={1.5} />
-          </button>
+            <div className="flex items-center gap-3 flex-1 justify-center">
+              <div className="text-center">
+                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
+                  VOLUME
+                </div>
+                <div
+                  className="text-white/70"
+                  style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                >
+                  {Math.round(totalVolume).toLocaleString()}
+                </div>
+              </div>
 
-          <div className="flex items-center justify-center gap-1.5 flex-1">
+              <div style={{ width: "1px", height: "20px", background: "rgba(255, 255, 255, 0.06)" }} />
+
+              <div className="text-center">
+                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
+                  SETS
+                </div>
+                <div
+                  className="text-white/70"
+                  style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                >
+                  {totalSetsCompleted}/{totalSets}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (!allExercisesCompleted) return
+                void finishWorkout()
+              }}
+              className="transition-colors"
+              style={{
+                fontSize: "9px",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                color: allExercisesCompleted ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.25)",
+              }}
+              type="button"
+              disabled={!allExercisesCompleted}
+            >
+              FINISH
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-1.5 mb-4">
             {exercises.map((exercise, index) => {
               const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
               const isCurrent = index === uiExerciseIndex
@@ -2525,99 +2549,504 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 <button
                   key={exercise.id}
                   onClick={() => void setExerciseIndex(index)}
-                  className="relative"
+                  className="transition-all duration-200"
                   style={{
-                    width: isCurrent ? "16px" : "4px",
-                    height: "4px",
+                    width: isCurrent ? "20px" : "5px",
+                    height: "5px",
                     background: isCurrent
-                      ? "rgba(255, 255, 255, 0.4)"
+                      ? "rgba(255, 255, 255, 0.5)"
                       : isComplete
-                        ? "rgba(255, 255, 255, 0.25)"
-                        : "rgba(255, 255, 255, 0.12)",
-                    borderRadius: "2px",
-                    transition: "all 0.3s ease",
+                        ? "rgba(255, 255, 255, 0.3)"
+                        : "rgba(255, 255, 255, 0.1)",
+                    borderRadius: "3px",
                   }}
                   type="button"
-                >
-                  {isComplete && !isCurrent && (
-                    <div className="absolute inset-0 flex items-center justify-center" style={{ transform: "scale(0.6)" }}>
-                      <Check size={4} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                    </div>
-                  )}
-                </button>
+                />
               )
             })}
           </div>
 
-          <div className="flex items-center gap-2">
-            {(syncState === "error" || syncState === "pending") && (
-              <button
-                onClick={retryWorkoutSync}
-                className="text-white/40 hover:text-white/70 transition-colors"
-                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em" }}
-                type="button"
-              >
-                Retry
-              </button>
-            )}
-            <button
-              onClick={() => {
-                if (!allExercisesCompleted) return
-                void finishWorkout()
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <div
+              style={{
+                height: "1px",
+                background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent)",
+                width: "200px",
               }}
-              className="text-white/50 hover:text-white/80 transition-colors"
-              style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em" }}
-              type="button"
-              disabled={!allExercisesCompleted}
-            >
-              FINISH
-            </button>
+            />
           </div>
         </div>
 
-        <div style={{ marginTop: "12px", display: "flex", justifyContent: "center" }}>
-          <div
-            style={{
-              height: "1px",
-              background: "rgba(255, 255, 255, 0.04)",
-              width: "160px",
-            }}
-          />
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 flex overflow-x-auto overflow-y-hidden"
+          style={{
+            scrollSnapType: "x mandatory",
+            scrollBehavior: "smooth",
+            WebkitOverflowScrolling: "touch",
+            height: "calc(100dvh - 160px)",
+          }}
+        >
+          {exercises.map((exercise: any, exerciseIndex: number) => {
+            const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
+            const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
+            const isCompactSets = showPlateCalc && exercise.sets.length >= 4
+            const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
+
+            return (
+              <div
+                key={exercise.id}
+                style={{
+                  scrollSnapAlign: "start",
+                  width: "100%",
+                  flexShrink: 0,
+                  paddingBottom: "120px",
+                  opacity: exerciseIndex === currentExerciseIndex ? 1 : 0.3,
+                  transition: "opacity 0.2s ease",
+                }}
+              >
+                <div className="mb-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div
+                      className="text-white/30 tracking-widest"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      EXERCISE {exerciseIndex + 1} • {formatSeconds(elapsedSeconds)}
+                    </div>
+                    <button
+                      onClick={() => setShowPlateCalc(!showPlateCalc)}
+                      className="transition-all duration-150"
+                      style={{
+                        background: showPlateCalc ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)",
+                        border: "none",
+                        borderRadius: "2px",
+                        padding: "4px 8px",
+                      }}
+                      type="button"
+                    >
+                      <span
+                        className={showPlateCalc ? "text-white/80" : "text-white/30"}
+                        style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.08em" }}
+                      >
+                        PLATES
+                      </span>
+                    </button>
+                  </div>
+
+                  <h1
+                    className="text-white/95"
+                    style={{
+                      fontSize: "36px",
+                      fontWeight: 400,
+                      letterSpacing: "-0.02em",
+                      lineHeight: "0.95",
+                      fontFamily: "'Bebas Neue', sans-serif",
+                    }}
+                  >
+                    {exercise.name}
+                  </h1>
+
+                  {exercise.targetReps && (
+                    <div
+                      className="text-white/25 mt-2"
+                      style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      TARGET {exercise.targetReps} REPS
+                    </div>
+                  )}
+
+                  <div
+                    className="text-white/20 flex items-center gap-2"
+                    style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif", marginTop: "6px" }}
+                  >
+                    <span>{exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}</span>
+                    <span>•</span>
+                    <span>NOW: SET {activeSetIndex + 1}/{exercise.sets.length}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col" style={{ gap: isCompactSets ? "20px" : "28px" }}>
+                  {exercise.sets.map((set: any, setIndex: number) => {
+                    const setKey = set.id ?? `${exercise.id}-${setIndex}`
+                    const isCurrentSet = exerciseIndex === currentExerciseIndex && setIndex === activeSetIndex
+                    const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
+                    const missingWeight = isMissingWeight(set.weight)
+                    const missingReps = isMissingReps(set.reps)
+                    const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
+                    const plates =
+                      typeof set.weight === "number"
+                        ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
+                        : []
+                    const isPlateSetActive =
+                      exerciseIndex === currentExerciseIndex &&
+                      !set.completed &&
+                      plates.length > 0 &&
+                      (isCurrentSet ||
+                        focusedInput === `${setKey}-weight` ||
+                        focusedInput === `${setKey}-reps`)
+
+                    return (
+                      <div key={setKey}>
+                        <div
+                          className="text-white/30 tracking-widest mb-3"
+                          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                        >
+                          SET {setIndex + 1}
+                        </div>
+
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="flex-1 relative">
+                            <input
+                              type="number"
+                              value={set.weight ?? ""}
+                              onChange={(e) => {
+                                if (!canEditExercise) return
+                                const raw = e.target.value
+                                if (!raw.trim()) {
+                                  void updateSetDataForExercise(exerciseIndex, setIndex, "weight", null)
+                                  return
+                                }
+                                const parsed = parseNumber(raw)
+                                if (parsed === null || parsed < 0) return
+                                void updateSetDataForExercise(exerciseIndex, setIndex, "weight", parsed)
+                              }}
+                              onFocus={(e) => {
+                                if (set.id) handleSetFieldFocus(set.id, "weight")
+                                handleInputAutoSelect(e)
+                                setFocusedInput(`${setKey}-weight`)
+                              }}
+                              onBlur={() => {
+                                if (set.id) handleSetFieldBlur(set.id, "weight")
+                                setFocusedInput(null)
+                              }}
+                              placeholder="—"
+                              className="w-full transition-all duration-150"
+                              disabled={!canEditExercise}
+                              style={{
+                                background: set.completed
+                                  ? "rgba(255, 255, 255, 0.02)"
+                                  : focusedInput === `${setKey}-weight`
+                                    ? "rgba(255, 255, 255, 0.06)"
+                                    : "rgba(255, 255, 255, 0.03)",
+                                border: `1px solid ${
+                                  showMissing && missingWeight
+                                    ? "rgba(255, 255, 255, 0.4)"
+                                    : focusedInput === `${setKey}-weight`
+                                      ? "rgba(255, 255, 255, 0.2)"
+                                      : "transparent"
+                                }`,
+                                borderRadius: "2px",
+                                padding: isCompactSets ? "12px" : "18px",
+                                fontSize: isCompactSets ? "22px" : "28px",
+                                fontWeight: 600,
+                                letterSpacing: "-0.02em",
+                                color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
+                                fontVariantNumeric: "tabular-nums",
+                                outline: "none",
+                                textAlign: "center",
+                              }}
+                            />
+                            <div
+                              className="text-white/25 mt-1.5 text-center transition-colors duration-150"
+                              style={{
+                                fontSize: isCompactSets ? "7px" : "8px",
+                                fontWeight: 500,
+                                letterSpacing: "0.06em",
+                                color: focusedInput === `${setKey}-weight` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
+                              }}
+                            >
+                              LBS
+                            </div>
+                          </div>
+
+                          <div className="flex-1 relative">
+                            <input
+                              type="number"
+                              value={set.reps ?? ""}
+                              onChange={(e) => {
+                                if (!canEditExercise) return
+                                const raw = e.target.value
+                                if (!raw.trim()) {
+                                  setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+                                  void updateSetDataForExercise(exerciseIndex, setIndex, "reps", null)
+                                  return
+                                }
+                                const parsed = parseNumber(raw)
+                                if (parsed === null) return
+                                if (parsed > REP_MAX) {
+                                  setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
+                                  return
+                                }
+                                setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+                                const clamped = Math.max(REP_MIN, parsed)
+                                void updateSetDataForExercise(exerciseIndex, setIndex, "reps", clamped)
+                              }}
+                              onFocus={(e) => {
+                                if (set.id) handleSetFieldFocus(set.id, "reps")
+                                handleInputAutoSelect(e)
+                                setFocusedInput(`${setKey}-reps`)
+                              }}
+                              onBlur={() => {
+                                if (set.id) handleSetFieldBlur(set.id, "reps")
+                                setFocusedInput(null)
+                              }}
+                              placeholder="—"
+                              className="w-full transition-all duration-150"
+                              disabled={!canEditExercise}
+                              style={{
+                                background: set.completed
+                                  ? "rgba(255, 255, 255, 0.02)"
+                                  : focusedInput === `${setKey}-reps`
+                                    ? "rgba(255, 255, 255, 0.06)"
+                                    : "rgba(255, 255, 255, 0.03)",
+                                border: `1px solid ${
+                                  (repCapError || (showMissing && missingReps))
+                                    ? "rgba(255, 255, 255, 0.4)"
+                                    : focusedInput === `${setKey}-reps`
+                                      ? "rgba(255, 255, 255, 0.2)"
+                                      : "transparent"
+                                }`,
+                                borderRadius: "2px",
+                                padding: isCompactSets ? "12px" : "18px",
+                                fontSize: isCompactSets ? "22px" : "28px",
+                                fontWeight: 600,
+                                letterSpacing: "-0.02em",
+                                color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
+                                fontVariantNumeric: "tabular-nums",
+                                outline: "none",
+                                textAlign: "center",
+                              }}
+                            />
+                            <div
+                              className="text-white/25 mt-1.5 text-center transition-colors duration-150"
+                              style={{
+                                fontSize: isCompactSets ? "7px" : "8px",
+                                fontWeight: 500,
+                                letterSpacing: "0.06em",
+                                color: focusedInput === `${setKey}-reps` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
+                              }}
+                            >
+                              REPS
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-center">
+                            <button
+                              onClick={() => {
+                                if (!canEditExercise) return
+                                if (!set.completed && (isSetIncomplete(set) || repCapError)) {
+                                  setValidationTrigger(Date.now())
+                                  return
+                                }
+                                void completeSet(setIndex, { exerciseIndex, startRest: isCurrentSet })
+                              }}
+                              disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
+                              className="flex items-center justify-center transition-all duration-150"
+                              style={{
+                                width: "36px",
+                                height: "36px",
+                                background: set.completed
+                                  ? "rgba(255, 255, 255, 0.08)"
+                                  : "rgba(255, 255, 255, 0.03)",
+                                border: "none",
+                                borderRadius: "2px",
+                                opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
+                              }}
+                              type="button"
+                            >
+                              {set.completed ? (
+                                <Check size={16} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.8)" }} />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: "12px",
+                                    height: "12px",
+                                    borderRadius: "1px",
+                                    border: "1px solid rgba(255, 255, 255, 0.35)",
+                                    background: "transparent",
+                                    boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.05)",
+                                  }}
+                                />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {(repCapError || showMissing) && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle size={10} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
+                              <div style={{ fontSize: "9px", fontWeight: 400, color: "rgba(255, 255, 255, 0.3)" }}>
+                                {repCapError && `Reps cannot exceed ${REP_MAX}`}
+                                {!repCapError && missingWeight && "Enter weight"}
+                                {!repCapError && !missingWeight && missingReps && "Enter reps"}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {showPlateCalc && isPlateSetActive && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2 mb-3">
+                              <button
+                                className="transition-colors duration-150"
+                              style={{
+                                  background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.03)",
+                                  border: "none",
+                                  borderRadius: "2px",
+                                  padding: "4px 8px",
+                                }}
+                                onClick={() => {
+                                  setPlateDisplayMode("per-side")
+                                  if (currentExercise?.name) {
+                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, "per-side")
+                                  }
+                                }}
+                                type="button"
+                              >
+                                <span
+                                  className={plateDisplayMode === "per-side" ? "text-white/80" : "text-white/30"}
+                                  style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
+                                >
+                                  PER SIDE
+                                </span>
+                              </button>
+                              <button
+                                className="transition-colors duration-150"
+                              style={{
+                                  background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.03)",
+                                  border: "none",
+                                  borderRadius: "2px",
+                                  padding: "4px 8px",
+                                }}
+                                onClick={() => {
+                                  setPlateDisplayMode("total")
+                                  if (currentExercise?.name) {
+                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, "total")
+                                  }
+                                }}
+                                type="button"
+                              >
+                                <span
+                                  className={plateDisplayMode === "total" ? "text-white/80" : "text-white/30"}
+                                  style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
+                                >
+                                  TOTAL
+                                </span>
+                              </button>
+                              <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                                BAR
+                              </span>
+                              <input
+                                type="number"
+                                value={plateStartingWeight || ""}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value)
+                                  const nextValue = Number.isNaN(value) ? 0 : Math.max(0, value)
+                                  setPlateStartingWeight(nextValue)
+                                  if (currentExercise?.name) {
+                                    localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
+                                  }
+                                }}
+                                onFocus={handleInputAutoSelect}
+                                className="transition-colors duration-150"
+                                style={{
+                                  width: "52px",
+                                  background: "rgba(255, 255, 255, 0.04)",
+                                  border: "none",
+                                  borderRadius: "2px",
+                                  padding: "4px 8px",
+                                  fontSize: "13px",
+                                  color: "rgba(255, 255, 255, 0.8)",
+                                  fontVariantNumeric: "tabular-nums",
+                                  fontWeight: 600,
+                                  textAlign: "center",
+                                }}
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 mb-3">
+                              {plates.map((plate, plateIndex) => (
+                                <div key={plateIndex} className="flex items-center gap-1">
+                                  {Array.from({ length: plate.count }).map((_, countIndex) => {
+                                    const getPlateColor = () => {
+                                      if (plate.plate === 45) return "rgba(180, 60, 60, 0.6)"
+                                      if (plate.plate === 35) return "rgba(60, 100, 180, 0.6)"
+                                      if (plate.plate === 25) return "rgba(60, 160, 100, 0.6)"
+                                      if (plate.plate === 10) return "rgba(200, 160, 70, 0.6)"
+                                      if (plate.plate === 5) return "rgba(200, 200, 200, 0.6)"
+                                      return "rgba(100, 100, 100, 0.6)"
+                                    }
+
+                                    const getPlateHeight = () => {
+                                      if (plate.plate === 45) return 40
+                                      if (plate.plate === 35) return 34
+                                      if (plate.plate === 25) return 28
+                                      if (plate.plate === 10) return 20
+                                      if (plate.plate === 5) return 16
+                                      return 12
+                                    }
+
+                                    return (
+                                      <div
+                                        key={countIndex}
+                                        style={{
+                                          width: "7px",
+                                          height: `${getPlateHeight()}px`,
+                                          background: getPlateColor(),
+                                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                                          borderRadius: "1px",
+                                        }}
+                                      />
+                                    )
+                                  })}
+                                </div>
+                              ))}
+                              <div
+                                style={{
+                                  width: "40px",
+                                  height: "5px",
+                                  background: "rgba(160, 160, 160, 0.4)",
+                                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                                  borderRadius: "1px",
+                                  marginLeft: "4px",
+                                }}
+                              />
+                            </div>
+
+                            <div
+                              className="text-white/30"
+                              style={{ fontSize: "8px", fontWeight: 500, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}
+                            >
+                              {plates.map((plate, plateIndex) => (
+                                <span key={plateIndex}>
+                                  {plateIndex > 0 && " + "}
+                                  {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
+                                </span>
+                              ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
-
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 flex overflow-x-auto overflow-y-hidden"
-        style={{
-          scrollSnapType: "x mandatory",
-          scrollBehavior: "smooth",
-          WebkitOverflowScrolling: "touch",
-          overflowY: "hidden",
-        }}
-      >
-        {exercises.map((exercise, index) => (
-          <div
-            key={exercise.id}
-            style={{
-              scrollSnapAlign: "start",
-              width: "100%",
-              flexShrink: 0,
-              overflowY: "hidden",
-            }}
-          >
-            {renderExerciseContent(exercise, index)}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex-shrink-0" style={{ height: 0 }} />
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        input[type="number"] {
+          -moz-appearance: textfield;
         }
       `}</style>
     </div>
