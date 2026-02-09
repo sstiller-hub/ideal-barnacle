@@ -32,54 +32,103 @@ export function AktIcon({ size = 28, opacity = 1, className = "" }: AktIconProps
         fill="url(#akt-dark-bg)" 
       />
       
-      {/* Training cycle rings - inspired by activity tracking but adapted for strength */}
-      {/* Outer ring - Volume progression */}
-      <circle
-        cx="32"
-        cy="32"
-        r="22"
-        fill="none"
+      {/* A-shaped design using angular strokes */}
+      
+      {/* Left diagonal stroke (outer) */}
+      <path
+        d="M 20 48 L 28 18"
         stroke="#E5E5E5"
-        strokeWidth="2.5"
+        strokeWidth="3.5"
         strokeLinecap="round"
-        strokeDasharray="138.23 138.23"
-        strokeDashoffset="24"
         opacity="0.95"
       />
       
-      {/* Middle ring - Intensity */}
-      <circle
-        cx="32"
-        cy="32"
-        r="16"
-        fill="none"
+      {/* Left diagonal stroke (middle) */}
+      <path
+        d="M 22 48 L 29.5 20"
         stroke="#C0C0C0"
         strokeWidth="2.5"
         strokeLinecap="round"
-        strokeDasharray="100.53 100.53"
-        strokeDashoffset="15"
         opacity="0.85"
       />
       
-      {/* Inner ring - Frequency */}
-      <circle
-        cx="32"
-        cy="32"
-        r="10"
-        fill="none"
+      {/* Left diagonal stroke (inner) */}
+      <path
+        d="M 24 48 L 31 22"
         stroke="#8A8A8A"
-        strokeWidth="2.5"
+        strokeWidth="1.5"
         strokeLinecap="round"
-        strokeDasharray="62.83 62.83"
-        strokeDashoffset="8"
         opacity="0.75"
       />
       
-      {/* Center dot - Current session/focus point */}
+      {/* Right diagonal stroke (outer) */}
+      <path
+        d="M 44 48 L 36 18"
+        stroke="#E5E5E5"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        opacity="0.95"
+      />
+      
+      {/* Right diagonal stroke (middle) */}
+      <path
+        d="M 42 48 L 34.5 20"
+        stroke="#C0C0C0"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      
+      {/* Right diagonal stroke (inner) */}
+      <path
+        d="M 40 48 L 33 22"
+        stroke="#8A8A8A"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.75"
+      />
+      
+      {/* Crossbar (outer) */}
+      <line
+        x1="24"
+        y1="36"
+        x2="40"
+        y2="36"
+        stroke="#E5E5E5"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        opacity="0.95"
+      />
+      
+      {/* Crossbar (middle) */}
+      <line
+        x1="24.5"
+        y1="34.5"
+        x2="39.5"
+        y2="34.5"
+        stroke="#C0C0C0"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      
+      {/* Crossbar (inner) */}
+      <line
+        x1="25"
+        y1="33"
+        x2="39"
+        y2="33"
+        stroke="#8A8A8A"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.75"
+      />
+      
+      {/* Peak dot */}
       <circle
         cx="32"
-        cy="32"
-        r="3"
+        cy="18"
+        r="2.5"
         fill="#FFFFFF"
         opacity="0.9"
       />

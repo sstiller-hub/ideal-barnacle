@@ -2,14 +2,15 @@
 
 ## Updated Icons
 
-The Akt app icon has been updated with a new design inspired by activity tracking rings but adapted for the Akt greyscale aesthetic.
+The Akt app icon has been updated with a new design that forms the letter "A" using layered strokes in the Akt greyscale aesthetic.
 
 ### Design Concept
-- **Three concentric rings** representing Volume (outer), Intensity (middle), and Frequency (inner)
-- **Activity ring-inspired gaps** showing cyclical training progression
+- **A-shaped letterform** created from diagonal strokes and crossbar
+- **Three layered strokes** representing Volume (outer), Intensity (middle), and Frequency (inner)
 - **Fully greyscale** with light to dark gradient maintaining A24-inspired aesthetic
-- **Center dot** representing current session focus point
+- **Peak dot** at the apex representing focus and precision
 - **Matte dark background** (#12121A to #0D0D0F)
+- **Angular, brutalist geometry** consistent with Akt's design philosophy
 
 ## Files Updated
 
