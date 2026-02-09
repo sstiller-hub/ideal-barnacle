@@ -95,6 +95,14 @@ function normalizeExerciseName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ")
 }
 
+function getExerciseLabel(name: string): string {
+  const lower = name.trim().toLowerCase()
+  if (lower === "leg extension (light)") {
+    return "Single-Leg Leg Extension"
+  }
+  return name
+}
+
 function getRecentPerformanceSnapshots(
   exerciseName: string,
   history: any[],
@@ -1748,7 +1756,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             className="text-white/95"
             style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: "1", fontFamily: "'Bebas Neue', sans-serif" }}
           >
-            {exercise.name}
+            {getExerciseLabel(exercise.name)}
           </h1>
 
           {exercise.targetReps && (
@@ -2083,47 +2091,25 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         <button
                           className="transition-all duration-200"
                           style={{
-                            background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.04)" : "transparent",
+                            background: "rgba(255, 255, 255, 0.04)",
                             border: "none",
                             borderRadius: "2px",
                             padding: "3px 6px",
                           }}
                           onClick={() => {
-                            setPlateDisplayMode("per-side")
+                            const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
+                            setPlateDisplayMode(nextMode)
                             if (currentExercise?.name) {
-                              localStorage.setItem(`plate_mode_${currentExercise.name}`, "per-side")
+                              localStorage.setItem(`plate_mode_${currentExercise.name}`, nextMode)
                             }
                           }}
                           type="button"
                         >
                           <span
-                            className={plateDisplayMode === "per-side" ? "text-white/70" : "text-white/30"}
+                            className="text-white/70"
                             style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}
                           >
-                            PER SIDE
-                          </span>
-                        </button>
-                        <button
-                          className="transition-all duration-200"
-                          style={{
-                            background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.04)" : "transparent",
-                            border: "none",
-                            borderRadius: "2px",
-                            padding: "3px 6px",
-                          }}
-                          onClick={() => {
-                            setPlateDisplayMode("total")
-                            if (currentExercise?.name) {
-                              localStorage.setItem(`plate_mode_${currentExercise.name}`, "total")
-                            }
-                          }}
-                          type="button"
-                        >
-                          <span
-                            className={plateDisplayMode === "total" ? "text-white/70" : "text-white/30"}
-                            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}
-                          >
-                            TOTAL
+                            {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
                           </span>
                         </button>
                         <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
@@ -2644,7 +2630,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       fontFamily: "'Bebas Neue', sans-serif",
                     }}
                   >
-                    {exercise.name}
+                    {getExerciseLabel(exercise.name)}
                   </h1>
 
                   {exercise.targetReps && (
@@ -2669,11 +2655,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 <div className="flex flex-col" style={{ gap: isCompactSets ? "20px" : "28px" }}>
                   {exercise.sets.map((set: any, setIndex: number) => {
                     const setKey = set.id ?? `${exercise.id}-${setIndex}`
-                    const isCurrentSet = exerciseIndex === currentExerciseIndex && setIndex === activeSetIndex
+                    const isActiveExercise = exerciseIndex === currentExerciseIndex
+                    const isCurrentSet = isActiveExercise && setIndex === activeSetIndex
+                    const isCompactCompleted = isActiveExercise && set.completed
                     const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
                     const missingWeight = isMissingWeight(set.weight)
                     const missingReps = isMissingReps(set.reps)
                     const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
+                    const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, session?.id)
+                    const comparison = getSetComparison(set, lastSet)
                     const plates =
                       typeof set.weight === "number"
                         ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
@@ -2737,8 +2727,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                       : "transparent"
                                 }`,
                                 borderRadius: "2px",
-                                padding: isCompactSets ? "12px" : "18px",
-                                fontSize: isCompactSets ? "22px" : "28px",
+                                padding: isCompactCompleted ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "12px" : "18px",
+                                fontSize: isCompactCompleted ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "22px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2750,7 +2740,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                             <div
                               className="text-white/25 mt-1.5 text-center transition-colors duration-150"
                               style={{
-                                fontSize: isCompactSets ? "7px" : "8px",
+                                fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
                                 color: focusedInput === `${setKey}-weight` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
@@ -2808,8 +2798,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                       : "transparent"
                                 }`,
                                 borderRadius: "2px",
-                                padding: isCompactSets ? "12px" : "18px",
-                                fontSize: isCompactSets ? "22px" : "28px",
+                                padding: isCompactCompleted ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "12px" : "18px",
+                                fontSize: isCompactCompleted ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "22px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2821,7 +2811,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                             <div
                               className="text-white/25 mt-1.5 text-center transition-colors duration-150"
                               style={{
-                                fontSize: isCompactSets ? "7px" : "8px",
+                                fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
                                 color: focusedInput === `${setKey}-reps` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
@@ -2887,53 +2877,62 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           </div>
                         )}
 
+                        {isActiveExercise && lastSet && typeof set.weight === "number" && typeof set.reps === "number" && (
+                          <div className="flex items-center gap-2 mb-3" style={{ marginBottom: isCompactSets ? "8px" : "12px" }}>
+                            <div
+                              className="text-white/20"
+                              style={{ fontSize: isCompactSets ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                            >
+                              Last: {lastSet.weight} × {lastSet.reps}
+                            </div>
+                            {comparison?.status !== "no-history" && (
+                              <div
+                                className="flex items-center gap-1.5"
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: comparison?.status === "pr" ? 600 : 400,
+                                  color:
+                                    comparison?.status === "pr"
+                                      ? "rgba(255, 255, 255, 0.9)"
+                                      : comparison?.status === "progressed"
+                                        ? "rgba(255, 255, 255, 0.5)"
+                                        : comparison?.status === "recovery"
+                                          ? "rgba(255, 255, 255, 0.25)"
+                                          : "rgba(255, 255, 255, 0.3)",
+                                  letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
+                                }}
+                              >
+                                {comparison?.message}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {showPlateCalc && isPlateSetActive && (
                           <div className="mb-3">
                             <div className="flex items-center gap-2 mb-3">
                               <button
                                 className="transition-colors duration-150"
-                              style={{
-                                  background: plateDisplayMode === "per-side" ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.03)",
+                                style={{
+                                  background: "rgba(255, 255, 255, 0.08)",
                                   border: "none",
                                   borderRadius: "2px",
                                   padding: "4px 8px",
                                 }}
                                 onClick={() => {
-                                  setPlateDisplayMode("per-side")
+                                  const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
+                                  setPlateDisplayMode(nextMode)
                                   if (currentExercise?.name) {
-                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, "per-side")
+                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, nextMode)
                                   }
                                 }}
                                 type="button"
                               >
                                 <span
-                                  className={plateDisplayMode === "per-side" ? "text-white/80" : "text-white/30"}
+                                  className="text-white/80"
                                   style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
                                 >
-                                  PER SIDE
-                                </span>
-                              </button>
-                              <button
-                                className="transition-colors duration-150"
-                              style={{
-                                  background: plateDisplayMode === "total" ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.03)",
-                                  border: "none",
-                                  borderRadius: "2px",
-                                  padding: "4px 8px",
-                                }}
-                                onClick={() => {
-                                  setPlateDisplayMode("total")
-                                  if (currentExercise?.name) {
-                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, "total")
-                                  }
-                                }}
-                                type="button"
-                              >
-                                <span
-                                  className={plateDisplayMode === "total" ? "text-white/80" : "text-white/30"}
-                                  style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
-                                >
-                                  TOTAL
+                                  {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
                                 </span>
                               </button>
                               <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>

@@ -40,7 +40,7 @@ import {
 import { deriveWorkoutType } from "@/lib/workout-type"
 import { computeWeekOverWeek } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
-import { isSetEligibleForStats } from "@/lib/set-validation"
+import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
 import { getPrExcludedExercises } from "@/lib/pr-exclusions"
 import {
   ArrowDown,
@@ -727,12 +727,35 @@ export default function Home() {
 
   const workoutOptions = routinePool.map((routine) => ({ id: routine.id, name: routine.name }))
 
+  const getExerciseLabel = (name: string) => {
+    const lower = name.trim().toLowerCase()
+    if (lower === "leg extension (light)") {
+      return "Single-Leg Leg Extension"
+    }
+    return name
+  }
+
   const selectedTitle = actualState === "activeSession" ? activeWorkoutType : scheduledWorkoutType
   const displayExercises =
     actualState === "activeSession" && session?.exercises
       ? session.exercises
       : workoutForDate?.exercises || scheduledRoutine?.exercises
   const isCompactExerciseList = (displayExercises?.length ?? 0) >= 9
+  const activeSessionProgress = useMemo(() => {
+    if (!session?.exercises) return null
+    let totalSets = 0
+    let remainingSets = 0
+    session.exercises.forEach((exercise: any) => {
+      const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+      totalSets += sets.length
+      sets.forEach((set: any) => {
+        if (!set?.completed || isSetIncomplete(set)) {
+          remainingSets += 1
+        }
+      })
+    })
+    return { totalSets, remainingSets }
+  }, [session?.exercises])
 
   return (
     <>
@@ -834,6 +857,14 @@ export default function Home() {
                   >
                     IN PROGRESS
                   </span>
+                  {activeSessionProgress && (
+                    <span
+                      className="text-white/30"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      • {activeSessionProgress.remainingSets} SETS REMAINING
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -1249,7 +1280,7 @@ export default function Home() {
                         letterSpacing: "0.005em",
                       }}
                     >
-                      {exercise.name}
+                      {getExerciseLabel(exercise.name)}
                     </div>
                     <div
                       className="text-white/30"
@@ -1304,7 +1335,7 @@ export default function Home() {
                       letterSpacing: "0.005em",
                     }}
                   >
-                    {exercise.name}
+                    {getExerciseLabel(exercise.name)}
                   </div>
                   <div
                     className="text-white/30"
