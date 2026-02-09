@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
@@ -331,6 +332,14 @@ export default function WorkoutSummaryPage() {
     month: "short",
     day: "numeric",
   })
+  const fullDateLabel = new Date(performedAt).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 
   const deltaLabel =
     summary.baselineTotalVolume > 0
@@ -340,19 +349,33 @@ export default function WorkoutSummaryPage() {
       : "Baseline set"
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="text-3xl font-bold text-foreground">Workout Complete</h1>
-          <p className="text-sm text-muted-foreground">
-            {workout.name} • {dateLabel}
-          </p>
+    <div className="min-h-screen bg-background pb-20">
+      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
+            <span className="text-xl">‹</span>
+          </Button>
+          <div>
+            <p className="text-xs text-muted-foreground">Workout Complete</p>
+            <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
+            <p className="text-xs text-muted-foreground">{fullDateLabel}</p>
+          </div>
         </div>
+      </div>
 
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-          <div className="text-sm text-muted-foreground uppercase tracking-wide">Total Volume</div>
-          <div className="text-4xl font-bold text-foreground tabular-nums">
-            {summary.totalVolume.toLocaleString()} lbs
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <Card className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</div>
+              <div className="text-3xl font-bold text-foreground tabular-nums">
+                {summary.totalVolume.toLocaleString()} lbs
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">Workout date</div>
+              <div className="text-sm font-medium text-foreground">{dateLabel}</div>
+            </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span
@@ -366,28 +389,51 @@ export default function WorkoutSummaryPage() {
             </span>
             {summary.baselineTotalVolume > 0 && <span>vs last time</span>}
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
-            <span>{summary.exercisesCount} exercises</span>
-            <span>{summary.totalValidSets} sets</span>
-            <span>{summary.prCount} PRs</span>
+          <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
+            <div>
+              <div className="text-lg font-semibold text-foreground">{summary.exercisesCount}</div>
+              <div>Exercises</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-foreground">{summary.totalValidSets}</div>
+              <div>Sets</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-foreground">{summary.prCount}</div>
+              <div>PRs</div>
+            </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
-            Improved on {summary.improvedCount}/{summary.nonWarmupExerciseCount} exercises
-          </span>
-          {summary.biggestJump && (
+        <Card className="p-4 space-y-3">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Performance</div>
+          <div className="flex flex-wrap gap-2">
             <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
-              Biggest jump: {summary.biggestJump.name} +{Math.round(summary.biggestJump.delta).toLocaleString()} lb
+              Improved on {summary.improvedCount}/{summary.nonWarmupExerciseCount} exercises
             </span>
-          )}
-          {summary.excludedSets > 0 && (
-            <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-1 rounded-full">
-              ⚠️ {summary.excludedSets} sets excluded
-            </span>
-          )}
-        </div>
+            {summary.biggestJump && (
+              <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
+                Biggest jump: {summary.biggestJump.name} +{Math.round(summary.biggestJump.delta).toLocaleString()} lb
+              </span>
+            )}
+            {summary.excludedSets > 0 && (
+              <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-1 rounded-full">
+                ⚠️ {summary.excludedSets} sets excluded
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => router.push(`/history/${workout.id}`)}>
+              View workout details
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/history")}>
+              All workouts
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/workout")}>
+              Start another workout
+            </Button>
+          </div>
+        </Card>
 
         <div className="space-y-3">
           {summary.exerciseSummaries.map(
@@ -399,16 +445,21 @@ export default function WorkoutSummaryPage() {
                   ? `${volumeDelta >= 0 ? "+" : ""}${Math.round(volumeDelta).toLocaleString()} lb`
                   : null
 
-            return (
-                <div
+              return (
+                <Card
                   key={exercise.id}
-                  className={`bg-card border border-border rounded-2xl p-4 space-y-3 ${
-                    isWarmup ? "opacity-75" : ""
-                  }`}
+                  className={`p-4 space-y-3 ${isWarmup ? "opacity-75" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-base font-semibold text-foreground">{exercise.name}</div>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                        className="text-base font-semibold text-foreground hover:underline"
+                      >
+                        {exercise.name}
+                      </button>
+                      <p className="text-xs text-muted-foreground">Exercise history</p>
                     </div>
                     {!isWarmup && visibleBadges.length > 0 && (
                       <div className="flex flex-wrap gap-2 justify-end">
@@ -453,7 +504,7 @@ export default function WorkoutSummaryPage() {
                       </span>
                     )}
                   </div>
-                </div>
+                </Card>
               )
             },
           )}

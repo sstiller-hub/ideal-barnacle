@@ -418,11 +418,18 @@ export default function Home() {
 
     sortedHistory.forEach((workout) => {
       workout.exercises.forEach((exercise) => {
-        const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0)
+        const completedSets = exercise.sets.filter((s: any) => s.completed && s.weight > 0 && s.reps > 0)
         completedSets.forEach((set: any) => {
           const key = normalizeExerciseName(exercise.name)
           const existing = prByExerciseName.get(key)
-          if (!existing || set.weight > existing.weight) {
+          const existingTime = existing?.achievedAt ? new Date(existing.achievedAt).getTime() : 0
+          const currentTime = workout.date ? new Date(workout.date).getTime() : 0
+          const shouldReplace =
+            !existing ||
+            set.weight > existing.weight ||
+            (set.weight === existing.weight && set.reps > existing.reps) ||
+            (set.weight === existing.weight && set.reps === existing.reps && currentTime > existingTime)
+          if (shouldReplace) {
             prByExerciseName.set(key, {
               name: exercise.name,
               weight: set.weight,

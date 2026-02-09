@@ -239,8 +239,15 @@ async function commitPayload(payload: { workout: any; sets: WorkoutSetDraft[] },
     body: JSON.stringify(payload),
   })
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw new Error(error?.error || error?.message || "Commit failed")
+    const text = await response.text()
+    let message = `Commit failed (${response.status})`
+    try {
+      const error = JSON.parse(text)
+      message = error?.error || error?.message || message
+    } catch {
+      if (text) message = `${message}: ${text.slice(0, 160)}`
+    }
+    throw new Error(message)
   }
   return response.json().catch(() => ({}))
 }
@@ -326,6 +333,8 @@ export async function runManualSync(options: ManualSyncOptions = {}): Promise<Ma
     const serverMeta = serverMetaMap.get(workoutId)
     const localUpdated = getLocalUpdatedAt(payload)
     const serverUpdated = getServerUpdatedAt(serverMeta)
+    const localCompletedAt = payload.workout.completed_at ?? null
+    const serverCompletedAt = serverMeta?.completed_at ?? null
 
     onProgress?.({
       current: i + 1,
@@ -337,7 +346,9 @@ export async function runManualSync(options: ManualSyncOptions = {}): Promise<Ma
       errors,
     })
 
-    if (serverUpdated !== null && serverUpdated >= localUpdated && !forceOverwrite) {
+    const shouldForceCompletedOverwrite = Boolean(localCompletedAt) && !serverCompletedAt
+
+    if (serverUpdated !== null && serverUpdated >= localUpdated && !forceOverwrite && !shouldForceCompletedOverwrite) {
       conflicts += 1
       results.push({
         workout_id: workoutId,
@@ -403,4 +414,3 @@ export async function runManualSync(options: ManualSyncOptions = {}): Promise<Ma
     results,
   }
 }
-

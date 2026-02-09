@@ -48,8 +48,14 @@ async function postCommit(draft: ActiveWorkoutDraft, token: string) {
   })
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}))
-    const message = payload?.error || payload?.message || "Commit failed"
+    const text = await response.text()
+    let message = `Commit failed (${response.status})`
+    try {
+      const payload = JSON.parse(text)
+      message = payload?.error || payload?.message || message
+    } catch {
+      if (text) message = `${message}: ${text.slice(0, 160)}`
+    }
     throw new Error(message)
   }
 
@@ -155,4 +161,3 @@ export function ensureWorkoutSync() {
   })
   void attemptWorkoutSync()
 }
-
