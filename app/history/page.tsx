@@ -43,7 +43,10 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border">
+      <div
+        className="sticky top-0 z-10"
+        style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+      >
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center gap-4">
             <button
