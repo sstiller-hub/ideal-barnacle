@@ -5,6 +5,8 @@ interface AktTabIconProps {
 }
 
 export function AktTabIcon({ size = 20, active = false, className = "" }: AktTabIconProps) {
+  const activeOpacity = active ? 1 : 0.6;
+  
   return (
     <svg 
       width={size} 
@@ -14,83 +16,107 @@ export function AktTabIcon({ size = 20, active = false, className = "" }: AktTab
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Simplified rings for tab bar - no background */}
+      {/* Simplified barbell for tab bar - no background */}
       
-      {/* Outer ring (Volume) */}
-      <path
-        d="M 32 12
-           A 20 20 0 1 1 47 32
-           A 20 20 0 0 1 32 52
-           A 20 20 0 0 1 17 32
-           A 20 20 0 0 1 26 15"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-        opacity={active ? 0.95 : 0.7}
+      {/* Center bar (barbell) */}
+      <rect
+        x="12"
+        y="30"
+        width="40"
+        height="4"
+        rx="2"
+        fill="currentColor"
+        opacity={activeOpacity * 0.95}
       />
       
-      {/* Middle ring (Intensity) */}
-      <path
-        d="M 32 16
-           A 16 16 0 1 1 43 32
-           A 16 16 0 0 1 32 48
-           A 16 16 0 0 1 21 32
-           A 16 16 0 0 1 27.5 18"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity={active ? 0.85 : 0.6}
+      {/* Left side plates */}
+      <rect
+        x="9"
+        y="22"
+        width="6"
+        height="20"
+        rx="1"
+        fill="currentColor"
+        opacity={activeOpacity * 0.9}
       />
       
-      {/* Inner ring (Frequency) */}
-      <path
-        d="M 32 20
-           A 12 12 0 1 1 39 32
-           A 12 12 0 0 1 32 44
-           A 12 12 0 0 1 25 32
-           A 12 12 0 0 1 29 21.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        fill="none"
-        opacity={active ? 0.75 : 0.5}
+      <rect
+        x="11"
+        y="24"
+        width="4"
+        height="16"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.7}
       />
       
-      {/* Vertical stem on the right to complete lowercase 'a' look */}
-      <line
-        x1="44"
-        y1="26"
-        x2="44"
-        y2="42"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        opacity={active ? 0.95 : 0.7}
+      <rect
+        x="12.5"
+        y="26"
+        width="2.5"
+        height="12"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.5}
       />
       
-      <line
-        x1="42"
-        y1="27"
-        x2="42"
-        y2="41"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        opacity={active ? 0.85 : 0.6}
+      {/* Right side plates */}
+      <rect
+        x="49"
+        y="22"
+        width="6"
+        height="20"
+        rx="1"
+        fill="currentColor"
+        opacity={activeOpacity * 0.9}
       />
       
-      <line
-        x1="40"
-        y1="28"
-        x2="40"
-        y2="40"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        opacity={active ? 0.75 : 0.5}
+      <rect
+        x="49"
+        y="24"
+        width="4"
+        height="16"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.7}
       />
+      
+      <rect
+        x="49"
+        y="26"
+        width="2.5"
+        height="12"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.5}
+      />
+      
+      {/* Collar clips */}
+      <rect
+        x="15"
+        y="29"
+        width="1"
+        height="6"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.6}
+      />
+      
+      <rect
+        x="48"
+        y="29"
+        width="1"
+        height="6"
+        rx="0.5"
+        fill="currentColor"
+        opacity={activeOpacity * 0.6}
+      />
+      
+      {/* Timer indicator */}
+      <circle cx="32" cy="14" r="1.5" fill="currentColor" opacity={activeOpacity * 0.8} />
+      
+      {/* Rep counter mark */}
+      <line x1="34" y1="48" x2="34" y2="52" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity={activeOpacity * 0.8} />
     </svg>
   );
 }

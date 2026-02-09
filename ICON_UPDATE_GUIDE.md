@@ -2,27 +2,34 @@
 
 ## Updated Icons
 
-The Akt app icon features three concentric rings with strategic gaps positioned to form a lowercase "a" shape, combining activity tracking aesthetics with clear brand identity.
+The Akt app icon is inspired by the active workout flow, featuring a minimalist barbell plate visualization that represents progressive loading and workout tracking.
 
 ### Design Concept
-- **Lowercase 'a' letterform** created from ring gaps and vertical stem
-- **Three layered rings** representing Volume (outer), Intensity (middle), and Frequency (inner)
-- **Activity ring-style gaps** positioned at top-right to create the 'a' opening
-- **Vertical stem** on the right side completing the lowercase 'a' silhouette
-- **Fully greyscale** with light to dark gradient maintaining A24-inspired aesthetic
+- **Barbell plate visualization** from the workout interface, viewed from the front
+- **Progressive loading layers** showing three stacked plates on each side (outer, middle, inner)
+- **Greyscale gradient** from light (#E5E5E5) to dark (#8A8A8A) representing weight progression
+- **Timer indicator dots** at the top representing the active workout timer
+- **Rep counter marks** at the bottom showing set tracking
+- **Collar clips** adding technical detail and realism
 - **Matte dark background** (#12121A to #0D0D0F)
-- **Circular, flowing geometry** with training progression metaphor
+- **Brutalist, functional aesthetic** directly inspired by the core workout tracking experience
+
+### Visual Hierarchy
+- Outer plates: Lightest (#E5E5E5) - Maximum weight/intensity
+- Middle plates: Medium (#C0C0C0) - Moderate weight
+- Inner plates: Darkest (#8A8A8A) - Warm-up weight
+- Central bar: Bright (#E5E5E5) - The constant, the foundation
 
 ## Files Updated
 
 ### 1. `/akt-app-icon.svg`
-Main app icon file (1024x1024) with the new training ring design.
+Main app icon file (1024x1024) with the barbell plate design.
 
 ### 2. `/src/app/components/AktIcon.tsx`
 React component for the app icon with background (for use in UI).
 
-### 3. `/src/app/components/AktTabIcon.tsx` (NEW)
-Simplified version for tab bar without background, just the rings.
+### 3. `/src/app/components/AktTabIcon.tsx`
+Simplified version for tab bar without background, reduced detail for small size.
 
 ### 4. `/src/app/components/BottomNav.tsx`
 Updated to use `AktTabIcon` for the Home tab instead of generic Home icon.
@@ -77,12 +84,24 @@ convert akt-app-icon.svg -resize 16x16 -resize 32x32 -resize 48x48 favicon.ico
 The Home tab in the bottom navigation now uses the custom `AktTabIcon` component:
 - Automatically adjusts opacity based on active state
 - Uses `currentColor` to inherit text color from parent
+- Simplified detail level optimized for 20px size
 - Matches the glassmorphic tab bar aesthetic
-- Scales properly at 20px for tab bar
+
+## Design Philosophy
+
+This icon directly represents the core Akt experience:
+- **Progressive overload**: Layered plates showing weight progression
+- **Data tracking**: Timer and rep counter indicators
+- **Technical precision**: Collar clips and symmetrical balance
+- **Functional focus**: No decoration, pure training visualization
+- **A24 aesthetic**: Matte surfaces, brutalist geometry, restrained confidence
+
+The icon is a window into the active workout flow - instantly recognizable to anyone who has tracked a set in Akt.
 
 ## Notes
 
 - All icons maintain the brutalist, greyscale Akt aesthetic
 - No gradients or colors outside of greyscale spectrum
-- Matte finish with subtle depth from overlapping rings
+- Matte finish with subtle depth from overlapping elements
 - Works well at all sizes from 16px to 1024px
+- Directly inspired by the plate visualization in active workouts

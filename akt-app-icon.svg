@@ -22,82 +22,115 @@
     fill="url(#akt-dark-bg)" 
   />
   
-  <!-- Three concentric rings with gaps positioned to form lowercase 'a' -->
-  <!-- Gaps positioned: top-right area for opening, right side for stem -->
-  
-  <!-- Outer ring (Volume) - lightest -->
-  <path
-    d="M 32 12
-       A 20 20 0 1 1 47 32
-       A 20 20 0 0 1 32 52
-       A 20 20 0 0 1 17 32
-       A 20 20 0 0 1 26 15"
-    stroke="#E5E5E5"
-    stroke-width="3"
-    stroke-linecap="round"
-    fill="none"
+  <!-- Barbell plate visualization inspired icon -->
+  <!-- Center bar (barbell) -->
+  <rect
+    x="12"
+    y="30"
+    width="40"
+    height="4"
+    rx="2"
+    fill="#E5E5E5"
     opacity="0.95"
   />
   
-  <!-- Middle ring (Intensity) -->
-  <path
-    d="M 32 16
-       A 16 16 0 1 1 43 32
-       A 16 16 0 0 1 32 48
-       A 16 16 0 0 1 21 32
-       A 16 16 0 0 1 27.5 18"
-    stroke="#C0C0C0"
-    stroke-width="2.5"
-    stroke-linecap="round"
-    fill="none"
-    opacity="0.85"
+  <!-- Left side plates (progressive loading) -->
+  <!-- Outer plate -->
+  <rect
+    x="9"
+    y="22"
+    width="6"
+    height="20"
+    rx="1"
+    fill="#E5E5E5"
+    opacity="0.9"
   />
   
-  <!-- Inner ring (Frequency) - darkest -->
-  <path
-    d="M 32 20
-       A 12 12 0 1 1 39 32
-       A 12 12 0 0 1 32 44
-       A 12 12 0 0 1 25 32
-       A 12 12 0 0 1 29 21.5"
-    stroke="#8A8A8A"
-    stroke-width="2"
-    stroke-linecap="round"
-    fill="none"
-    opacity="0.75"
+  <!-- Middle plate -->
+  <rect
+    x="11"
+    y="24"
+    width="4"
+    height="16"
+    rx="0.5"
+    fill="#C0C0C0"
+    opacity="0.8"
   />
   
-  <!-- Vertical stem on the right to complete lowercase 'a' look -->
-  <line
-    x1="44"
-    y1="26"
-    x2="44"
-    y2="42"
-    stroke="#E5E5E5"
-    stroke-width="3"
-    stroke-linecap="round"
-    opacity="0.95"
+  <!-- Inner plate -->
+  <rect
+    x="12.5"
+    y="26"
+    width="2.5"
+    height="12"
+    rx="0.5"
+    fill="#8A8A8A"
+    opacity="0.7"
   />
   
-  <line
-    x1="42"
-    y1="27"
-    x2="42"
-    y2="41"
-    stroke="#C0C0C0"
-    stroke-width="2.5"
-    stroke-linecap="round"
-    opacity="0.85"
+  <!-- Right side plates (progressive loading) -->
+  <!-- Outer plate -->
+  <rect
+    x="49"
+    y="22"
+    width="6"
+    height="20"
+    rx="1"
+    fill="#E5E5E5"
+    opacity="0.9"
   />
   
-  <line
-    x1="40"
-    y1="28"
-    x2="40"
-    y2="40"
-    stroke="#8A8A8A"
-    stroke-width="2"
-    stroke-linecap="round"
-    opacity="0.75"
+  <!-- Middle plate -->
+  <rect
+    x="49"
+    y="24"
+    width="4"
+    height="16"
+    rx="0.5"
+    fill="#C0C0C0"
+    opacity="0.8"
   />
+  
+  <!-- Inner plate -->
+  <rect
+    x="49"
+    y="26"
+    width="2.5"
+    height="12"
+    rx="0.5"
+    fill="#8A8A8A"
+    opacity="0.7"
+  />
+  
+  <!-- Collar clips -->
+  <rect
+    x="15"
+    y="29"
+    width="1"
+    height="6"
+    rx="0.5"
+    fill="#FFFFFF"
+    opacity="0.6"
+  />
+  
+  <rect
+    x="48"
+    y="29"
+    width="1"
+    height="6"
+    rx="0.5"
+    fill="#FFFFFF"
+    opacity="0.6"
+  />
+  
+  <!-- Timer/tracking indicator dots at top -->
+  <circle cx="28" cy="14" r="1.5" fill="#E5E5E5" opacity="0.7" />
+  <circle cx="32" cy="14" r="1.5" fill="#E5E5E5" opacity="0.9" />
+  <circle cx="36" cy="14" r="1.5" fill="#E5E5E5" opacity="0.7" />
+  
+  <!-- Rep counter marks at bottom -->
+  <line x1="26" y1="48" x2="26" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+  <line x1="30" y1="48" x2="30" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+  <line x1="34" y1="48" x2="34" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.9" />
+  <line x1="38" y1="48" x2="38" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
 </svg>
