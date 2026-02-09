@@ -16,107 +16,25 @@ export function AktTabIcon({ size = 20, active = false, className = "" }: AktTab
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Simplified barbell for tab bar - no background */}
+      {/* Simplified plate viz bars for tab bar - no background */}
       
-      {/* Center bar (barbell) */}
-      <rect
-        x="12"
-        y="30"
-        width="40"
-        height="4"
-        rx="2"
-        fill="currentColor"
-        opacity={activeOpacity * 0.95}
-      />
+      {/* Set 1 - Full progression */}
+      <rect x="10" y="38" width="3" height="14" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.95} />
+      <rect x="14" y="38" width="3" height="14" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.95} />
+      <rect x="18" y="32" width="3" height="20" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
+      <rect x="22" y="32" width="3" height="20" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
+      <rect x="26" y="24" width="3" height="28" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.75} />
       
-      {/* Left side plates */}
-      <rect
-        x="9"
-        y="22"
-        width="6"
-        height="20"
-        rx="1"
-        fill="currentColor"
-        opacity={activeOpacity * 0.9}
-      />
+      {/* Set 2 - Medium progression */}
+      <rect x="33" y="38" width="3" height="14" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
+      <rect x="37" y="38" width="3" height="14" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
+      <rect x="41" y="32" width="3" height="20" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.8} />
       
-      <rect
-        x="11"
-        y="24"
-        width="4"
-        height="16"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.7}
-      />
+      {/* Set 3 - Light progression */}
+      <rect x="48" y="38" width="3" height="14" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
       
-      <rect
-        x="12.5"
-        y="26"
-        width="2.5"
-        height="12"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.5}
-      />
-      
-      {/* Right side plates */}
-      <rect
-        x="49"
-        y="22"
-        width="6"
-        height="20"
-        rx="1"
-        fill="currentColor"
-        opacity={activeOpacity * 0.9}
-      />
-      
-      <rect
-        x="49"
-        y="24"
-        width="4"
-        height="16"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.7}
-      />
-      
-      <rect
-        x="49"
-        y="26"
-        width="2.5"
-        height="12"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.5}
-      />
-      
-      {/* Collar clips */}
-      <rect
-        x="15"
-        y="29"
-        width="1"
-        height="6"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.6}
-      />
-      
-      <rect
-        x="48"
-        y="29"
-        width="1"
-        height="6"
-        rx="0.5"
-        fill="currentColor"
-        opacity={activeOpacity * 0.6}
-      />
-      
-      {/* Timer indicator */}
-      <circle cx="32" cy="14" r="1.5" fill="currentColor" opacity={activeOpacity * 0.8} />
-      
-      {/* Rep counter mark */}
-      <line x1="34" y1="48" x2="34" y2="52" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity={activeOpacity * 0.8} />
+      {/* Subtle base line */}
+      <line x1="10" y1="53" x2="51" y2="53" stroke="currentColor" strokeWidth="0.5" opacity={activeOpacity * 0.2} />
     </svg>
   );
 }

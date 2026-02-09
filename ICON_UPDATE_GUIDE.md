@@ -2,28 +2,28 @@
 
 ## Updated Icons
 
-The Akt app icon is inspired by the active workout flow, featuring a minimalist barbell plate visualization that represents progressive loading and workout tracking.
+The Akt app icon is inspired by the distinctive plate visualization bars from the active workout interface - the most recognizable and unique visual element of the Akt training experience.
 
 ### Design Concept
-- **Barbell plate visualization** from the workout interface, viewed from the front
-- **Progressive loading layers** showing three stacked plates on each side (outer, middle, inner)
-- **Greyscale gradient** from light (#E5E5E5) to dark (#8A8A8A) representing weight progression
-- **Timer indicator dots** at the top representing the active workout timer
-- **Rep counter marks** at the bottom showing set tracking
-- **Collar clips** adding technical detail and realism
+- **Plate visualization bars** exactly as shown in the workout set cards
+- **Progressive loading pattern** showing three sets with decreasing plate counts (5 plates → 3 plates → 1 plate)
+- **Greyscale gradient** representing different plate weights (light = smaller plates, dark = larger plates)
+- **Minimalist bar chart aesthetic** - pure data visualization, no decoration
+- **Subtle exercise label** at the top suggesting the workout card header
+- **Base line** anchoring the visualization
 - **Matte dark background** (#12121A to #0D0D0F)
-- **Brutalist, functional aesthetic** directly inspired by the core workout tracking experience
+- **Brutalist data-first design** - the icon IS the interface
 
-### Visual Hierarchy
-- Outer plates: Lightest (#E5E5E5) - Maximum weight/intensity
-- Middle plates: Medium (#C0C0C0) - Moderate weight
-- Inner plates: Darkest (#8A8A8A) - Warm-up weight
-- Central bar: Bright (#E5E5E5) - The constant, the foundation
+### Visual Language
+- Outer plates (lightest): #E5E5E5 - Small change plates
+- Middle plates (medium): #C0C0C0 - Medium weight plates  
+- Inner plates (darkest): #8A8A8A - Heavy loading plates
+- Pattern shows progressive overload across multiple sets
 
 ## Files Updated
 
 ### 1. `/akt-app-icon.svg`
-Main app icon file (1024x1024) with the barbell plate design.
+Main app icon file (1024x1024) with the plate visualization design.
 
 ### 2. `/src/app/components/AktIcon.tsx`
 React component for the app icon with background (for use in UI).
@@ -89,19 +89,21 @@ The Home tab in the bottom navigation now uses the custom `AktTabIcon` component
 
 ## Design Philosophy
 
-This icon directly represents the core Akt experience:
-- **Progressive overload**: Layered plates showing weight progression
-- **Data tracking**: Timer and rep counter indicators
-- **Technical precision**: Collar clips and symmetrical balance
-- **Functional focus**: No decoration, pure training visualization
-- **A24 aesthetic**: Matte surfaces, brutalist geometry, restrained confidence
+This icon is the purest representation of Akt's identity:
+- **Data is the design**: The visualization bars ARE the app
+- **Instant recognition**: Users see this exact pattern during every workout
+- **Progressive overload**: Shows the training methodology visually
+- **No metaphor needed**: It's not inspired by training, it IS training
+- **A24 aesthetic**: Matte surfaces, brutal honesty, zero decoration
+- **Functional purity**: Form follows data
 
-The icon is a window into the active workout flow - instantly recognizable to anyone who has tracked a set in Akt.
+The icon doesn't represent the app - it's a direct screenshot of the core experience. Anyone who has logged a set in Akt will immediately recognize these bars.
 
 ## Notes
 
 - All icons maintain the brutalist, greyscale Akt aesthetic
 - No gradients or colors outside of greyscale spectrum
-- Matte finish with subtle depth from overlapping elements
+- Matte finish with subtle depth from varying opacities
 - Works well at all sizes from 16px to 1024px
-- Directly inspired by the plate visualization in active workouts
+- Directly extracted from the plate visualization in set cards
+- The most distinctive and ownable visual element of Akt

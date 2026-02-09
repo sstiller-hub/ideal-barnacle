@@ -22,115 +22,28 @@
     fill="url(#akt-dark-bg)" 
   />
   
-  <!-- Barbell plate visualization inspired icon -->
-  <!-- Center bar (barbell) -->
-  <rect
-    x="12"
-    y="30"
-    width="40"
-    height="4"
-    rx="2"
-    fill="#E5E5E5"
-    opacity="0.95"
-  />
+  <!-- Plate visualization bars inspired by the workout interface -->
+  <!-- Progressive loading pattern with varying heights -->
   
-  <!-- Left side plates (progressive loading) -->
-  <!-- Outer plate -->
-  <rect
-    x="9"
-    y="22"
-    width="6"
-    height="20"
-    rx="1"
-    fill="#E5E5E5"
-    opacity="0.9"
-  />
+  <!-- Set 1 - Full progression (5 plates) -->
+  <rect x="10" y="38" width="3" height="14" rx="0.5" fill="#E5E5E5" opacity="0.95" />
+  <rect x="14" y="38" width="3" height="14" rx="0.5" fill="#E5E5E5" opacity="0.95" />
+  <rect x="18" y="32" width="3" height="20" rx="0.5" fill="#C0C0C0" opacity="0.85" />
+  <rect x="22" y="32" width="3" height="20" rx="0.5" fill="#C0C0C0" opacity="0.85" />
+  <rect x="26" y="24" width="3" height="28" rx="0.5" fill="#8A8A8A" opacity="0.75" />
   
-  <!-- Middle plate -->
-  <rect
-    x="11"
-    y="24"
-    width="4"
-    height="16"
-    rx="0.5"
-    fill="#C0C0C0"
-    opacity="0.8"
-  />
+  <!-- Set 2 - Medium progression (3 plates) -->
+  <rect x="33" y="38" width="3" height="14" rx="0.5" fill="#E5E5E5" opacity="0.9" />
+  <rect x="37" y="38" width="3" height="14" rx="0.5" fill="#E5E5E5" opacity="0.9" />
+  <rect x="41" y="32" width="3" height="20" rx="0.5" fill="#C0C0C0" opacity="0.8" />
   
-  <!-- Inner plate -->
-  <rect
-    x="12.5"
-    y="26"
-    width="2.5"
-    height="12"
-    rx="0.5"
-    fill="#8A8A8A"
-    opacity="0.7"
-  />
+  <!-- Set 3 - Light progression (1 plate) -->
+  <rect x="48" y="38" width="3" height="14" rx="0.5" fill="#E5E5E5" opacity="0.85" />
   
-  <!-- Right side plates (progressive loading) -->
-  <!-- Outer plate -->
-  <rect
-    x="49"
-    y="22"
-    width="6"
-    height="20"
-    rx="1"
-    fill="#E5E5E5"
-    opacity="0.9"
-  />
+  <!-- Subtle base line -->
+  <line x1="10" y1="53" x2="51" y2="53" stroke="#FFFFFF" stroke-width="0.5" opacity="0.2" />
   
-  <!-- Middle plate -->
-  <rect
-    x="49"
-    y="24"
-    width="4"
-    height="16"
-    rx="0.5"
-    fill="#C0C0C0"
-    opacity="0.8"
-  />
-  
-  <!-- Inner plate -->
-  <rect
-    x="49"
-    y="26"
-    width="2.5"
-    height="12"
-    rx="0.5"
-    fill="#8A8A8A"
-    opacity="0.7"
-  />
-  
-  <!-- Collar clips -->
-  <rect
-    x="15"
-    y="29"
-    width="1"
-    height="6"
-    rx="0.5"
-    fill="#FFFFFF"
-    opacity="0.6"
-  />
-  
-  <rect
-    x="48"
-    y="29"
-    width="1"
-    height="6"
-    rx="0.5"
-    fill="#FFFFFF"
-    opacity="0.6"
-  />
-  
-  <!-- Timer/tracking indicator dots at top -->
-  <circle cx="28" cy="14" r="1.5" fill="#E5E5E5" opacity="0.7" />
-  <circle cx="32" cy="14" r="1.5" fill="#E5E5E5" opacity="0.9" />
-  <circle cx="36" cy="14" r="1.5" fill="#E5E5E5" opacity="0.7" />
-  
-  <!-- Rep counter marks at bottom -->
-  <line x1="26" y1="48" x2="26" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
-  <line x1="30" y1="48" x2="30" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
-  <line x1="34" y1="48" x2="34" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.9" />
-  <line x1="38" y1="48" x2="38" y2="52" stroke="#E5E5E5" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+  <!-- Top indicator - exercise label suggestion -->
+  <rect x="10" y="12" width="20" height="2" rx="1" fill="#E5E5E5" opacity="0.6" />
+  <rect x="10" y="17" width="14" height="1.5" rx="0.75" fill="#8A8A8A" opacity="0.5" />
 </svg>
