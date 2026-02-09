@@ -57,42 +57,53 @@ export default function WorkoutDetailPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
-              <span className="text-xl">‹</span>
-            </Button>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
-              <p className="text-xs text-muted-foreground">{formatDate(workout.date)}</p>
-            </div>
+      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
+            <span className="text-xl">‹</span>
+          </Button>
+          <div>
+            <p className="text-xs text-muted-foreground">Workout Summary</p>
+            <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
+            <p className="text-xs text-muted-foreground">{formatDate(workout.date)}</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-        {/* Summary Stats */}
-        <Card className="p-4">
-          <h2 className="text-sm font-semibold mb-3 text-muted-foreground">Workout Summary</h2>
-          <div className="grid grid-cols-3 gap-4">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <Card className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold text-foreground">{workout.stats.completedSets}</div>
-              <div className="text-xs text-muted-foreground">Sets</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</div>
+              <div className="text-3xl font-bold text-foreground tabular-nums">
+                {(workout.stats.totalVolume / 1000).toFixed(1)}k lbs
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">Workout date</div>
+              <div className="text-sm font-medium text-foreground">
+                {new Date(workout.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
+            <div>
+              <div className="text-lg font-semibold text-foreground">{workout.stats.completedSets}</div>
+              <div>Sets</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">{workout.exercises.length}</div>
-              <div className="text-xs text-muted-foreground">Exercises</div>
+              <div className="text-lg font-semibold text-foreground">{workout.exercises.length}</div>
+              <div>Exercises</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">{(workout.stats.totalVolume / 1000).toFixed(1)}k</div>
-              <div className="text-xs text-muted-foreground">lbs</div>
+              <div className="text-lg font-semibold text-foreground">
+                {Math.round(workout.stats.totalVolume).toLocaleString()}
+              </div>
+              <div>lbs</div>
             </div>
           </div>
         </Card>
 
-        {/* Exercises */}
         <div className="space-y-3">
           {workout.exercises.map((exercise, idx) => {
             const completedSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
@@ -100,10 +111,16 @@ export default function WorkoutDetailPage() {
             const totalVolume = completedSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0)
 
             return (
-              <Card key={idx} className="p-4">
-                <div className="flex items-start justify-between mb-3">
+              <Card key={idx} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold text-foreground">{exercise.name}</h3>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                      className="text-base font-semibold text-foreground hover:underline"
+                    >
+                      {exercise.name}
+                    </button>
                     <p className="text-xs text-muted-foreground">
                       {completedSets.length}/{exercise.sets.length} sets completed
                     </p>
@@ -114,7 +131,6 @@ export default function WorkoutDetailPage() {
                   </div>
                 </div>
 
-                {/* Sets Table */}
                 <div className="border border-border rounded-md overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50">
