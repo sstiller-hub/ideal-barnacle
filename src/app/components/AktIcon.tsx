@@ -32,105 +32,83 @@ export function AktIcon({ size = 28, opacity = 1, className = "" }: AktIconProps
         fill="url(#akt-dark-bg)" 
       />
       
-      {/* A-shaped design using angular strokes */}
+      {/* Three concentric rings with gaps positioned to form lowercase 'a' */}
+      {/* Gaps positioned: top-right area for opening, right side for stem */}
       
-      {/* Left diagonal stroke (outer) */}
+      {/* Outer ring (Volume) - lightest */}
       <path
-        d="M 20 48 L 28 18"
+        d="M 32 12
+           A 20 20 0 1 1 47 32
+           A 20 20 0 0 1 32 52
+           A 20 20 0 0 1 17 32
+           A 20 20 0 0 1 26 15"
         stroke="#E5E5E5"
-        strokeWidth="3.5"
+        strokeWidth="3"
         strokeLinecap="round"
+        fill="none"
         opacity="0.95"
       />
       
-      {/* Left diagonal stroke (middle) */}
+      {/* Middle ring (Intensity) */}
       <path
-        d="M 22 48 L 29.5 20"
+        d="M 32 16
+           A 16 16 0 1 1 43 32
+           A 16 16 0 0 1 32 48
+           A 16 16 0 0 1 21 32
+           A 16 16 0 0 1 27.5 18"
         stroke="#C0C0C0"
         strokeWidth="2.5"
         strokeLinecap="round"
+        fill="none"
         opacity="0.85"
       />
       
-      {/* Left diagonal stroke (inner) */}
+      {/* Inner ring (Frequency) - darkest */}
       <path
-        d="M 24 48 L 31 22"
+        d="M 32 20
+           A 12 12 0 1 1 39 32
+           A 12 12 0 0 1 32 44
+           A 12 12 0 0 1 25 32
+           A 12 12 0 0 1 29 21.5"
         stroke="#8A8A8A"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
+        fill="none"
         opacity="0.75"
       />
       
-      {/* Right diagonal stroke (outer) */}
-      <path
-        d="M 44 48 L 36 18"
-        stroke="#E5E5E5"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        opacity="0.95"
-      />
-      
-      {/* Right diagonal stroke (middle) */}
-      <path
-        d="M 42 48 L 34.5 20"
-        stroke="#C0C0C0"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        opacity="0.85"
-      />
-      
-      {/* Right diagonal stroke (inner) */}
-      <path
-        d="M 40 48 L 33 22"
-        stroke="#8A8A8A"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.75"
-      />
-      
-      {/* Crossbar (outer) */}
+      {/* Vertical stem on the right to complete lowercase 'a' look */}
       <line
-        x1="24"
-        y1="36"
+        x1="44"
+        y1="26"
+        x2="44"
+        y2="42"
+        stroke="#E5E5E5"
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity="0.95"
+      />
+      
+      <line
+        x1="42"
+        y1="27"
+        x2="42"
+        y2="41"
+        stroke="#C0C0C0"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      
+      <line
+        x1="40"
+        y1="28"
         x2="40"
-        y2="36"
-        stroke="#E5E5E5"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        opacity="0.95"
-      />
-      
-      {/* Crossbar (middle) */}
-      <line
-        x1="24.5"
-        y1="34.5"
-        x2="39.5"
-        y2="34.5"
-        stroke="#C0C0C0"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        opacity="0.85"
-      />
-      
-      {/* Crossbar (inner) */}
-      <line
-        x1="25"
-        y1="33"
-        x2="39"
-        y2="33"
+        y2="40"
         stroke="#8A8A8A"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
         opacity="0.75"
-      />
-      
-      {/* Peak dot */}
-      <circle
-        cx="32"
-        cy="18"
-        r="2.5"
-        fill="#FFFFFF"
-        opacity="0.9"
       />
     </svg>
   );

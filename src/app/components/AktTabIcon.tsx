@@ -14,105 +14,82 @@ export function AktTabIcon({ size = 20, active = false, className = "" }: AktTab
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Simplified A design for tab bar - no background */}
+      {/* Simplified rings for tab bar - no background */}
       
-      {/* Left diagonal stroke (outer) */}
+      {/* Outer ring (Volume) */}
       <path
-        d="M 20 48 L 28 18"
+        d="M 32 12
+           A 20 20 0 1 1 47 32
+           A 20 20 0 0 1 32 52
+           A 20 20 0 0 1 17 32
+           A 20 20 0 0 1 26 15"
         stroke="currentColor"
-        strokeWidth="3.5"
+        strokeWidth="3"
         strokeLinecap="round"
+        fill="none"
         opacity={active ? 0.95 : 0.7}
       />
       
-      {/* Left diagonal stroke (middle) */}
+      {/* Middle ring (Intensity) */}
       <path
-        d="M 22 48 L 29.5 20"
+        d="M 32 16
+           A 16 16 0 1 1 43 32
+           A 16 16 0 0 1 32 48
+           A 16 16 0 0 1 21 32
+           A 16 16 0 0 1 27.5 18"
         stroke="currentColor"
         strokeWidth="2.5"
         strokeLinecap="round"
+        fill="none"
         opacity={active ? 0.85 : 0.6}
       />
       
-      {/* Left diagonal stroke (inner) */}
+      {/* Inner ring (Frequency) */}
       <path
-        d="M 24 48 L 31 22"
+        d="M 32 20
+           A 12 12 0 1 1 39 32
+           A 12 12 0 0 1 32 44
+           A 12 12 0 0 1 25 32
+           A 12 12 0 0 1 29 21.5"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
+        fill="none"
         opacity={active ? 0.75 : 0.5}
       />
       
-      {/* Right diagonal stroke (outer) */}
-      <path
-        d="M 44 48 L 36 18"
-        stroke="currentColor"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        opacity={active ? 0.95 : 0.7}
-      />
-      
-      {/* Right diagonal stroke (middle) */}
-      <path
-        d="M 42 48 L 34.5 20"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        opacity={active ? 0.85 : 0.6}
-      />
-      
-      {/* Right diagonal stroke (inner) */}
-      <path
-        d="M 40 48 L 33 22"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity={active ? 0.75 : 0.5}
-      />
-      
-      {/* Crossbar (outer) */}
+      {/* Vertical stem on the right to complete lowercase 'a' look */}
       <line
-        x1="24"
-        y1="36"
+        x1="44"
+        y1="26"
+        x2="44"
+        y2="42"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity={active ? 0.95 : 0.7}
+      />
+      
+      <line
+        x1="42"
+        y1="27"
+        x2="42"
+        y2="41"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity={active ? 0.85 : 0.6}
+      />
+      
+      <line
+        x1="40"
+        y1="28"
         x2="40"
-        y2="36"
+        y2="40"
         stroke="currentColor"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        opacity={active ? 0.95 : 0.7}
-      />
-      
-      {/* Crossbar (middle) */}
-      <line
-        x1="24.5"
-        y1="34.5"
-        x2="39.5"
-        y2="34.5"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        opacity={active ? 0.85 : 0.6}
-      />
-      
-      {/* Crossbar (inner) */}
-      <line
-        x1="25"
-        y1="33"
-        x2="39"
-        y2="33"
-        stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
         opacity={active ? 0.75 : 0.5}
-      />
-      
-      {/* Peak dot */}
-      <circle
-        cx="32"
-        cy="18"
-        r="2.5"
-        fill="currentColor"
-        opacity={active ? 0.9 : 0.6}
       />
     </svg>
   );

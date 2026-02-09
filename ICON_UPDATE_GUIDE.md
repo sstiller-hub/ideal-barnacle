@@ -2,15 +2,16 @@
 
 ## Updated Icons
 
-The Akt app icon has been updated with a new design that forms the letter "A" using layered strokes in the Akt greyscale aesthetic.
+The Akt app icon features three concentric rings with strategic gaps positioned to form a lowercase "a" shape, combining activity tracking aesthetics with clear brand identity.
 
 ### Design Concept
-- **A-shaped letterform** created from diagonal strokes and crossbar
-- **Three layered strokes** representing Volume (outer), Intensity (middle), and Frequency (inner)
+- **Lowercase 'a' letterform** created from ring gaps and vertical stem
+- **Three layered rings** representing Volume (outer), Intensity (middle), and Frequency (inner)
+- **Activity ring-style gaps** positioned at top-right to create the 'a' opening
+- **Vertical stem** on the right side completing the lowercase 'a' silhouette
 - **Fully greyscale** with light to dark gradient maintaining A24-inspired aesthetic
-- **Peak dot** at the apex representing focus and precision
 - **Matte dark background** (#12121A to #0D0D0F)
-- **Angular, brutalist geometry** consistent with Akt's design philosophy
+- **Circular, flowing geometry** with training progression metaphor
 
 ## Files Updated
 
