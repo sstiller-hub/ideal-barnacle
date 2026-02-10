@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
 import {
@@ -66,6 +66,9 @@ type Exercise = {
   targetWeight?: string
   restTime: number
   completed: boolean
+  machineSettings?: {
+    seat?: string
+  }
   sets: {
     id: string
     reps: number | null
@@ -101,6 +104,18 @@ function getExerciseLabel(name: string): string {
     return "Single-Leg Leg Extension"
   }
   return name
+}
+
+function isMachineExercise(name: string): boolean {
+  const lower = name.toLowerCase()
+  return (
+    lower.includes("machine") ||
+    lower.includes("cable") ||
+    lower.includes("smith") ||
+    lower.includes("lever") ||
+    lower.includes("hack") ||
+    lower.includes("pendulum")
+  )
 }
 
 function getRecentPerformanceSnapshots(
@@ -212,6 +227,26 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const exercisesRef = useRef<any[]>([])
   const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
   const currentExerciseIndexRef = useRef(0)
+  const maxSetVolumeByExercise = useMemo(() => {
+    const history = getWorkoutHistory()
+    const map = new Map<string, number>()
+    history.forEach((workout) => {
+      workout.exercises?.forEach((exercise: any) => {
+        const key = normalizeExerciseName(exercise.name)
+        const maxForExercise = map.get(key) ?? 0
+        const maxForWorkout = (exercise.sets || [])
+          .filter((set: any) => isSetEligibleForStats(set))
+          .reduce((max: number, set: any) => {
+            const volume = (set.weight ?? 0) * (set.reps ?? 0)
+            return volume > max ? volume : max
+          }, 0)
+        if (maxForWorkout > maxForExercise) {
+          map.set(key, maxForWorkout)
+        }
+      })
+    })
+    return map
+  }, [session?.id])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -1140,6 +1175,35 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     signalAutoSaved()
   }
 
+  const updateExerciseMachineSetting = async (
+    exerciseIndex: number,
+    field: "seat",
+    value: string
+  ) => {
+    if (!session) return
+    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
+      if (exerciseIdx !== exerciseIndex) {
+        return exercise
+      }
+      const nextSettings = {
+        ...(exercise.machineSettings || {}),
+        [field]: value,
+      }
+      return { ...exercise, machineSettings: nextSettings }
+    })
+
+    setExercises(newExercises)
+
+    const updatedSession: WorkoutSession = {
+      ...session,
+      exercises: newExercises,
+    }
+
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    signalAutoSaved()
+  }
+
   const completeSet = async (
     setIndex: number,
     options?: {
@@ -1775,6 +1839,41 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""} • NOW: SET {activeSetIndex + 1}/{exercise.sets.length}
           </div>
 
+          {isCurrentExercise && isMachineExercise(exercise.name) && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={exercise.machineSettings?.seat ?? ""}
+                onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
+                placeholder="Seat"
+                className="flex-1"
+                style={{
+                  background: "rgba(255, 255, 255, 0.04)",
+                  border: "none",
+                  borderRadius: "2px",
+                  padding: "6px 8px",
+                  fontSize: "10px",
+                  color: "rgba(255, 255, 255, 0.9)",
+                }}
+              />
+              <input
+                type="text"
+                value={exercise.machineSettings?.height ?? ""}
+                onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "height", e.target.value)}
+                placeholder="Height"
+                className="flex-1"
+                style={{
+                  background: "rgba(255, 255, 255, 0.04)",
+                  border: "none",
+                  borderRadius: "2px",
+                  padding: "6px 8px",
+                  fontSize: "10px",
+                  color: "rgba(255, 255, 255, 0.9)",
+                }}
+              />
+            </div>
+          )}
+
           {isCurrentExercise && allSetsRecorded && (
             <div
               className="mt-4 flex items-center gap-2"
@@ -1807,7 +1906,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !canEditExercise
             const isCompactCompleted = set.completed
             const lastSet = getMostRecentCompletedSetPerformance(exercise.name, index, session?.id)
-            const comparison = getSetComparison(set, lastSet)
+            const comparison = getSetComparison(
+              set,
+              lastSet,
+              maxSetVolumeByExercise.get(normalizeExerciseName(exercise.name)) ?? 0
+            )
             const plates =
               typeof set.weight === "number"
                 ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
@@ -2337,15 +2440,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     return plates
   }
 
-  const getSetComparison = (set: Exercise["sets"][number], last: { weight: number; reps: number } | null) => {
+  const getSetComparison = (
+    set: Exercise["sets"][number],
+    last: { weight: number; reps: number } | null,
+    maxHistoricalVolume: number
+  ) => {
     if (!last) return null
     if (typeof set.weight !== "number" || typeof set.reps !== "number") {
       return { status: "no-history", message: `Last: ${last.weight} × ${last.reps}` }
     }
 
-    const weightIncrease = set.weight - last.weight
-    const repIncrease = set.reps - last.reps
-    if (weightIncrease >= 10 || (weightIncrease === 0 && repIncrease >= 1)) {
+    const volume = set.weight * set.reps
+    if (volume > maxHistoricalVolume) {
       return { status: "pr", message: "NEW PR!" }
     }
 
@@ -2389,31 +2495,29 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       <div className="relative z-10" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
         {isResting && (
           <div
-            className="absolute left-5 right-5 transition-all duration-200"
+            className="absolute right-5 transition-all duration-200"
             style={{
-              top: "0px",
-              marginLeft: "-24px",
-              marginRight: "-24px",
+              top: "6px",
               background: "rgba(10, 10, 12, 0.95)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               borderRadius: "2px",
-              padding: "12px 16px",
+              padding: "8px 10px",
               backdropFilter: "blur(20px)",
               zIndex: 20,
             }}
           >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <div
                   className="text-white/50"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
                 >
                   REST
                 </div>
                 <div
                   className="text-white/95"
                   style={{
-                    fontSize: "32px",
+                    fontSize: "22px",
                     fontWeight: 400,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
@@ -2439,11 +2543,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     background: "rgba(255, 255, 255, 0.05)",
                     border: "none",
                     borderRadius: "2px",
-                    padding: "8px 12px",
+                    padding: "4px 8px",
                   }}
                   type="button"
                 >
-                  <span className="text-white/90" style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.04em" }}>
+                  <span className="text-white/90" style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em" }}>
                     +30s
                   </span>
                 </button>
@@ -2454,11 +2558,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     background: "rgba(255, 255, 255, 0.08)",
                     border: "none",
                     borderRadius: "2px",
-                    padding: "8px 18px",
+                    padding: "4px 10px",
                   }}
                   type="button"
                 >
-                  <span className="text-white/95" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em" }}>
+                  <span className="text-white/95" style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em" }}>
                     SKIP
                   </span>
                 </button>
@@ -2471,8 +2575,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           className="flex-shrink-0 pt-2 pb-2"
           style={{
             paddingBottom: "12px",
-            marginTop: isResting ? "64px" : "0px",
-            transition: "margin-top 0.2s ease",
+            marginTop: "0px",
           }}
         >
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -2600,24 +2703,52 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     >
                       EXERCISE {exerciseIndex + 1} • {formatSeconds(elapsedSeconds)}
                     </div>
-                    <button
-                      onClick={() => setShowPlateCalc(!showPlateCalc)}
-                      className="transition-all duration-150"
-                      style={{
-                        background: showPlateCalc ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)",
-                        border: "none",
-                        borderRadius: "2px",
-                        padding: "4px 8px",
-                      }}
-                      type="button"
-                    >
-                      <span
-                        className={showPlateCalc ? "text-white/80" : "text-white/30"}
-                        style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.08em" }}
+                    <div className="flex items-center gap-2">
+                      {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
+                        <input
+                          type="text"
+                          value={exercise.machineSettings?.seat ?? ""}
+                          onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
+                          placeholder="Seat"
+                          className="transition-all duration-150"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.02)",
+                            border: "1px solid rgba(255, 255, 255, 0.06)",
+                            borderRadius: "2px",
+                            padding: "4px 8px",
+                            fontSize: "8px",
+                            color: "rgba(255, 255, 255, 0.7)",
+                            width: "48px",
+                            height: "22px",
+                          }}
+                        />
+                      )}
+                      <button
+                        onClick={() => {
+                          if (exerciseIndex !== currentExerciseIndex) return
+                          handleTogglePlateCalc()
+                        }}
+                        className="transition-all duration-150"
+                        style={{
+                          background: showPlateCalc ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)",
+                          border: "none",
+                          borderRadius: "2px",
+                          padding: "4px 8px",
+                          height: "22px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        type="button"
                       >
-                        PLATES
-                      </span>
-                    </button>
+                        <span
+                          className={showPlateCalc ? "text-white/80" : "text-white/30"}
+                          style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.08em" }}
+                        >
+                          PLATES
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   <h1
@@ -2862,6 +2993,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               )}
                             </button>
                           </div>
+
                         </div>
 
                         {(repCapError || showMissing) && (
