@@ -3,9 +3,21 @@
 import { useParams, useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
+import { isWarmupExercise } from "@/lib/exercise-heuristics"
+
+function normalizeExerciseName(name: string) {
+  return name.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
+function getMaxRepsAtWeight(sets: { weight?: number | null; reps?: number | null }[], weight: number) {
+  return Math.max(
+    ...sets.filter((s) => (s.weight ?? 0) === weight).map((s) => s.reps ?? 0),
+    0
+  )
+}
 
 export default function WorkoutDetailPage() {
   const params = useParams()
@@ -54,6 +66,97 @@ export default function WorkoutDetailPage() {
       </div>
     )
   }
+
+  const performanceSummary = useMemo<{
+    excludedSets: number
+    improvedCount: number
+    nonWarmupExerciseCount: number
+    biggestJump: { name: string; delta: number } | null
+  } | null>(() => {
+    if (!workout) return null
+
+    const history = getWorkoutHistory()
+    const baselineWorkout = history
+      .filter((w) => w.id !== workout.id && w.name === workout.name)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+
+    const baselineByKey = new Map<string, CompletedWorkout["exercises"][number]>()
+    baselineWorkout?.exercises?.forEach((ex) => {
+      baselineByKey.set(normalizeExerciseName(ex.name), ex)
+    })
+
+    let excludedSets = 0
+    let improvedCount = 0
+    let warmupExerciseCount = 0
+    let biggestJump: { name: string; delta: number } | null = null
+
+    workout.exercises.forEach((exercise) => {
+      const isWarmup = isWarmupExercise(exercise.name)
+      if (isWarmup) warmupExerciseCount += 1
+
+      const validSets = exercise.sets.filter((set) =>
+        isSetEligibleForStats({
+          reps: set.reps,
+          weight: set.weight,
+          completed: set.completed,
+          validationFlags: (set as any).validationFlags ?? undefined,
+        })
+      )
+      const excluded = exercise.sets.filter((set) => set.completed && !validSets.includes(set)).length
+      excludedSets += excluded
+
+      const volume = validSets.reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+
+      const baseline = baselineByKey.get(normalizeExerciseName(exercise.name))
+      const baselineValidSets = baseline
+        ? baseline.sets.filter((set) =>
+            isSetEligibleForStats({
+              reps: set.reps,
+              weight: set.weight,
+              completed: set.completed,
+              validationFlags: (set as any).validationFlags ?? undefined,
+            })
+          )
+        : []
+      const baselineVolume = baselineValidSets.reduce(
+        (sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0),
+        0
+      )
+      const baselineHasData = baselineValidSets.length > 0
+      const volumeDelta = baselineHasData ? volume - baselineVolume : 0
+
+      const maxWeight = Math.max(...validSets.map((s) => s.weight ?? 0), 0)
+      const baselineMaxWeight = Math.max(...baselineValidSets.map((s) => s.weight ?? 0), 0)
+      const weightPR = baselineHasData && !isWarmup && maxWeight >= baselineMaxWeight + 1
+
+      const repsAtBestWeight = getMaxRepsAtWeight(validSets, maxWeight)
+      const baselineWeightForReps = baselineValidSets.some((s) => (s.weight ?? 0) === maxWeight)
+        ? maxWeight
+        : baselineMaxWeight
+      const baselineRepsAtWeight = getMaxRepsAtWeight(baselineValidSets, baselineWeightForReps)
+      const repsPR = baselineHasData && !isWarmup && repsAtBestWeight >= baselineRepsAtWeight + 1
+
+      const volumePR =
+        baselineHasData && !isWarmup && baselineVolume > 0 && volume >= baselineVolume * 1.01
+
+      const prCount = [weightPR, repsPR, volumePR].filter(Boolean).length
+      const improved = !isWarmup && (prCount > 0 || volumeDelta > 0)
+      if (improved) improvedCount += 1
+
+      if (!isWarmup && baselineHasData && volumeDelta > 0) {
+        if (!biggestJump || volumeDelta > biggestJump.delta) {
+          biggestJump = { name: exercise.name, delta: volumeDelta }
+        }
+      }
+    })
+
+    return {
+      excludedSets,
+      improvedCount,
+      nonWarmupExerciseCount: workout.exercises.length - warmupExerciseCount,
+      biggestJump,
+    }
+  }, [workout])
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -106,6 +209,28 @@ export default function WorkoutDetailPage() {
             </div>
           </div>
         </Card>
+
+        {performanceSummary && (
+          <Card className="p-4 space-y-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide">Performance</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
+                Improved on {performanceSummary.improvedCount}/{performanceSummary.nonWarmupExerciseCount} exercises
+              </span>
+              {performanceSummary.biggestJump && (
+                <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
+                  Biggest jump: {performanceSummary.biggestJump.name} +
+                  {Math.round(performanceSummary.biggestJump.delta).toLocaleString()} lb
+                </span>
+              )}
+              {performanceSummary.excludedSets > 0 && (
+                <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-1 rounded-full">
+                  ⚠️ {performanceSummary.excludedSets} sets excluded
+                </span>
+              )}
+            </div>
+          </Card>
+        )}
 
         <div className="space-y-3">
           {workout.exercises.map((exercise, idx) => {

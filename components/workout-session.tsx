@@ -1856,21 +1856,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   color: "rgba(255, 255, 255, 0.9)",
                 }}
               />
-              <input
-                type="text"
-                value={exercise.machineSettings?.height ?? ""}
-                onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "height", e.target.value)}
-                placeholder="Height"
-                className="flex-1"
-                style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "none",
-                  borderRadius: "2px",
-                  padding: "6px 8px",
-                  fontSize: "10px",
-                  color: "rgba(255, 255, 255, 0.9)",
-                }}
-              />
             </div>
           )}
 
@@ -2794,7 +2779,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     const missingReps = isMissingReps(set.reps)
                     const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
                     const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, session?.id)
-                    const comparison = getSetComparison(set, lastSet)
+                    const comparison = getSetComparison(
+                      set,
+                      lastSet,
+                      maxSetVolumeByExercise.get(normalizeExerciseName(exercise.name)) ?? 0
+                    )
                     const plates =
                       typeof set.weight === "number"
                         ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
