@@ -770,7 +770,7 @@ export default function Home() {
         onClick={() => router.push("/settings")}
         className="fixed z-[60] text-white/25 hover:text-white/50 transition-colors duration-200"
         style={{
-          top: "24px",
+          top: "calc(env(safe-area-inset-top, 0px) + 6px)",
           right: "calc(16px + env(safe-area-inset-right, 0px))",
           background: "transparent",
           border: "none",
