@@ -32,37 +32,31 @@ export function AktIcon({ size = 28, opacity = 1, className = "" }: AktIconProps
         fill="url(#akt-dark-bg)" 
       />
       
-      {/* Plate visualization bars - matching pairs are identical sizes */}
+      {/* Plate visualization bars forming "A" shape */}
       
-      {/* Set 1 - Full progression (5 plates) */}
-      {/* Pair 1: Small plates (lightest) */}
-      <rect x="10" y="40" width="2.5" height="12" rx="0.5" fill="#E5E5E5" opacity="0.95" />
-      <rect x="13" y="40" width="2.5" height="12" rx="0.5" fill="#E5E5E5" opacity="0.95" />
+      {/* Left leg of A (ascending) */}
+      <rect x="16" y="46" width="2.5" height="8" rx="0.5" fill="#8A8A8A" opacity="0.7" />
+      <rect x="19" y="42" width="2.5" height="12" rx="0.5" fill="#A0A0A0" opacity="0.75" />
+      <rect x="22" y="38" width="2.5" height="16" rx="0.5" fill="#B8B8B8" opacity="0.8" />
+      <rect x="25" y="32" width="2.5" height="22" rx="0.5" fill="#D0D0D0" opacity="0.85" />
+      <rect x="28" y="26" width="2.5" height="28" rx="0.5" fill="#E5E5E5" opacity="0.9" />
       
-      {/* Pair 2: Medium plates */}
-      <rect x="16.5" y="36" width="2.5" height="16" rx="0.5" fill="#C0C0C0" opacity="0.85" />
-      <rect x="19.5" y="36" width="2.5" height="16" rx="0.5" fill="#C0C0C0" opacity="0.85" />
+      {/* Right leg of A (descending) */}
+      <rect x="33.5" y="26" width="2.5" height="28" rx="0.5" fill="#E5E5E5" opacity="0.9" />
+      <rect x="36.5" y="32" width="2.5" height="22" rx="0.5" fill="#D0D0D0" opacity="0.85" />
+      <rect x="39.5" y="38" width="2.5" height="16" rx="0.5" fill="#B8B8B8" opacity="0.8" />
+      <rect x="42.5" y="42" width="2.5" height="12" rx="0.5" fill="#A0A0A0" opacity="0.75" />
+      <rect x="45.5" y="46" width="2.5" height="8" rx="0.5" fill="#8A8A8A" opacity="0.7" />
       
-      {/* Large plate (single, darkest) */}
-      <rect x="23" y="30" width="3" height="22" rx="0.5" fill="#8A8A8A" opacity="0.75" />
-      
-      {/* Set 2 - Medium progression (3 plates) */}
-      {/* Pair 1: Small plates */}
-      <rect x="30" y="40" width="2.5" height="12" rx="0.5" fill="#E5E5E5" opacity="0.9" />
-      <rect x="33" y="40" width="2.5" height="12" rx="0.5" fill="#E5E5E5" opacity="0.9" />
-      
-      {/* Large plate (single) */}
-      <rect x="36.5" y="36" width="2.5" height="16" rx="0.5" fill="#C0C0C0" opacity="0.8" />
-      
-      {/* Set 3 - Light progression (1 plate) */}
-      <rect x="43" y="40" width="2.5" height="12" rx="0.5" fill="#E5E5E5" opacity="0.85" />
+      {/* Horizontal crossbar of A */}
+      <rect x="22" y="40" width="20.5" height="2" rx="0.5" fill="#E5E5E5" opacity="0.95" />
       
       {/* Subtle base line */}
-      <line x1="10" y1="53" x2="46" y2="53" stroke="#FFFFFF" strokeWidth="0.5" opacity="0.2" />
+      <line x="16" y1="54.5" x2="48" y2="54.5" stroke="#FFFFFF" strokeWidth="0.5" opacity="0.2" />
       
-      {/* Top indicator - exercise label suggestion */}
-      <rect x="10" y="12" width="20" height="2" rx="1" fill="#E5E5E5" opacity="0.6" />
-      <rect x="10" y="17" width="14" height="1.5" rx="0.75" fill="#8A8A8A" opacity="0.5" />
+      {/* Top apex indicator */}
+      <rect x="29.5" y="12" width="5" height="2" rx="1" fill="#E5E5E5" opacity="0.7" />
+      <rect x="30.5" y="16" width="3" height="1.5" rx="0.75" fill="#C0C0C0" opacity="0.6" />
     </svg>
   );
 }
