@@ -93,6 +93,10 @@ export function parseTargetReps(targetReps?: string): { min: number; max: number
 }
 
 export function parseTargetWeight(targetWeight?: string): number | null {
+  if (targetWeight === null || targetWeight === undefined) return null
+  if (typeof targetWeight !== "string") {
+    return typeof targetWeight === "number" && !Number.isNaN(targetWeight) ? targetWeight : null
+  }
   if (!targetWeight) return null
   const match = targetWeight.match(/\d+(\.\d+)?/)
   if (!match) return null

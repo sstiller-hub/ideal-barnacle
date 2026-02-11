@@ -41,16 +41,18 @@ export function WorkoutScheduleEditor() {
   )
 
   const updateDaySelection = (day: DayOfWeek, value: string) => {
-    if (!weeklySchedule) return
-    const next = { ...weeklySchedule }
-    if (value === "rest") {
-      next[day] = null
-    } else {
-      const routineName = routineNameById.get(value)
-      if (!routineName) return
-      next[day] = { routineId: value, routineName }
-    }
-    setWeeklyScheduleState(next)
+    setWeeklyScheduleState((prev) => {
+      if (!prev) return prev
+      const next = { ...prev }
+      if (value === "rest") {
+        next[day] = null
+      } else {
+        const routineName = routineNameById.get(value)
+        if (!routineName) return prev
+        next[day] = { routineId: value, routineName }
+      }
+      return next
+    })
   }
 
   const handleSaveWeeklySchedule = () => {
