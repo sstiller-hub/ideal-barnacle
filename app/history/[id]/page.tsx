@@ -19,6 +19,21 @@ function getMaxRepsAtWeight(sets: { weight?: number | null; reps?: number | null
   )
 }
 
+function getWorkoutStats(workout: CompletedWorkout) {
+  const exercises = workout.exercises ?? []
+  const completedSets = exercises
+    .flatMap((exercise) => exercise.sets ?? [])
+    .filter((set) => isSetEligibleForStats(set)).length
+  const totalVolume = exercises
+    .flatMap((exercise) => exercise.sets ?? [])
+    .filter((set) => isSetEligibleForStats(set))
+    .reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+  return {
+    completedSets,
+    totalVolume,
+  }
+}
+
 export default function WorkoutDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -94,7 +109,7 @@ export default function WorkoutDetailPage() {
       const isWarmup = isWarmupExercise(exercise.name)
       if (isWarmup) warmupExerciseCount += 1
 
-      const validSets = exercise.sets.filter((set) =>
+      const validSets = (exercise.sets ?? []).filter((set) =>
         isSetEligibleForStats({
           reps: set.reps,
           weight: set.weight,
@@ -102,7 +117,7 @@ export default function WorkoutDetailPage() {
           validationFlags: (set as any).validationFlags ?? undefined,
         })
       )
-      const excluded = exercise.sets.filter((set) => set.completed && !validSets.includes(set)).length
+      const excluded = (exercise.sets ?? []).filter((set) => set.completed && !validSets.includes(set)).length
       excludedSets += excluded
 
       const volume = validSets.reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
@@ -158,6 +173,17 @@ export default function WorkoutDetailPage() {
     }
   }, [workout])
 
+  const safeStats = useMemo(() => {
+    if (!workout) return { completedSets: 0, totalVolume: 0 }
+    if (workout.stats?.totalVolume !== undefined && workout.stats?.completedSets !== undefined) {
+      return {
+        completedSets: workout.stats.completedSets,
+        totalVolume: workout.stats.totalVolume,
+      }
+    }
+    return getWorkoutStats(workout)
+  }, [workout])
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <div
@@ -182,7 +208,7 @@ export default function WorkoutDetailPage() {
             <div>
               <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</div>
               <div className="text-3xl font-bold text-foreground tabular-nums">
-                {(workout.stats.totalVolume / 1000).toFixed(1)}k lbs
+                {(safeStats.totalVolume / 1000).toFixed(1)}k lbs
               </div>
             </div>
             <div className="text-right">
@@ -194,7 +220,7 @@ export default function WorkoutDetailPage() {
           </div>
           <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
             <div>
-              <div className="text-lg font-semibold text-foreground">{workout.stats.completedSets}</div>
+              <div className="text-lg font-semibold text-foreground">{safeStats.completedSets}</div>
               <div>Sets</div>
             </div>
             <div>
@@ -203,7 +229,7 @@ export default function WorkoutDetailPage() {
             </div>
             <div>
               <div className="text-lg font-semibold text-foreground">
-                {Math.round(workout.stats.totalVolume).toLocaleString()}
+                {Math.round(safeStats.totalVolume).toLocaleString()}
               </div>
               <div>lbs</div>
             </div>
@@ -234,7 +260,7 @@ export default function WorkoutDetailPage() {
 
         <div className="space-y-3">
           {workout.exercises.map((exercise, idx) => {
-            const completedSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
+            const completedSets = (exercise.sets ?? []).filter((s) => isSetEligibleForStats(s))
             const maxWeight = Math.max(...completedSets.map((s) => s.weight ?? 0), 0)
             const totalVolume = completedSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0)
 
@@ -250,7 +276,7 @@ export default function WorkoutDetailPage() {
                       {exercise.name}
                     </button>
                     <p className="text-xs text-muted-foreground">
-                      {completedSets.length}/{exercise.sets.length} sets completed
+                      {completedSets.length}/{(exercise.sets ?? []).length} sets completed
                     </p>
                   </div>
                   <div className="text-right">
@@ -270,7 +296,7 @@ export default function WorkoutDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {exercise.sets.map((set, setIdx) => {
+                      {(exercise.sets ?? []).map((set, setIdx) => {
                         const isMaxWeight = set.completed && (set.weight ?? 0) === maxWeight
                         return (
                           <tr
