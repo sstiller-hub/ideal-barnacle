@@ -16,27 +16,35 @@ export function AktTabIcon({ size = 20, active = false, className = "" }: AktTab
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Simplified plate viz bars forming "A" shape - no background */}
+      {/* Horizontal bar chart forming "A" shape - no background */}
       
-      {/* Left leg of A (ascending) */}
-      <rect x="16" y="46" width="2.5" height="8" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.7} />
-      <rect x="19" y="42" width="2.5" height="12" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.75} />
-      <rect x="22" y="38" width="2.5" height="16" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.8} />
-      <rect x="25" y="32" width="2.5" height="22" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
-      <rect x="28" y="26" width="2.5" height="28" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
+      {/* Top apex */}
+      <rect x="29" y="16" width="6" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.95} />
       
-      {/* Right leg of A (descending) */}
-      <rect x="33.5" y="26" width="2.5" height="28" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
-      <rect x="36.5" y="32" width="2.5" height="22" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
-      <rect x="39.5" y="38" width="2.5" height="16" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.8} />
-      <rect x="42.5" y="42" width="2.5" height="12" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.75} />
-      <rect x="45.5" y="46" width="2.5" height="8" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.7} />
+      {/* Left leg (bars extending from center-left outward as you go down) */}
+      <rect x="27" y="21" width="8" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
+      <rect x="25" y="26" width="10" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
+      <rect x="23" y="31" width="12" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.8} />
+      <rect x="21" y="36" width="14" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.75} />
       
-      {/* Horizontal crossbar of A */}
-      <rect x="22" y="40" width="20.5" height="2" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.95} />
+      {/* Crossbar */}
+      <rect x="21" y="36" width="22" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.95} />
+      
+      {/* Right leg (bars extending from center-right outward as you go down) */}
+      <rect x="29" y="21" width="8" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.9} />
+      <rect x="29" y="26" width="10" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.85} />
+      <rect x="29" y="31" width="12" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.8} />
+      <rect x="29" y="36" width="14" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.75} />
+      
+      {/* Bottom bars */}
+      <rect x="19" y="41" width="16" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.7} />
+      <rect x="29" y="41" width="16" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.7} />
+      
+      <rect x="17" y="46" width="18" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.65} />
+      <rect x="29" y="46" width="18" height="2.5" rx="0.5" fill="currentColor" opacity={activeOpacity * 0.65} />
       
       {/* Subtle base line */}
-      <line x1="16" y1="54.5" x2="48" y2="54.5" stroke="currentColor" strokeWidth="0.5" opacity={activeOpacity * 0.2} />
+      <line x1="17" y1="51" x2="47" y2="51" stroke="currentColor" strokeWidth="0.5" opacity={activeOpacity * 0.2} />
     </svg>
   );
 }
