@@ -34,6 +34,16 @@ function getWorkoutStats(workout: CompletedWorkout) {
   }
 }
 
+function formatWeightDelta(weightDelta: number | null) {
+  if (typeof weightDelta !== "number" || weightDelta === 0) return null
+  return `${weightDelta > 0 ? "+" : ""}${weightDelta} lb${Math.abs(weightDelta) === 1 ? "" : "s"}`
+}
+
+function formatRepsDelta(repsDelta: number | null) {
+  if (typeof repsDelta !== "number" || repsDelta === 0) return null
+  return `${repsDelta > 0 ? "+" : ""}${repsDelta} rep${Math.abs(repsDelta) === 1 ? "" : "s"}`
+}
+
 export default function WorkoutDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -162,6 +172,19 @@ export default function WorkoutDetailPage() {
     return getWorkoutStats(workout)
   }, [workout])
 
+  const baselineByExercise = useMemo(() => {
+    if (!workout) return new Map<string, CompletedWorkout["exercises"][number]>()
+    const history = getWorkoutHistory()
+    const baselineWorkout = history
+      .filter((w) => w.id !== workout.id && w.name === workout.name)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+    const map = new Map<string, CompletedWorkout["exercises"][number]>()
+    baselineWorkout?.exercises?.forEach((exercise) => {
+      map.set(normalizeExerciseName(exercise.name), exercise)
+    })
+    return map
+  }, [workout])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
@@ -263,6 +286,7 @@ export default function WorkoutDetailPage() {
             const completedSets = (exercise.sets ?? []).filter((s) => isSetEligibleForStats(s))
             const maxWeight = Math.max(...completedSets.map((s) => s.weight ?? 0), 0)
             const totalVolume = completedSets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0)
+            const baselineExercise = baselineByExercise.get(normalizeExerciseName(exercise.name))
 
             return (
               <Card key={idx} className="p-4 space-y-3">
@@ -298,17 +322,47 @@ export default function WorkoutDetailPage() {
                     <tbody>
                       {(exercise.sets ?? []).map((set, setIdx) => {
                         const isMaxWeight = set.completed && (set.weight ?? 0) === maxWeight
+                        const baselineSet = baselineExercise?.sets?.[setIdx]
+                        const canCompare =
+                          set.completed &&
+                          baselineSet?.completed &&
+                          typeof set.weight === "number" &&
+                          typeof set.reps === "number" &&
+                          typeof baselineSet.weight === "number" &&
+                          typeof baselineSet.reps === "number"
+                        const weightDelta = canCompare ? set.weight - (baselineSet?.weight ?? 0) : null
+                        const repsDelta = canCompare ? set.reps - (baselineSet?.reps ?? 0) : null
+                        const weightDeltaLabel = canCompare ? formatWeightDelta(weightDelta) : null
+                        const repsDeltaLabel = canCompare ? formatRepsDelta(repsDelta) : null
                         return (
                           <tr
                             key={setIdx}
                             className={`border-t border-border ${!set.completed ? "opacity-40" : ""} ${isMaxWeight ? "bg-primary/10" : ""}`}
                           >
                             <td className="px-3 py-2 text-foreground">{setIdx + 1}</td>
-                            <td className="text-center px-3 py-2 font-medium text-foreground">
-                              {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} lbs` : "—"}
+                            <td className="px-3 py-2 font-medium text-foreground">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="mx-auto">
+                                  {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} lbs` : "—"}
+                                </span>
+                                {weightDeltaLabel && (
+                                  <span className="text-[10px] text-white/40" style={{ fontWeight: 400 }}>
+                                    {weightDeltaLabel}
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                            <td className="text-center px-3 py-2 font-medium text-foreground">
-                              {set.completed && set.reps !== null && set.reps !== undefined ? set.reps : "—"}
+                            <td className="px-3 py-2 font-medium text-foreground">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="mx-auto">
+                                  {set.completed && set.reps !== null && set.reps !== undefined ? set.reps : "—"}
+                                </span>
+                                {repsDeltaLabel && (
+                                  <span className="text-[10px] text-white/40" style={{ fontWeight: 400 }}>
+                                    {repsDeltaLabel}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="text-right px-3 py-2 text-muted-foreground">
                               {set.completed && set.weight !== null && set.reps !== null

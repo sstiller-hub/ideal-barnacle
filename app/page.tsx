@@ -713,6 +713,24 @@ export default function Home() {
     selected.setHours(0, 0, 0, 0)
     return selected.getTime() < today.getTime()
   }, [selectedDate])
+  const isTomorrow = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    return selected.getTime() === tomorrow.getTime()
+  }
+  const isYesterday = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    return selected.getTime() === yesterday.getTime()
+  }
 
   const effectiveRestDay = scheduleOverride?.workout === null ? true : scheduleOverride ? false : baseIsRestDay
   const scheduledWorkoutType = effectiveRestDay
@@ -807,8 +825,8 @@ export default function Home() {
         onClick={() => router.push("/settings")}
         className="fixed z-[60] text-white/25 hover:text-white/50 transition-colors duration-200"
         style={{
-          top: "calc(env(safe-area-inset-top, 0px) + 6px)",
-          right: "calc(16px + env(safe-area-inset-right, 0px))",
+          top: "calc(env(safe-area-inset-top, 0px) + 10px)",
+          right: "calc(18px + env(safe-area-inset-right, 0px))",
           background: "transparent",
           border: "none",
           padding: "8px",
@@ -867,9 +885,10 @@ export default function Home() {
           style={{
             background: "#0D0D0F",
             boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
+            paddingRight: "60px",
           }}
         >
-        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
           <div className="relative flex-shrink-0">
             <div className="flex items-center gap-2 mb-1">
               <button
@@ -921,6 +940,7 @@ export default function Home() {
               onClick={() => !isPastDay && setShowWorkoutPicker(!showWorkoutPicker)}
               disabled={isPastDay}
               className="text-left transition-opacity duration-200 hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
+              style={{ paddingRight: "44px" }}
             >
               <h1
                 className="text-white"
@@ -948,14 +968,14 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="flex items-start gap-4" style={{ marginTop: "20px" }}>
+          <div className="flex items-start gap-4" style={{ marginTop: "16px" }}>
             <div className="flex items-center gap-1.5">
               <div>
                 <div
                   className="text-white/25 tracking-widest mb-1"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
                 >
-                  {isToday() ? "TODAY" : isPastDay ? "PAST" : "UPCOMING"}
+                  {isToday() ? "TODAY" : isTomorrow() ? "TOMORROW" : isYesterday() ? "YESTERDAY" : isPastDay ? "PAST" : "UPCOMING"}
                 </div>
                 <div className="text-white/95" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em", textAlign: "left" }}>
                   {selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
