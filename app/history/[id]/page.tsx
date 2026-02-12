@@ -60,28 +60,6 @@ export default function WorkoutDetailPage() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading workout...</p>
-      </div>
-    )
-  }
-
-  if (!workout) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <Card className="p-8 text-center">
-            <h2 className="text-lg font-semibold mb-2">Workout not found</h2>
-            <p className="text-sm text-muted-foreground mb-4">This workout may have been deleted</p>
-            <Button onClick={() => router.push("/history")}>Back to History</Button>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
   const performanceSummary = useMemo<{
     excludedSets: number
     improvedCount: number
@@ -183,6 +161,28 @@ export default function WorkoutDetailPage() {
     }
     return getWorkoutStats(workout)
   }, [workout])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading workout...</p>
+      </div>
+    )
+  }
+
+  if (!workout) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <Card className="p-8 text-center">
+            <h2 className="text-lg font-semibold mb-2">Workout not found</h2>
+            <p className="text-sm text-muted-foreground mb-4">This workout may have been deleted</p>
+            <Button onClick={() => router.push("/history")}>Back to History</Button>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
