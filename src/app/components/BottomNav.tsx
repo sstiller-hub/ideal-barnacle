@@ -131,7 +131,7 @@ export function BottomNav({ fixed = true, activeTab = "/", onTabChange }: Bottom
               }`}
             >
               {isAktIcon ? (
-                <Icon size={20} active={active} className={active ? "stroke-[2.5]" : ""} />
+                <Icon size={16} active={active} className={active ? "stroke-[2.5]" : ""} />
               ) : (
                 <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
               )}
