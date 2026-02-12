@@ -1,15 +1,26 @@
-<svg width="1024" height="1024" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Black background -->
-  <rect width="100" height="100" fill="#000000"/>
-  <!-- Dark matte background -->
-  <rect x="0" y="0" width="100" height="100" rx="22" fill="#0D0D0F"/>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- AKT App Icon - Upward Delta (△) -->
+  <!-- Pure grayscale data bars representing measured ascent and progressive overload -->
+  <!-- Wide at bottom, narrow at top = upward pointing triangle -->
   
-  <!-- Data bars: narrow at bottom → wide at top, dark → bright -->
-  <line x1="46" y1="85" x2="54" y2="85" stroke="#4A4A4A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="40" y1="73" x2="60" y2="73" stroke="#5A5A5A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="34" y1="61" x2="66" y2="61" stroke="#6A6A6A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="28" y1="49" x2="72" y2="49" stroke="#7A7A7A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="22" y1="37" x2="78" y2="37" stroke="#8A8A8A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="16" y1="25" x2="84" y2="25" stroke="#9A9A9A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="10" y1="13" x2="90" y2="13" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round"/>
+  <!-- Bottom bar (widest) - #4A4A4A -->
+  <line x1="102.4" y1="870.4" x2="921.6" y2="870.4" stroke="#4A4A4A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Bar 2 - #5A5A5A -->
+  <line x1="163.84" y1="747.52" x2="860.16" y2="747.52" stroke="#5A5A5A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Bar 3 - #6A6A6A -->
+  <line x1="225.28" y1="624.64" x2="798.72" y2="624.64" stroke="#6A6A6A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Bar 4 (middle) - #7A7A7A -->
+  <line x1="286.72" y1="501.76" x2="737.28" y2="501.76" stroke="#7A7A7A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Bar 5 - #8A8A8A -->
+  <line x1="348.16" y1="378.88" x2="675.84" y2="378.88" stroke="#8A8A8A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Bar 6 - #9A9A9A -->
+  <line x1="409.6" y1="256" x2="614.4" y2="256" stroke="#9A9A9A" stroke-width="25.6" stroke-linecap="round"/>
+  
+  <!-- Top bar (narrowest) - Pure White #FFFFFF for maximum emphasis -->
+  <line x1="471.04" y1="133.12" x2="552.96" y2="133.12" stroke="#FFFFFF" stroke-width="35.84" stroke-linecap="round"/>
 </svg>
