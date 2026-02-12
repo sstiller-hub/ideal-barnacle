@@ -1,19 +1,15 @@
-<svg 
-  width="1024" 
-  height="1024" 
-  viewBox="0 0 100 100" 
-  fill="none" 
-  xmlns="http://www.w3.org/2000/svg"
->
+<svg width="1024" height="1024" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black background -->
+  <rect width="100" height="100" fill="#000000"/>
   <!-- Dark matte background -->
   <rect x="0" y="0" width="100" height="100" rx="22" fill="#0D0D0F"/>
   
-  <!-- Data bars forming implied delta -->
-  <line x1="10" y1="85" x2="90" y2="85" stroke="#4A4A4A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="16" y1="73" x2="84" y2="73" stroke="#5A5A5A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="22" y1="61" x2="78" y2="61" stroke="#6A6A6A" strokeWidth="2.5" strokeLinecap="round"/>
+  <!-- Data bars: narrow at bottom → wide at top, dark → bright -->
+  <line x1="46" y1="85" x2="54" y2="85" stroke="#4A4A4A" strokeWidth="2.5" strokeLinecap="round"/>
+  <line x1="40" y1="73" x2="60" y2="73" stroke="#5A5A5A" strokeWidth="2.5" strokeLinecap="round"/>
+  <line x1="34" y1="61" x2="66" y2="61" stroke="#6A6A6A" strokeWidth="2.5" strokeLinecap="round"/>
   <line x1="28" y1="49" x2="72" y2="49" stroke="#7A7A7A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="34" y1="37" x2="66" y2="37" stroke="#8A8A8A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="40" y1="25" x2="60" y2="25" stroke="#9A9A9A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="46" y1="13" x2="54" y2="13" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round"/>
+  <line x1="22" y1="37" x2="78" y2="37" stroke="#8A8A8A" strokeWidth="2.5" strokeLinecap="round"/>
+  <line x1="16" y1="25" x2="84" y2="25" stroke="#9A9A9A" strokeWidth="2.5" strokeLinecap="round"/>
+  <line x1="10" y1="13" x2="90" y2="13" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round"/>
 </svg>
