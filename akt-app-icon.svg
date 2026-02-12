@@ -1,5 +1,5 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" fill="#000000"/>
+  <rect width="1024" height="1024" rx="225.28" ry="225.28" fill="#000000"/>
   <!-- AKT App Icon - Upward Delta (△) -->
   <!-- Pure grayscale data bars representing measured ascent and progressive overload -->
   <!-- Wide at bottom, narrow at top = upward pointing triangle -->

@@ -2480,15 +2480,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       <div className="relative z-10" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
         {isResting && (
           <div
-            className="absolute right-5 transition-all duration-200"
+            className="absolute left-1/2 transition-all duration-200"
             style={{
-              top: "6px",
+              top: "calc(env(safe-area-inset-top, 0px) + 8px)",
               background: "rgba(10, 10, 12, 0.95)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               borderRadius: "2px",
               padding: "8px 10px",
               backdropFilter: "blur(20px)",
               zIndex: 20,
+              transform: "translateX(-50%)",
             }}
           >
             <div className="flex items-center justify-between gap-3">
