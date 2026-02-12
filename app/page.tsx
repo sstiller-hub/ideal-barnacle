@@ -887,7 +887,7 @@ export default function Home() {
           onTouchEnd={handleDaySwipeEnd}
         >
         <div
-          className="px-5 pb-8"
+          className="px-5 pb-6"
           style={{
             paddingRight: "60px",
           }}
@@ -1478,7 +1478,12 @@ export default function Home() {
       </div>
       </div>
 
-      <div className="px-5 mt-2 flex-shrink-0">
+      <div
+        className="px-5 mt-0 flex-shrink-0"
+        onTouchStart={(event) => event.stopPropagation()}
+        onTouchMove={(event) => event.stopPropagation()}
+        onTouchEnd={(event) => event.stopPropagation()}
+      >
         <div
           className="text-white/25 tracking-widest mb-2"
           style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
@@ -1501,7 +1506,13 @@ export default function Home() {
       </div>
 
       {todayPRs.length > 0 && (
-        <div className="flex-shrink-0 pb-6" data-testid="pr-section">
+        <div
+          className="flex-shrink-0 pb-4"
+          data-testid="pr-section"
+          onTouchStart={(event) => event.stopPropagation()}
+          onTouchMove={(event) => event.stopPropagation()}
+          onTouchEnd={(event) => event.stopPropagation()}
+        >
           <div className="px-5 flex items-center justify-between mb-4">
             <h2
               className="text-white/25 tracking-widest"
