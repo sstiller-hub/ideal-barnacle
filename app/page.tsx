@@ -764,6 +764,43 @@ export default function Home() {
     return { totalSets, remainingSets }
   }, [session?.exercises])
 
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
+
+  const handleDaySwipeStart = (event: React.TouchEvent) => {
+    if (event.touches.length !== 1) return
+    swipeStartRef.current = {
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY,
+    }
+    swipeDeltaRef.current = null
+  }
+
+  const handleDaySwipeMove = (event: React.TouchEvent) => {
+    if (!swipeStartRef.current || event.touches.length !== 1) return
+    const dx = event.touches[0].clientX - swipeStartRef.current.x
+    const dy = event.touches[0].clientY - swipeStartRef.current.y
+    swipeDeltaRef.current = { x: dx, y: dy }
+  }
+
+  const handleDaySwipeEnd = () => {
+    if (!swipeStartRef.current || !swipeDeltaRef.current) {
+      swipeStartRef.current = null
+      swipeDeltaRef.current = null
+      return
+    }
+    const { x: dx, y: dy } = swipeDeltaRef.current
+    swipeStartRef.current = null
+    swipeDeltaRef.current = null
+    if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return
+    setShowWorkoutPicker(false)
+    if (dx > 0) {
+      goToPreviousDay()
+    } else {
+      goToNextDay()
+    }
+  }
+
   return (
     <>
       <button
@@ -791,7 +828,12 @@ export default function Home() {
           paddingBottom: "env(safe-area-inset-bottom, 100px)",
           background: "#0D0D0F",
           boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          touchAction: "pan-x",
+          overscrollBehavior: "none",
         }}
+        onTouchStart={handleDaySwipeStart}
+        onTouchMove={handleDaySwipeMove}
+        onTouchEnd={handleDaySwipeEnd}
       >
         {devModeEnabled && (
           <div className="px-5 pb-4 flex-shrink-0">
@@ -908,17 +950,6 @@ export default function Home() {
 
           <div className="flex items-start gap-4" style={{ marginTop: "20px" }}>
             <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => {
-                  setShowWorkoutPicker(false)
-                  goToPreviousDay()
-                }}
-                aria-label="Previous day"
-                className="text-white/40 hover:text-white/70 transition-colors"
-              >
-                <ChevronLeft size={16} strokeWidth={2} />
-              </button>
-
               <div>
                 <div
                   className="text-white/25 tracking-widest mb-1"
@@ -933,17 +964,6 @@ export default function Home() {
                   {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </div>
               </div>
-
-              <button
-                onClick={() => {
-                  setShowWorkoutPicker(false)
-                  goToNextDay()
-                }}
-                aria-label="Next day"
-                className="text-white/40 hover:text-white/70 transition-colors"
-              >
-                <ChevronRight size={16} strokeWidth={2} />
-              </button>
             </div>
           </div>
         </div>
