@@ -32,7 +32,7 @@ export function WorkoutScheduleEditor() {
 
   useEffect(() => {
     setRoutines(getRoutines())
-    setWeeklyScheduleState(getWeeklySchedule())
+    setWeeklyScheduleState((prev) => prev ?? getWeeklySchedule())
   }, [])
 
   const fallbackRoutines = routines.length > 0 ? routines : GROWTH_V2_ROUTINES

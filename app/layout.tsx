@@ -46,10 +46,10 @@ export const metadata: Metadata = {
       },
     ],
     apple: [
-      { url: "/icons/akt-app-120.png?v=20260211", sizes: "120x120", type: "image/png" },
-      { url: "/icons/akt-app-152.png?v=20260211", sizes: "152x152", type: "image/png" },
-      { url: "/icons/akt-app-167.png?v=20260211", sizes: "167x167", type: "image/png" },
-      { url: "/icons/akt-app-180.png?v=20260211", sizes: "180x180", type: "image/png" },
+      { url: "/icons/akt-app-120-v2.png", sizes: "120x120", type: "image/png" },
+      { url: "/icons/akt-app-152-v2.png", sizes: "152x152", type: "image/png" },
+      { url: "/icons/akt-app-167-v2.png", sizes: "167x167", type: "image/png" },
+      { url: "/icons/akt-app-180-v2.png", sizes: "180x180", type: "image/png" },
     ],
   },
 }
@@ -70,10 +70,10 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/kova-tab-2.svg" />
-        <link rel="apple-touch-icon" sizes="120x120" href="/icons/akt-app-120.png?v=20260211" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/akt-app-152.png?v=20260211" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/icons/akt-app-167.png?v=20260211" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/akt-app-180.png?v=20260211" />
+        <link rel="apple-touch-icon" sizes="120x120" href="/icons/akt-app-120-v2.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/akt-app-152-v2.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icons/akt-app-167-v2.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/akt-app-180-v2.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
