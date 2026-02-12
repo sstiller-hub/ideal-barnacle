@@ -1483,6 +1483,9 @@ export default function Home() {
         onTouchStart={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
         onTouchEnd={(event) => event.stopPropagation()}
+        onTouchStartCapture={(event) => event.stopPropagation()}
+        onTouchMoveCapture={(event) => event.stopPropagation()}
+        onTouchEndCapture={(event) => event.stopPropagation()}
       >
         <div
           className="text-white/25 tracking-widest mb-2"
@@ -1512,6 +1515,9 @@ export default function Home() {
           onTouchStart={(event) => event.stopPropagation()}
           onTouchMove={(event) => event.stopPropagation()}
           onTouchEnd={(event) => event.stopPropagation()}
+          onTouchStartCapture={(event) => event.stopPropagation()}
+          onTouchMoveCapture={(event) => event.stopPropagation()}
+          onTouchEndCapture={(event) => event.stopPropagation()}
         >
           <div className="px-5 flex items-center justify-between mb-4">
             <h2
