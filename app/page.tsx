@@ -846,12 +846,7 @@ export default function Home() {
           paddingBottom: "env(safe-area-inset-bottom, 100px)",
           background: "#0D0D0F",
           boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
-          touchAction: "pan-x",
-          overscrollBehavior: "none",
         }}
-        onTouchStart={handleDaySwipeStart}
-        onTouchMove={handleDaySwipeMove}
-        onTouchEnd={handleDaySwipeEnd}
       >
         {devModeEnabled && (
           <div className="px-5 pb-4 flex-shrink-0">
@@ -881,14 +876,23 @@ export default function Home() {
           </div>
         )}
         <div
-          className="relative z-50 px-5 pb-8 flex-shrink-0"
+          className="relative z-50 flex-shrink-0"
           style={{
             background: "#0D0D0F",
             boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
+            touchAction: "pan-x",
+          }}
+          onTouchStart={handleDaySwipeStart}
+          onTouchMove={handleDaySwipeMove}
+          onTouchEnd={handleDaySwipeEnd}
+        >
+        <div
+          className="px-5 pb-8"
+          style={{
             paddingRight: "60px",
           }}
         >
-          <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div className="relative flex-shrink-0">
             <div className="flex items-center gap-2 mb-1">
               <button
@@ -1471,6 +1475,7 @@ export default function Home() {
           </div>
         )}
 
+      </div>
       </div>
 
       <div className="px-5 mt-2 flex-shrink-0">
