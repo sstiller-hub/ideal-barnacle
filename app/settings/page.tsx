@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
-import { seedDemoData } from "@/lib/seed-demo-data"
 import { importWorkouts, type ImportResult } from "@/lib/import-workouts"
 import {
   backupToGoogleDrive,
@@ -161,15 +160,10 @@ export default function SettingsPage() {
     const keysToRemove = [
       "workout_history",
       "personal_records",
-      "workout_routines",
       "workout_routines_v2",
       "workoutSessions",
       "workoutSets",
       "currentSessionId",
-      "current_session_id",
-      "workout_session",
-      "autosave_workout_session",
-      "workout_achievements",
       "workout_schedule",
       "exercise_preferences",
     ]
@@ -184,34 +178,6 @@ export default function SettingsPage() {
 
     setTimeout(() => {
       window.location.replace(window.location.href)
-    }, 100)
-  }
-
-  const handleFixWorkoutDate = () => {
-    const targetId = "0a4113eb-74cd-438e-97ed-e256c1d5582d"
-    const history = getWorkoutHistory()
-    const now = new Date()
-    now.setHours(12, 0, 0, 0)
-    const updated = history.map((workout) =>
-      workout.id === targetId ? { ...workout, date: now.toISOString() } : workout
-    )
-    localStorage.setItem("workout_history", JSON.stringify(updated))
-    setWorkouts(updated)
-    alert("Workout date updated for today.")
-  }
-
-  const handleSeedDemoData = () => {
-    const confirmed = confirm("This will replace all existing data with demo data. Are you sure?")
-    if (!confirmed) return
-
-    const result = seedDemoData()
-
-    setWorkouts(getWorkoutHistory())
-
-    alert(`Demo data loaded! Added ${result.workouts} workouts and ${result.prs} personal records.`)
-
-    setTimeout(() => {
-      window.location.href = window.location.origin
     }, 100)
   }
 
@@ -705,7 +671,6 @@ export default function SettingsPage() {
         >
           <SettingItem label="Workout Schedule" />
           <SettingItem label="Reset Program" />
-          <SettingItem label="Demo Data" />
           <div className="mt-3 space-y-4">
               <WorkoutScheduleEditor />
 
@@ -719,19 +684,6 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              <div>
-                <h2 className="font-bold text-base mb-2">Demo Data</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Load realistic demo data with 14 days of workout history and progressive overload. Perfect for testing
-                  and demonstrations.
-                </p>
-                <Button onClick={handleSeedDemoData} className="w-full" variant="default">
-                  Load Demo Data
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Includes 10 workouts with progressive overload and PRs
-                </p>
-              </div>
           </div>
         </SettingsSection>
 
@@ -840,16 +792,6 @@ export default function SettingsPage() {
                 />
                 <Button onClick={handleSavePrExclusions} className="w-full mt-3" variant="secondary">
                   {prExclusionSaved ? "Saved" : "Save Exclusions"}
-                </Button>
-              </div>
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Fix Workout Date</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Updates a specific workout to today in local history.
-                </p>
-                <Button onClick={handleFixWorkoutDate} className="w-full" variant="secondary">
-                  Fix Date for Today
                 </Button>
               </div>
 

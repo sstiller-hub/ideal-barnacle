@@ -66,7 +66,7 @@ function getAllLocalStorageData() {
   return {
     workout_history: localStorage.getItem("workout_history"),
     personal_records: localStorage.getItem("personal_records"),
-    workout_routines: localStorage.getItem("workout_routines"),
+    workout_routines_v2: localStorage.getItem("workout_routines_v2"),
     timestamp: new Date().toISOString(),
     version: "1.0",
   }
@@ -76,7 +76,11 @@ function getAllLocalStorageData() {
 function restoreAllLocalStorageData(data: any) {
   if (data.workout_history) localStorage.setItem("workout_history", data.workout_history)
   if (data.personal_records) localStorage.setItem("personal_records", data.personal_records)
-  if (data.workout_routines) localStorage.setItem("workout_routines", data.workout_routines)
+  if (data.workout_routines_v2) localStorage.setItem("workout_routines_v2", data.workout_routines_v2)
+  // Legacy compatibility for old backup files.
+  if (!data.workout_routines_v2 && data.workout_routines) {
+    localStorage.setItem("workout_routines_v2", data.workout_routines)
+  }
 }
 
 // Backup to Google Drive

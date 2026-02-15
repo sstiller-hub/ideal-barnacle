@@ -2496,8 +2496,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               }}
               transition={{ duration: 0.2, ease: "easeOut" }}
               style={{
-                left: "16px",
-                right: "16px",
+                left: "calc(16px + env(safe-area-inset-left, 0px))",
+                right: "calc(16px + env(safe-area-inset-right, 0px))",
                 bottom: "calc(12px + env(safe-area-inset-bottom))",
                 borderColor:
                   restRemainingSeconds <= 10
