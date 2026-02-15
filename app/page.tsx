@@ -184,6 +184,35 @@ export default function Home() {
   const currentWeekVolume = weeklyVolumes[weeklyVolumes.length - 1] ?? 0
   const previousWeekVolume = weeklyVolumes[weeklyVolumes.length - 2] ?? 0
 
+  const inProgressSessionVolume = useMemo(() => {
+    if (!session?.exercises) return 0
+    return session.exercises.reduce((sum: number, exercise: any) => {
+      const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+      const exerciseVolume = sets
+        .filter((set: any) => isSetEligibleForStats(set))
+        .reduce((setSum: number, set: any) => setSum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+      return sum + exerciseVolume
+    }, 0)
+  }, [session?.exercises])
+
+  const isSessionInProgress = Boolean(session && session.status !== "completed" && !session.endedAt)
+  const isInProgressSessionInCurrentWeek = useMemo(() => {
+    if (!isSessionInProgress || !session?.startedAt) return false
+    const startedAt = new Date(session.startedAt)
+    if (Number.isNaN(startedAt.getTime())) return false
+    const { start, end } = getWeekRange(new Date())
+    return startedAt >= start && startedAt < end
+  }, [isSessionInProgress, session?.startedAt])
+
+  const currentWeekVolumeSoFar =
+    currentWeekVolume + (isInProgressSessionInCurrentWeek ? inProgressSessionVolume : 0)
+  const weeklyVolumesForCard = useMemo(() => {
+    if (!weeklyVolumes.length || !isInProgressSessionInCurrentWeek) return weeklyVolumes
+    const next = [...weeklyVolumes]
+    next[next.length - 1] = currentWeekVolumeSoFar
+    return next
+  }, [weeklyVolumes, isInProgressSessionInCurrentWeek, currentWeekVolumeSoFar])
+  const canCompareWeekOverWeek = !isInProgressSessionInCurrentWeek
   useEffect(() => {
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
@@ -771,6 +800,42 @@ export default function Home() {
       ? session.exercises
       : workoutForDate?.exercises || scheduledRoutine?.exercises
   const isCompactExerciseList = (displayExercises?.length ?? 0) >= 9
+  const prRows = useMemo(() => {
+    const splitEvenly = (prs: PersonalRecord[]) => {
+      const splitIndex = Math.ceil(prs.length / 2)
+      return {
+        firstRow: prs.slice(0, splitIndex),
+        secondRow: prs.slice(splitIndex),
+      }
+    }
+
+    if (actualState === "rest") {
+      return splitEvenly(todayPRs)
+    }
+
+    const todayExerciseNames = new Set(
+      (displayExercises ?? [])
+        .map((exercise: any) => (typeof exercise?.name === "string" ? normalizeExerciseName(exercise.name) : ""))
+        .filter(Boolean)
+    )
+
+    if (todayExerciseNames.size === 0) {
+      return splitEvenly(todayPRs)
+    }
+
+    const firstRow: PersonalRecord[] = []
+    const secondRow: PersonalRecord[] = []
+
+    todayPRs.forEach((pr) => {
+      if (todayExerciseNames.has(normalizeExerciseName(pr.name))) {
+        firstRow.push(pr)
+      } else {
+        secondRow.push(pr)
+      }
+    })
+
+    return { firstRow, secondRow }
+  }, [todayPRs, actualState, displayExercises])
   const activeSessionProgress = useMemo(() => {
     if (!session?.exercises) return null
     let totalSets = 0
@@ -1083,9 +1148,9 @@ export default function Home() {
         )}
       </div>
 
-      <div className="flex-1 overflow-hidden" style={{ paddingBottom: "20px" }}>
+      <div className="overflow-hidden" style={{ paddingBottom: "8px" }}>
         {weeklySummary && (
-          <div className="px-5 mb-6">
+          <div className="px-5 mb-3">
             <div
               className="text-white/25 tracking-widest mb-3"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
@@ -1144,7 +1209,7 @@ export default function Home() {
         )}
 
         {lastWorkoutSummary && (
-          <div className="px-5 mb-6">
+          <div className="px-5 mb-3">
             <div className="flex items-center justify-between mb-3">
               <div
                 className="text-white/25 tracking-widest"
@@ -1234,7 +1299,7 @@ export default function Home() {
         )}
 
         {actualState === "completed" && workoutForDate && (
-          <div className="px-5 mb-12">
+          <div className="px-5 mb-6">
             <div
               className="mb-6"
               style={{
@@ -1356,7 +1421,7 @@ export default function Home() {
         )}
 
         {actualState === "rest" && (
-          <div className="px-5 mb-12">
+          <div className="px-5 mb-6">
             <div className="text-white/20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
               Rest day — no workout scheduled
             </div>
@@ -1364,8 +1429,8 @@ export default function Home() {
         )}
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
-          <div className="px-5 mb-12">
-            <div className="mb-6 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
+          <div className="px-5 mb-3">
+            <div className="mb-4 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
               {displayExercises.map((exercise: any, index: number) => (
                 <div
                   key={exercise.id ?? `${exercise.name}-${index}`}
@@ -1505,9 +1570,10 @@ export default function Home() {
           type="button"
         >
           <TrainingVolumeCard
-            currentWeekVolume={currentWeekVolume}
+            currentWeekVolume={currentWeekVolumeSoFar}
             previousWeekVolume={previousWeekVolume}
-            chartData={weeklyVolumes}
+            chartData={weeklyVolumesForCard}
+            canCompareWeekOverWeek={canCompareWeekOverWeek}
             timeframe="7w"
           />
         </button>
@@ -1533,22 +1599,43 @@ export default function Home() {
             </h2>
           </div>
 
-          <div
-            className="flex gap-3 overflow-x-auto px-5"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-          >
-            {todayPRs.map((pr) => (
-              <PRCard
-                key={pr.name}
-                exercise={pr.name}
-                reps={pr.reps}
-                weight={pr.weight}
-                details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
-                chartData={pr.chartData || []}
-                trendPct={pr.trendPct}
-                onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
-              />
-            ))}
+          <div className="flex flex-col gap-3 px-5">
+            <div
+              className="flex gap-3 overflow-x-auto"
+              data-scroll-x="pr-cards-row-1"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+            >
+              {prRows.firstRow.map((pr) => (
+                <PRCard
+                  key={`r1-${pr.name}`}
+                  exercise={pr.name}
+                  reps={pr.reps}
+                  weight={pr.weight}
+                  details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
+                  chartData={pr.chartData || []}
+                  trendPct={pr.trendPct}
+                  onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
+                />
+              ))}
+            </div>
+            <div
+              className="flex gap-3 overflow-x-auto"
+              data-scroll-x="pr-cards-row-2"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+            >
+              {prRows.secondRow.map((pr) => (
+                <PRCard
+                  key={`r2-${pr.name}`}
+                  exercise={pr.name}
+                  reps={pr.reps}
+                  weight={pr.weight}
+                  details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
+                  chartData={pr.chartData || []}
+                  trendPct={pr.trendPct}
+                  onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -1626,7 +1713,7 @@ export default function Home() {
       </AlertDialog>
 
         <style>{`
-        .flex.overflow-x-auto::-webkit-scrollbar {
+        [data-scroll-x]::-webkit-scrollbar {
           display: none;
         }
 
@@ -1794,11 +1881,13 @@ function TrainingVolumeCard({
   currentWeekVolume,
   previousWeekVolume,
   chartData,
+  canCompareWeekOverWeek,
   timeframe,
 }: {
   currentWeekVolume: number
   previousWeekVolume: number
   chartData: number[]
+  canCompareWeekOverWeek: boolean
   timeframe: string
 }) {
   const formattedData = chartData.map((value, index) => ({ week: index + 1, volume: value }))
@@ -1808,8 +1897,8 @@ function TrainingVolumeCard({
   const arrowColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
   const valueColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
   const percentColor = isPositive ? "rgba(255, 87, 51, 0.6)" : "rgba(255, 255, 255, 0.2)"
-  const showWeekCompare = currentWeekVolume > 0 && previousWeekVolume > 0
-  const displayVolume = showWeekCompare ? currentWeekVolume : previousWeekVolume
+  const showWeekCompare = canCompareWeekOverWeek && currentWeekVolume > 0 && previousWeekVolume > 0
+  const displayVolume = currentWeekVolume
   const formatVolumeK = (value: number) => {
     const abs = Math.abs(value)
     if (abs >= 1000) return `${(abs / 1000).toFixed(1)}k`
@@ -1843,7 +1932,7 @@ function TrainingVolumeCard({
           className="text-white/40"
           style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "'Archivo Narrow', sans-serif" }}
         >
-          {showWeekCompare ? "WEEK/WEEK" : "LAST WEEK"}
+          {showWeekCompare ? "WEEK/WEEK" : "THIS WEEK SO FAR"}
         </div>
         {showWeekCompare ? (
           <div className="flex items-center gap-1.5">
@@ -1880,7 +1969,7 @@ function TrainingVolumeCard({
             className="text-white/25"
             style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
           >
-            {formatVolumeK(previousWeekVolume)} lbs
+            Prev 7d {formatVolumeK(previousWeekVolume)} lbs
           </div>
         )}
       </div>
