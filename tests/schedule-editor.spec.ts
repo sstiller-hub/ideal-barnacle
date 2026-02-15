@@ -28,16 +28,14 @@ test("schedule editor saves and Home reflects rest day", async ({ page }) => {
   }, routine)
 
   await page.goto("/schedule")
-  const browserDayIndex = await page.evaluate(() => new Date().getDay())
-  const dayIndex = (browserDayIndex + 6) % 7
 
   const selects = page.getByRole("combobox")
-  const count = await selects.count()
-  for (let i = 0; i < count; i += 1) {
-    await selects.nth(i).selectOption("rest")
+  await expect(selects).toHaveCount(dayLabels.length)
+  for (const dayLabel of dayLabels) {
+    await page.getByRole("combobox", { name: `${dayLabel} schedule` }).selectOption("rest")
   }
   await expect(selects.first()).toHaveValue("rest")
-  await expect(selects.nth(count - 1)).toHaveValue("rest")
+  await expect(selects.nth(dayLabels.length - 1)).toHaveValue("rest")
 
   await page.getByRole("button", { name: "Save schedule" }).click()
   await expect(page.getByText("Schedule saved.")).toBeVisible()
