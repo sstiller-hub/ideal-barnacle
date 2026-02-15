@@ -3067,14 +3067,20 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                         )}
 
                         {isActiveExercise &&
-                          !isCompressedCompletedSet &&
                           lastSet &&
                           typeof set.weight === "number" &&
                           typeof set.reps === "number" && (
-                          <div className="flex items-center gap-2 mb-3" style={{ marginBottom: isCompactSets ? "8px" : "12px" }}>
+                          <div
+                            className="flex items-center gap-2"
+                            style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "8px" : "12px" }}
+                          >
                             <div
                               className="text-white/20"
-                              style={{ fontSize: isCompactSets ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                              style={{
+                                fontSize: isCompressedCompletedSet ? "7px" : isCompactSets ? "8px" : "9px",
+                                fontWeight: 400,
+                                fontVariantNumeric: "tabular-nums",
+                              }}
                             >
                               Last: {lastSet.weight} × {lastSet.reps}
                             </div>
@@ -3082,7 +3088,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               <div
                                 className="flex items-center gap-1.5"
                                 style={{
-                                  fontSize: "9px",
+                                  fontSize: isCompressedCompletedSet ? "7px" : "9px",
                                   fontWeight: comparison?.status === "pr" ? 600 : 400,
                                   color:
                                     comparison?.status === "pr"
