@@ -37,18 +37,69 @@ export default function WorkoutSessionPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (routineId) {
-      const current = getCurrentInProgressSession()
-      if (current?.routineId && current.routineId !== routineId) {
-        setActiveSession(current)
-        setConflictOpen(true)
-        setRoutine(null)
-        return
+  const toRoutineFromSession = useMemo(() => {
+    return (session: AutosaveWorkoutSession | null): WorkoutRoutine | null => {
+      if (!session) return null
+      const byId = resolveRoutine(session.routineId || null)
+      if (byId) return byId
+
+      const fallbackExercises = Array.isArray(session.exercises) ? session.exercises : []
+      if (fallbackExercises.length === 0) return null
+
+      const nowIso = new Date().toISOString()
+      return {
+        id: session.routineId || `resumed-${session.id}`,
+        name: session.routineName || "Resumed Workout",
+        description: "Recovered from active session",
+        estimatedTime: "45 min",
+        category: "Recovered",
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        exercises: fallbackExercises.map((exercise: any, index: number) => ({
+          id: exercise.id || `exercise-${index + 1}`,
+          name: exercise.name || `Exercise ${index + 1}`,
+          type: "strength",
+          targetSets:
+            typeof exercise.targetSets === "number"
+              ? exercise.targetSets
+              : Array.isArray(exercise.sets)
+                ? exercise.sets.length
+                : 1,
+          targetReps:
+            typeof exercise.targetReps === "string"
+              ? exercise.targetReps
+              : exercise.targetReps != null
+                ? String(exercise.targetReps)
+                : "8-12",
+          notes: typeof exercise.notes === "string" ? exercise.notes : undefined,
+        })),
       }
-      setRoutine(resolveRoutine(routineId))
     }
-  }, [routineId, resolveRoutine])
+  }, [resolveRoutine])
+
+  useEffect(() => {
+    const current = getCurrentInProgressSession()
+
+    if (!routineId) {
+      setRoutine(toRoutineFromSession(current))
+      return
+    }
+
+    if (current?.routineId && current.routineId !== routineId) {
+      setActiveSession(current)
+      setConflictOpen(true)
+      setRoutine(null)
+      return
+    }
+
+    const resolved = resolveRoutine(routineId)
+    if (resolved) {
+      setRoutine(resolved)
+      return
+    }
+
+    setRoutine(toRoutineFromSession(current))
+  }, [routineId, resolveRoutine, toRoutineFromSession])
 
   const handleResumeExisting = () => {
     if (!activeSession?.routineId) return

@@ -189,3 +189,43 @@ test("plate toggle is single button and flips label", async ({ page }) => {
   const nextLabel = (await toggle.textContent()) || ""
   expect(nextLabel).not.toBe(initialLabel)
 })
+
+test("resumes active session when routine is missing from library", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem("__resume_missing_routine_seeded") === "true") return
+    localStorage.clear()
+    localStorage.setItem("workout_routines_v2", JSON.stringify([]))
+    localStorage.setItem(
+      "workoutSessions",
+      JSON.stringify([
+        {
+          id: "legacy-session-1",
+          routineId: "legacy-routine-id",
+          routineName: "Legacy Routine",
+          status: "in_progress",
+          startedAt: new Date().toISOString(),
+          activeDurationSeconds: 0,
+          currentExerciseIndex: 0,
+          exercises: [
+            {
+              id: "legacy-ex-1",
+              name: "Legacy Row",
+              targetSets: 2,
+              targetReps: "6-8",
+              completed: false,
+              sets: [
+                { id: "legacy-s1", reps: 8, weight: 100, completed: true },
+                { id: "legacy-s2", reps: null, weight: null, completed: false },
+              ],
+            },
+          ],
+        },
+      ]),
+    )
+    localStorage.setItem("currentSessionId", "legacy-session-1")
+    localStorage.setItem("__resume_missing_routine_seeded", "true")
+  })
+
+  await page.goto("/workout/session?routineId=legacy-routine-id")
+  await expect(page.getByText("LEGACY ROW")).toBeVisible()
+})
