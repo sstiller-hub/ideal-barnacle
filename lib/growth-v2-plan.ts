@@ -199,7 +199,6 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetReps: "10-12",
       }),
       ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" }),
-      ex({ id: "sa-rotation", name: "Cable Rotation", type: "other", targetSets: 3, targetReps: "10-12", notes: "Control > weight." }),
       ex({ id: "sa-oblique-crunch", name: "Oblique Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15", notes: "Control > weight." }),
     ],
   },

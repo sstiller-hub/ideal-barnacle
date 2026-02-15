@@ -8,12 +8,12 @@
   <!-- Dark matte background -->
   <rect x="0" y="0" width="100" height="100" rx="22" fill="#0D0D0F"/>
   
-  <!-- Data bars forming implied delta - scaled to 85% and centered both vertically and horizontally -->
-  <line x1="16" y1="80.6" x2="84" y2="80.6" stroke="#4A4A4A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="21.1" y1="70.4" x2="78.9" y2="70.4" stroke="#5A5A5A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="26.2" y1="60.2" x2="73.8" y2="60.2" stroke="#6A6A6A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="31.3" y1="50" x2="68.7" y2="50" stroke="#7A7A7A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="36.4" y1="39.8" x2="63.6" y2="39.8" stroke="#8A8A8A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="41.5" y1="29.6" x2="58.5" y2="29.6" stroke="#9A9A9A" strokeWidth="2.5" strokeLinecap="round"/>
-  <line x1="46.6" y1="19.4" x2="53.4" y2="19.4" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round"/>
+  <!-- Midpoint treatment: slightly narrower and lighter than the current thick variant -->
+  <line x1="17" y1="80" x2="83" y2="80" stroke="#4A4A4A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="22" y1="70" x2="78" y2="70" stroke="#5A5A5A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="27" y1="60" x2="73" y2="60" stroke="#6A6A6A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="32" y1="50" x2="68" y2="50" stroke="#7A7A7A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="37" y1="40" x2="63" y2="40" stroke="#8A8A8A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="42" y1="30" x2="58" y2="30" stroke="#9A9A9A" strokeWidth="2.2" strokeLinecap="round"/>
+  <line x1="47" y1="20" x2="53" y2="20" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round"/>
 </svg>
