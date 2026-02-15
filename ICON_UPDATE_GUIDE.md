@@ -22,7 +22,7 @@ The Akt app icon is inspired by the distinctive plate visualization bars from th
 
 ## Files Updated
 
-### 1. `/akt-app-icon.svg`
+### 1. `/public/akt-app-icon.svg`
 Main app icon file (1024x1024) with the plate visualization design.
 
 ### 2. `/src/app/components/AktIcon.tsx`
@@ -43,40 +43,26 @@ import Head from 'next/head'
 
 // In your root layout:
 <Head>
-  <link rel="icon" href="/favicon.ico" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="icon" href="/akt-app-icon.svg" />
+  <link rel="apple-touch-icon" href="/akt-app-icon.svg" />
   <meta name="theme-color" content="#0D0D0F" />
 </Head>
 ```
 
-### Generate Icon Files from SVG
+### File Placement
 
-1. Copy `/akt-app-icon.svg` to your production repo
-2. Use a tool like ImageMagick or an online converter to generate:
-   - `apple-touch-icon.png` (180x180)
-   - `favicon-32x32.png` (32x32)
-   - `favicon-16x16.png` (16x16)
-   - `favicon.ico` (multi-size ICO file)
-
-### ImageMagick Commands (if available):
-
-```bash
-# From akt-app-icon.svg, generate:
-convert akt-app-icon.svg -resize 180x180 apple-touch-icon.png
-convert akt-app-icon.svg -resize 32x32 favicon-32x32.png
-convert akt-app-icon.svg -resize 16x16 favicon-16x16.png
-convert akt-app-icon.svg -resize 16x16 -resize 32x32 -resize 48x48 favicon.ico
+Store the canonical icon at:
+```
+/public/akt-app-icon.svg
 ```
 
-### Place Generated Files In:
+Generate minimal PNG fallbacks:
 ```
-/public/
-  ├── apple-touch-icon.png
-  ├── favicon.ico
-  ├── favicon-32x32.png
-  └── favicon-16x16.png
+/public/apple-touch-icon.png (180x180)
+/public/favicon-32x32.png
+/public/favicon-16x16.png
+/public/icons/akt-app-192.png
+/public/icons/akt-app-512.png
 ```
 
 ## Tab Bar Icon

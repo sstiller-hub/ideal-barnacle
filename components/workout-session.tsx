@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import type { WorkoutRoutine } from "@/lib/routine-storage"
 import {
@@ -2478,32 +2479,38 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }}
     >
       <div className="relative z-10" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
-        {isResting && (
-          <div
-            className="absolute left-1/2 transition-all duration-200"
-            style={{
-              top: "calc(env(safe-area-inset-top, 0px) + 8px)",
-              background: "rgba(10, 10, 12, 0.95)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "2px",
-              padding: "8px 10px",
-              backdropFilter: "blur(20px)",
-              zIndex: 20,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+        <AnimatePresence>
+          {isResting && restState ? (
+            <motion.div
+              key="rest-timer"
+              className="fixed inset-0 z-50 flex items-center justify-center"
+              initial={{ filter: "blur(20px)", opacity: 0 }}
+              animate={{ filter: "blur(0px)", opacity: 1 }}
+              exit={{
+                filter: "blur(20px)",
+                opacity: 0,
+                transition: { duration: 0.3, ease: "easeOut" },
+              }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            >
+              <motion.div
+                className="flex flex-col items-center justify-center gap-6 border bg-black px-10 py-6"
+                animate={{
+                  borderColor:
+                    restRemainingSeconds <= 10
+                      ? ["rgba(255, 255, 255, 0.2)", "rgba(255, 255, 255, 0.4)", "rgba(255, 255, 255, 0.2)"]
+                      : "rgba(255, 255, 255, 0.2)",
+                }}
+                transition={
+                  restRemainingSeconds <= 10
+                    ? { duration: 1, repeat: Infinity, ease: "easeInOut" }
+                    : { duration: 0.2, ease: "linear" }
+                }
+                style={{ borderColor: "rgba(255, 255, 255, 0.2)" }}
+              >
                 <div
-                  className="text-white/50"
-                  style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                >
-                  REST
-                </div>
-                <div
-                  className="text-white/95"
+                  className="text-white text-[180px] leading-none"
                   style={{
-                    fontSize: "22px",
                     fontWeight: 400,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
@@ -2512,50 +2519,50 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 >
                   {formatSeconds(restRemainingSeconds)}
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (!isResting || !restState) return
-                    const next = restRemainingSeconds + 30
-                    void setRestStateAndPersist({
-                      ...restState,
-                      remainingSeconds: next,
-                    })
-                    scheduleRestNotification(next)
-                  }}
-                  className="transition-colors duration-150 hover:bg-white/10"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "none",
-                    borderRadius: "2px",
-                    padding: "4px 8px",
-                  }}
-                  type="button"
-                >
-                  <span className="text-white/90" style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em" }}>
-                    +30s
-                  </span>
-                </button>
-                <button
-                  onClick={() => void setRestStateAndPersist(null)}
-                  className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "none",
-                    borderRadius: "2px",
-                    padding: "4px 10px",
-                  }}
-                  type="button"
-                >
-                  <span className="text-white/95" style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em" }}>
-                    SKIP
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (!isResting || !restState) return
+                      const next = restRemainingSeconds + 30
+                      void setRestStateAndPersist({
+                        ...restState,
+                        remainingSeconds: next,
+                      })
+                      scheduleRestNotification(next)
+                    }}
+                    className="transition-colors duration-150 hover:bg-white/10"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "none",
+                      borderRadius: "2px",
+                      padding: "6px 10px",
+                    }}
+                    type="button"
+                  >
+                    <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
+                      +30s
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => void setRestStateAndPersist(null)}
+                    className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.08)",
+                      border: "none",
+                      borderRadius: "2px",
+                      padding: "6px 12px",
+                    }}
+                    type="button"
+                  >
+                    <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
+                      SKIP
+                    </span>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         <div
           className="flex-shrink-0 pt-2 pb-2"
