@@ -1182,13 +1182,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     value: string
   ) => {
     if (!session) return
+    const normalizedValue = field === "seat" ? value.replace(/\D/g, "") : value
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
       if (exerciseIdx !== exerciseIndex) {
         return exercise
       }
       const nextSettings = {
         ...(exercise.machineSettings || {}),
-        [field]: value,
+        [field]: normalizedValue,
       }
       return { ...exercise, machineSettings: nextSettings }
     })
@@ -1843,7 +1844,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           {isCurrentExercise && isMachineExercise(exercise.name) && (
             <div className="mt-3 flex items-center gap-2">
               <input
-                type="text"
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={exercise.machineSettings?.seat ?? ""}
                 onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
                 placeholder="Seat"
@@ -2482,35 +2485,57 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         <AnimatePresence>
           {isResting && restState ? (
             <motion.div
-              key="rest-timer"
-              className="fixed inset-0 z-50 flex items-center justify-center"
-              initial={{ filter: "blur(20px)", opacity: 0 }}
-              animate={{ filter: "blur(0px)", opacity: 1 }}
+              key="rest-dock"
+              className="fixed z-[70] flex items-center justify-between gap-3 border"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{
-                filter: "blur(20px)",
                 opacity: 0,
-                transition: { duration: 0.3, ease: "easeOut" },
+                y: 8,
+                transition: { duration: 0.2, ease: "easeOut" },
               }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              style={{
+                left: "16px",
+                right: "16px",
+                bottom: "calc(12px + env(safe-area-inset-bottom))",
+                borderColor:
+                  restRemainingSeconds <= 10
+                    ? "rgba(255, 255, 255, 0.35)"
+                    : "rgba(255, 255, 255, 0.15)",
+                background: "rgba(0, 0, 0, 0.55)",
+                borderRadius: "2px",
+                padding: "8px 10px",
+                pointerEvents: "auto",
+              }}
             >
               <motion.div
-                className="flex flex-col items-center justify-center gap-6 border bg-black px-10 py-6"
+                className="flex items-end gap-3"
                 animate={{
-                  borderColor:
-                    restRemainingSeconds <= 10
-                      ? ["rgba(255, 255, 255, 0.2)", "rgba(255, 255, 255, 0.4)", "rgba(255, 255, 255, 0.2)"]
-                      : "rgba(255, 255, 255, 0.2)",
+                  opacity: restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1,
                 }}
                 transition={
                   restRemainingSeconds <= 10
                     ? { duration: 1, repeat: Infinity, ease: "easeInOut" }
                     : { duration: 0.2, ease: "linear" }
                 }
-                style={{ borderColor: "rgba(255, 255, 255, 0.2)" }}
               >
                 <div
-                  className="text-white text-[180px] leading-none"
+                  className="text-white/35"
                   style={{
+                    fontSize: "8px",
+                    fontWeight: 600,
+                    letterSpacing: "0.12em",
+                    lineHeight: 1,
+                    paddingBottom: "5px",
+                  }}
+                >
+                  REST
+                </div>
+                <div
+                  className="text-white leading-none"
+                  style={{
+                    fontSize: "44px",
                     fontWeight: 400,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
@@ -2519,47 +2544,48 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 >
                   {formatSeconds(restRemainingSeconds)}
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (!isResting || !restState) return
-                      const next = restRemainingSeconds + 30
-                      void setRestStateAndPersist({
-                        ...restState,
-                        remainingSeconds: next,
-                      })
-                      scheduleRestNotification(next)
-                    }}
-                    className="transition-colors duration-150 hover:bg-white/10"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.05)",
-                      border: "none",
-                      borderRadius: "2px",
-                      padding: "6px 10px",
-                    }}
-                    type="button"
-                  >
-                    <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
-                      +30s
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => void setRestStateAndPersist(null)}
-                    className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.08)",
-                      border: "none",
-                      borderRadius: "2px",
-                      padding: "6px 12px",
-                    }}
-                    type="button"
-                  >
-                    <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
-                      SKIP
-                    </span>
-                  </button>
-                </div>
               </motion.div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!isResting || !restState) return
+                    const next = restRemainingSeconds + 30
+                    void setRestStateAndPersist({
+                      ...restState,
+                      remainingSeconds: next,
+                    })
+                    scheduleRestNotification(next)
+                  }}
+                  className="transition-colors duration-150 hover:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "none",
+                    borderRadius: "2px",
+                    padding: "6px 10px",
+                  }}
+                  type="button"
+                >
+                  <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
+                    +30s
+                  </span>
+                </button>
+                <button
+                  onClick={() => void setRestStateAndPersist(null)}
+                  className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "none",
+                    borderRadius: "2px",
+                    padding: "6px 12px",
+                  }}
+                  type="button"
+                >
+                  <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
+                    SKIP
+                  </span>
+                </button>
+              </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -2699,7 +2725,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     <div className="flex items-center gap-2">
                       {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
                         <input
-                          type="text"
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={exercise.machineSettings?.seat ?? ""}
                           onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
                           placeholder="Seat"
@@ -2776,12 +2804,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   </div>
                 </div>
 
-                <div className="flex flex-col" style={{ gap: isCompactSets ? "20px" : "28px" }}>
+                <div className="flex flex-col" style={{ gap: isCompactSets ? "16px" : "28px" }}>
                   {exercise.sets.map((set: any, setIndex: number) => {
                     const setKey = set.id ?? `${exercise.id}-${setIndex}`
                     const isActiveExercise = exerciseIndex === currentExerciseIndex
                     const isCurrentSet = isActiveExercise && setIndex === activeSetIndex
                     const isCompactCompleted = isActiveExercise && set.completed
+                    const isCompressedCompletedSet = isCompactSets && isCompactCompleted && !isCurrentSet
                     const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
                     const missingWeight = isMissingWeight(set.weight)
                     const missingReps = isMissingReps(set.reps)
@@ -2807,13 +2836,22 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     return (
                       <div key={setKey}>
                         <div
-                          className="text-white/30 tracking-widest mb-3"
-                          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                          className="text-white/30 tracking-widest"
+                          style={{
+                            fontSize: "7px",
+                            fontWeight: 500,
+                            letterSpacing: "0.12em",
+                            fontFamily: "'Archivo Narrow', sans-serif",
+                            marginBottom: isCompressedCompletedSet ? "4px" : "12px",
+                          }}
                         >
                           SET {setIndex + 1}
                         </div>
 
-                        <div className="flex items-center gap-3 mb-3">
+                        <div
+                          className="flex items-center gap-3"
+                          style={{ marginBottom: isCompressedCompletedSet ? "4px" : "12px" }}
+                        >
                           <div className="flex-1 relative">
                             <input
                               type="number"
@@ -2855,8 +2893,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                       : "transparent"
                                 }`,
                                 borderRadius: "2px",
-                                padding: isCompactCompleted ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "12px" : "18px",
-                                fontSize: isCompactCompleted ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "22px" : "28px",
+                                padding: isCompressedCompletedSet
+                                  ? "5px"
+                                  : isCompactCompleted
+                                    ? (isCompactSets ? "8px" : "12px")
+                                    : isCompactSets ? "12px" : "18px",
+                                fontSize: isCompressedCompletedSet
+                                  ? "16px"
+                                  : isCompactCompleted
+                                    ? (isCompactSets ? "18px" : "22px")
+                                    : isCompactSets ? "22px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2866,8 +2912,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               }}
                             />
                             <div
-                              className="text-white/25 mt-1.5 text-center transition-colors duration-150"
+                              className="text-white/25 text-center transition-colors duration-150"
                               style={{
+                                marginTop: isCompressedCompletedSet ? "2px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
@@ -2926,8 +2973,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                       : "transparent"
                                 }`,
                                 borderRadius: "2px",
-                                padding: isCompactCompleted ? (isCompactSets ? "8px" : "12px") : isCompactSets ? "12px" : "18px",
-                                fontSize: isCompactCompleted ? (isCompactSets ? "18px" : "22px") : isCompactSets ? "22px" : "28px",
+                                padding: isCompressedCompletedSet
+                                  ? "5px"
+                                  : isCompactCompleted
+                                    ? (isCompactSets ? "8px" : "12px")
+                                    : isCompactSets ? "12px" : "18px",
+                                fontSize: isCompressedCompletedSet
+                                  ? "16px"
+                                  : isCompactCompleted
+                                    ? (isCompactSets ? "18px" : "22px")
+                                    : isCompactSets ? "22px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2937,8 +2992,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               }}
                             />
                             <div
-                              className="text-white/25 mt-1.5 text-center transition-colors duration-150"
+                              className="text-white/25 text-center transition-colors duration-150"
                               style={{
+                                marginTop: isCompressedCompletedSet ? "2px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
@@ -2962,8 +3018,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
                               className="flex items-center justify-center transition-all duration-150"
                               style={{
-                                width: "36px",
-                                height: "36px",
+                                width: isCompressedCompletedSet ? "30px" : "36px",
+                                height: isCompressedCompletedSet ? "30px" : "36px",
                                 background: set.completed
                                   ? "rgba(255, 255, 255, 0.08)"
                                   : "rgba(255, 255, 255, 0.03)",
@@ -2975,7 +3031,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                               aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
                             >
                               {set.completed ? (
-                                <Check size={16} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.8)" }} />
+                                <Check
+                                  size={isCompressedCompletedSet ? 13 : 16}
+                                  strokeWidth={2}
+                                  style={{ color: "rgba(255, 255, 255, 0.8)" }}
+                                />
                               ) : (
                                 <div
                                   style={{
@@ -3006,7 +3066,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           </div>
                         )}
 
-                        {isActiveExercise && lastSet && typeof set.weight === "number" && typeof set.reps === "number" && (
+                        {isActiveExercise &&
+                          !isCompressedCompletedSet &&
+                          lastSet &&
+                          typeof set.weight === "number" &&
+                          typeof set.reps === "number" && (
                           <div className="flex items-center gap-2 mb-3" style={{ marginBottom: isCompactSets ? "8px" : "12px" }}>
                             <div
                               className="text-white/20"
