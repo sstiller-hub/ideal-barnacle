@@ -2498,13 +2498,13 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               style={{
                 left: "calc(16px + env(safe-area-inset-left, 0px))",
                 right: "calc(16px + env(safe-area-inset-right, 0px))",
-                bottom: "calc(12px + env(safe-area-inset-bottom))",
+                bottom: "calc(20px + env(safe-area-inset-bottom))",
                 borderColor:
                   restRemainingSeconds <= 10
                     ? "rgba(255, 255, 255, 0.35)"
                     : "rgba(255, 255, 255, 0.15)",
                 background: "rgba(0, 0, 0, 0.55)",
-                borderRadius: "2px",
+                borderRadius: "14px",
                 padding: "8px 10px",
                 pointerEvents: "auto",
               }}
