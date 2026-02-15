@@ -1,11 +1,12 @@
 export type WorkoutStatus = "in_progress" | "paused" | "completed"
+type PersistedWorkoutStatus = WorkoutStatus | "active"
 
 export interface WorkoutSession {
   id: string
   workoutId?: string
   startedAt: string
   endedAt?: string
-  status: WorkoutStatus
+  status: PersistedWorkoutStatus
   notes?: string
   routineId?: string
   routineName?: string
@@ -40,11 +41,35 @@ const SESSIONS_KEY = "workoutSessions"
 const SETS_KEY = "workoutSets"
 const CURRENT_SESSION_KEY = "currentSessionId"
 
+function normalizeWorkoutStatus(status: PersistedWorkoutStatus | string | null | undefined): WorkoutStatus {
+  if (status === "active") return "in_progress"
+  if (status === "paused") return "paused"
+  if (status === "in_progress") return "in_progress"
+  return "completed"
+}
+
+function normalizeSession(session: WorkoutSession): WorkoutSession {
+  const normalizedStatus = normalizeWorkoutStatus(session.status)
+  if (session.status === normalizedStatus) return session
+  return { ...session, status: normalizedStatus }
+}
+
 // Session helpers
 export function loadSessions(): WorkoutSession[] {
   if (typeof window === "undefined") return []
   const stored = localStorage.getItem(SESSIONS_KEY)
-  return stored ? JSON.parse(stored) : []
+  if (!stored) return []
+  try {
+    const parsed = JSON.parse(stored) as WorkoutSession[]
+    const normalized = parsed.map(normalizeSession)
+    const changed = normalized.some((session, idx) => session !== parsed[idx])
+    if (changed) {
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(normalized))
+    }
+    return normalized
+  } catch {
+    return []
+  }
 }
 
 export function saveSessions(sessions: WorkoutSession[]): void {
@@ -54,11 +79,12 @@ export function saveSessions(sessions: WorkoutSession[]): void {
 
 export function saveSession(session: WorkoutSession): void {
   const sessions = loadSessions()
-  const index = sessions.findIndex((s) => s.id === session.id)
+  const normalizedSession = normalizeSession(session)
+  const index = sessions.findIndex((s) => s.id === normalizedSession.id)
   if (index >= 0) {
-    sessions[index] = session
+    sessions[index] = normalizedSession
   } else {
-    sessions.push(session)
+    sessions.push(normalizedSession)
   }
   saveSessions(sessions)
 }
@@ -190,14 +216,18 @@ export function getCurrentInProgressSession(): WorkoutSession | null {
   const currentId = loadCurrentSessionId()
   if (currentId) {
     const session = getSessionById(currentId)
-    if (session && (session.status === "in_progress" || session.status === "paused")) {
-      return session
+    if (session) {
+      const status = normalizeWorkoutStatus(session.status)
+      if (status === "in_progress" || status === "paused") {
+        return { ...session, status }
+      }
     }
   }
 
-  const sessions = loadSessions().filter(
-    (session) => session.status === "in_progress" || session.status === "paused",
-  )
+  const sessions = loadSessions()
+    .map((session) => ({ ...session, status: normalizeWorkoutStatus(session.status) }))
+    .filter((session) => session.status === "in_progress" || session.status === "paused")
+
   if (sessions.length === 0) return null
 
   const mostRecent = sessions.reduce((latest, session) => {
@@ -216,10 +246,11 @@ export function cleanupOldSessions(): void {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  const filtered = sessions.filter((s) => {
-    if (s.status === "in_progress") return true
-    if (s.endedAt) {
-      return new Date(s.endedAt) > thirtyDaysAgo
+  const filtered = sessions.filter((session) => {
+    const status = normalizeWorkoutStatus(session.status)
+    if (status === "in_progress" || status === "paused") return true
+    if (session.endedAt) {
+      return new Date(session.endedAt) > thirtyDaysAgo
     }
     return true
   })

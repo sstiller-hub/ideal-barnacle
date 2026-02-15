@@ -100,6 +100,35 @@ test("Home shows sets remaining for active workout", async ({ page }) => {
   await expect(page.getByText(/3 sets remaining/i)).toBeVisible()
 })
 
+test("Home treats legacy active status as resumable session", async ({ page }) => {
+  const session = {
+    id: "session-active-legacy",
+    routineId: routine.id,
+    routineName: routine.name,
+    status: "active",
+    startedAt: new Date().toISOString(),
+    activeDurationSeconds: 0,
+    currentExerciseIndex: 0,
+    exercises: [
+      {
+        id: "ex-1",
+        name: "Overhand Row",
+        targetSets: 2,
+        targetReps: "6-8",
+        completed: false,
+        sets: [
+          { id: "s1", reps: 8, weight: 100, completed: true },
+          { id: "s2", reps: null, weight: null, completed: false },
+        ],
+      },
+    ],
+  }
+  await seedBaseStorage(page, { session })
+  await page.goto("/")
+  await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Discard Active Workout" })).toBeVisible()
+})
+
 test("completed set persists after reload", async ({ page }) => {
   await seedBaseStorage(page)
   await page.goto(`/workout/session?routineId=${routine.id}`)
