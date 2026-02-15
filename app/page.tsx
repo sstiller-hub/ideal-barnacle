@@ -222,9 +222,6 @@ export default function Home() {
     if (!session?.startedAt) return
     const sessionDate = new Date(session.startedAt)
     sessionDate.setHours(0, 0, 0, 0)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    if (sessionDate.getTime() !== today.getTime()) return
     setSelectedDate((prev) => {
       const next = new Date(prev)
       next.setHours(0, 0, 0, 0)
@@ -738,11 +735,19 @@ export default function Home() {
     : scheduleOverride?.workoutType || deriveWorkoutType(scheduledRoutine?.name)
   const activeWorkoutType =
     session?.routineName ? deriveWorkoutType(session.routineName) : scheduledWorkoutType
+  const isSelectedDateSessionDate = (() => {
+    if (!session?.startedAt) return false
+    const sessionDate = new Date(session.startedAt)
+    sessionDate.setHours(0, 0, 0, 0)
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    return sessionDate.getTime() === selected.getTime()
+  })()
   const actualState =
     uiStateOverride ||
     (workoutForDate
       ? "completed"
-      : session && isToday()
+      : session && (isToday() || isSelectedDateSessionDate)
         ? "activeSession"
         : effectiveRestDay
           ? "rest"

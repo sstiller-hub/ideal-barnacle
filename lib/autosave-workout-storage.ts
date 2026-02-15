@@ -41,15 +41,18 @@ const SESSIONS_KEY = "workoutSessions"
 const SETS_KEY = "workoutSets"
 const CURRENT_SESSION_KEY = "currentSessionId"
 
-function normalizeWorkoutStatus(status: PersistedWorkoutStatus | string | null | undefined): WorkoutStatus {
-  if (status === "active") return "in_progress"
+function normalizeWorkoutStatus(
+  status: PersistedWorkoutStatus | string | null | undefined,
+  endedAt?: string,
+): WorkoutStatus {
+  if (status === "active" || status === "inprogress" || status === "in_progress") return "in_progress"
   if (status === "paused") return "paused"
-  if (status === "in_progress") return "in_progress"
-  return "completed"
+  if (status === "completed" || status === "abandoned") return "completed"
+  return endedAt ? "completed" : "in_progress"
 }
 
 function normalizeSession(session: WorkoutSession): WorkoutSession {
-  const normalizedStatus = normalizeWorkoutStatus(session.status)
+  const normalizedStatus = normalizeWorkoutStatus(session.status, session.endedAt)
   if (session.status === normalizedStatus) return session
   return { ...session, status: normalizedStatus }
 }
@@ -217,7 +220,7 @@ export function getCurrentInProgressSession(): WorkoutSession | null {
   if (currentId) {
     const session = getSessionById(currentId)
     if (session) {
-      const status = normalizeWorkoutStatus(session.status)
+      const status = normalizeWorkoutStatus(session.status, session.endedAt)
       if (status === "in_progress" || status === "paused") {
         return { ...session, status }
       }
@@ -225,7 +228,7 @@ export function getCurrentInProgressSession(): WorkoutSession | null {
   }
 
   const sessions = loadSessions()
-    .map((session) => ({ ...session, status: normalizeWorkoutStatus(session.status) }))
+    .map((session) => ({ ...session, status: normalizeWorkoutStatus(session.status, session.endedAt) }))
     .filter((session) => session.status === "in_progress" || session.status === "paused")
 
   if (sessions.length === 0) return null
@@ -247,7 +250,7 @@ export function cleanupOldSessions(): void {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
   const filtered = sessions.filter((session) => {
-    const status = normalizeWorkoutStatus(session.status)
+    const status = normalizeWorkoutStatus(session.status, session.endedAt)
     if (status === "in_progress" || status === "paused") return true
     if (session.endedAt) {
       return new Date(session.endedAt) > thirtyDaysAgo

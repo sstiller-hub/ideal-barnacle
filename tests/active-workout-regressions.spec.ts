@@ -129,6 +129,64 @@ test("Home treats legacy active status as resumable session", async ({ page }) =
   await expect(page.getByRole("button", { name: "Discard Active Workout" })).toBeVisible()
 })
 
+test("Home treats missing status as resumable when session has no end time", async ({ page }) => {
+  const session = {
+    id: "session-no-status",
+    routineId: routine.id,
+    routineName: routine.name,
+    startedAt: new Date().toISOString(),
+    activeDurationSeconds: 0,
+    currentExerciseIndex: 0,
+    exercises: [
+      {
+        id: "ex-1",
+        name: "Overhand Row",
+        targetSets: 2,
+        targetReps: "6-8",
+        completed: false,
+        sets: [
+          { id: "s1", reps: 8, weight: 100, completed: true },
+          { id: "s2", reps: null, weight: null, completed: false },
+        ],
+      },
+    ],
+  }
+  await seedBaseStorage(page, { session })
+  await page.goto("/")
+  await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Discard Active Workout" })).toBeVisible()
+})
+
+test("Home shows resume for active session started yesterday", async ({ page }) => {
+  const startedAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const session = {
+    id: "session-yesterday",
+    routineId: routine.id,
+    routineName: routine.name,
+    status: "in_progress",
+    startedAt,
+    activeDurationSeconds: 0,
+    currentExerciseIndex: 0,
+    exercises: [
+      {
+        id: "ex-1",
+        name: "Overhand Row",
+        targetSets: 2,
+        targetReps: "6-8",
+        completed: false,
+        sets: [
+          { id: "s1", reps: 8, weight: 100, completed: true },
+          { id: "s2", reps: null, weight: null, completed: false },
+        ],
+      },
+    ],
+  }
+  await seedBaseStorage(page, { session })
+  await page.goto("/")
+  await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Discard Active Workout" })).toBeVisible()
+})
+
 test("completed set persists after reload", async ({ page }) => {
   await seedBaseStorage(page)
   await page.goto(`/workout/session?routineId=${routine.id}`)
