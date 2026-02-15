@@ -1218,6 +1218,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const targetExerciseIndex = options?.exerciseIndex ?? currentExerciseIndex
     const shouldAutoRest = options?.startRest ?? targetExerciseIndex === currentExerciseIndex
     let shouldStartRest = false
+    let restSecondsToStart: number | null = null
     const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
       if (exerciseIdx !== targetExerciseIndex) {
         return exercise
@@ -1245,11 +1246,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         if (
           shouldAutoRest &&
           isCompleted &&
-          exerciseIdx === currentExerciseIndex &&
-          idx === currentSetIndex &&
           exercise.restTime > 0
         ) {
           shouldStartRest = true
+          restSecondsToStart = exercise.restTime
         }
 
         const updatedSet = {
@@ -1307,10 +1307,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     if (shouldAutoRest && shouldStartRest) {
       const restSeconds =
-        exercises[currentExerciseIndex]?.restTime ??
-        extractRestSeconds(exercises[currentExerciseIndex]?.notes)
+        restSecondsToStart ??
+        exercises[targetExerciseIndex]?.restTime ??
+        extractRestSeconds(exercises[targetExerciseIndex]?.notes)
       await setRestStateAndPersist({
-        exerciseIndex: currentExerciseIndex,
+        exerciseIndex: targetExerciseIndex,
         setIndex,
         remainingSeconds: restSeconds,
       })
