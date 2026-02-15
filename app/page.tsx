@@ -1615,7 +1615,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="flex flex-col gap-3 px-5">
+          <div className="flex flex-col gap-3">
             <div
               className="flex gap-3 overflow-x-auto"
               data-scroll-x="pr-cards-row-1"
@@ -1792,12 +1792,13 @@ function PRCard({
   const changePercent = typeof trendPct === "number" ? trendPct : null
   const isPositive = (changePercent ?? 0) > 0
   const gradientId = `prGradient-${exercise.replace(/\s+/g, "-").toLowerCase()}`
+  const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px) / 2), 260px)"
 
   return (
     <button
       onClick={onClick}
       className="flex-shrink-0 text-left"
-      style={{ width: "172px", padding: "0" }}
+      style={{ width: cardWidth, minWidth: cardWidth, padding: "0" }}
       type="button"
     >
       <div className="flex items-start justify-between mb-4">
