@@ -500,10 +500,7 @@ export default function Home() {
     const excludedPrExercises = new Set(
       ["side crunch", "decline bench knee raise", ...prExcludedNames].map(normalizeExerciseName)
     )
-    const prSourceExercises =
-      scheduledRoutine?.exercises || workoutForDate?.exercises || workoutHistory[0]?.exercises || []
-    const exerciseNames = prSourceExercises.map((e: any) => normalizeExerciseName(e.name))
-    const rawSourceNames = userId ? exerciseNames : Array.from(prByExerciseName.keys())
+    const rawSourceNames = Array.from(prByExerciseName.keys())
     const sourceNames: string[] = rawSourceNames.filter(
       (name): name is string =>
         typeof name === "string" &&
@@ -957,7 +954,7 @@ export default function Home() {
           onTouchEnd={handleDaySwipeEnd}
         >
         <div
-          className="px-5 pb-6"
+          className="px-5 pb-4"
           style={{
             paddingRight: "60px",
           }}
@@ -1148,9 +1145,9 @@ export default function Home() {
         )}
       </div>
 
-      <div className="overflow-hidden" style={{ paddingBottom: "8px" }}>
+      <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
         {weeklySummary && (
-          <div className="px-5 mb-3">
+          <div className="px-5 mb-2">
             <div
               className="text-white/25 tracking-widest mb-3"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
@@ -1209,7 +1206,7 @@ export default function Home() {
         )}
 
         {lastWorkoutSummary && (
-          <div className="px-5 mb-3">
+          <div className="px-5 mb-2">
             <div className="flex items-center justify-between mb-3">
               <div
                 className="text-white/25 tracking-widest"
@@ -1429,8 +1426,8 @@ export default function Home() {
         )}
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
-          <div className="px-5 mb-3">
-            <div className="mb-4 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
+          <div className="px-5 mb-2">
+            <div className="mb-3 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
               {displayExercises.map((exercise: any, index: number) => (
                 <div
                   key={exercise.id ?? `${exercise.name}-${index}`}
