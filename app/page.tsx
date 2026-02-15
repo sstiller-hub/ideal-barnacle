@@ -747,7 +747,7 @@ export default function Home() {
     uiStateOverride ||
     (workoutForDate
       ? "completed"
-      : session && (isToday() || isSelectedDateSessionDate)
+      : session && (isToday() || isSelectedDateSessionDate || !workoutForDate)
         ? "activeSession"
         : effectiveRestDay
           ? "rest"
