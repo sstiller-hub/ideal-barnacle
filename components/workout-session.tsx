@@ -337,6 +337,25 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     return !set.completed && repsEmpty && weightEmpty
   }
 
+  const canCutOffFinalSet = (exercise: any) => {
+    const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+    if (sets.length === 0) return false
+    const lastSet = sets[sets.length - 1]
+    return Boolean(lastSet) && !lastSet.completed
+  }
+
+  const canExerciseBeFinished = (exercise: any) => {
+    const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
+    if (sets.length === 0) return true
+    const lastSetIndex = sets.length - 1
+    return sets.every((set: any, index: number) => {
+      if (set.completed) {
+        return !isSetIncomplete(set)
+      }
+      return index === lastSetIndex
+    })
+  }
+
   useEffect(() => {
     const buildExercises = (seed?: any[]) => {
       if (seed && seed.length > 0) {
@@ -668,11 +687,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     currentExercise?.sets?.findIndex((set: any) => !set.completed) ?? -1
   const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
-  const allSetsCompleted =
-    currentExercise?.sets?.every((set: any) => set.completed && !isSetIncomplete(set)) ?? false
-  const allExercisesCompleted = exercises.every(
-    (exercise) => exercise.sets?.every((set: any) => set.completed && !isSetIncomplete(set))
-  )
+  const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
   const syncTimeLabel = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : null
@@ -720,8 +735,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if ("serviceWorker" in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready
-        await registration.showNotification("Rest complete", {
-          body: "Time to start your next set.",
+        await registration.showNotification("Akt", {
+          body: "Rest is over. Start your next set.",
         })
         return
       } catch {
@@ -729,8 +744,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }
     }
     try {
-      new Notification("Rest complete", {
-        body: "Time to start your next set.",
+      new Notification("Akt", {
+        body: "Rest is over. Start your next set.",
       })
     } catch {
       // ignore notification errors
@@ -1615,12 +1630,20 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (!session) return
     if (isFinishing) return
     setIsFinishing(true)
-    const cleanedExercises = exercises.map((exercise: any) => ({
-      ...exercise,
-      sets: exercise.sets.filter((set: any) => !isGhostSet(set)),
-    }))
-    const firstInvalidExerciseIndex = cleanedExercises.findIndex((exercise: any) =>
-      exercise.sets?.some((set: any) => isSetIncomplete(set))
+    const cleanedExercises = exercises.map((exercise: any) => {
+      const nonGhostSets = exercise.sets.filter((set: any) => !isGhostSet(set))
+      const trimmedSets = canCutOffFinalSet({ ...exercise, sets: nonGhostSets })
+        ? nonGhostSets.slice(0, -1)
+        : nonGhostSets
+      const allCompleted = trimmedSets.every((set: any) => set.completed && !isSetIncomplete(set))
+      return {
+        ...exercise,
+        sets: trimmedSets,
+        completed: allCompleted,
+      }
+    })
+    const firstInvalidExerciseIndex = cleanedExercises.findIndex(
+      (exercise: any) => !canExerciseBeFinished(exercise)
     )
     if (firstInvalidExerciseIndex !== -1) {
       if (firstInvalidExerciseIndex !== currentExerciseIndex) {
@@ -2633,7 +2656,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
             <button
               onClick={() => {
-                if (!allExercisesCompleted) return
+                if (!canFinishWorkout) return
                 void finishWorkout()
               }}
               className="transition-colors"
@@ -2641,10 +2664,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                 fontSize: "9px",
                 fontWeight: 600,
                 letterSpacing: "0.08em",
-                color: allExercisesCompleted ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.25)",
+                color: canFinishWorkout ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.25)",
               }}
               type="button"
-              disabled={!allExercisesCompleted}
+              disabled={!canFinishWorkout}
             >
               FINISH
             </button>
