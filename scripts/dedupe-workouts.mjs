@@ -3,7 +3,7 @@ import path from "node:path"
 import process from "node:process"
 import { createClient } from "@supabase/supabase-js"
 
-const USER_ID = process.argv[2] || "5eef3bfd-d598-4a20-aa66-5bedaebcb376"
+const USER_ID = process.argv[2] || process.env.AKT_USER_ID
 
 const readEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) return {}
@@ -28,6 +28,12 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || envFromFile.SU
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL in environment.")
+  process.exit(1)
+}
+
+if (!USER_ID) {
+  console.error("Missing user id. Pass as argv[2] or set AKT_USER_ID.")
+  console.error("Usage: node scripts/dedupe-workouts.mjs <user-id>")
   process.exit(1)
 }
 

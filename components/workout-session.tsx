@@ -10,7 +10,6 @@ import {
   getExerciseHistory,
   getLatestPerformance,
   getMostRecentCompletedSetPerformance,
-  getMostRecentSetPerformance,
   getWorkoutHistory,
   saveWorkout,
 } from "@/lib/workout-storage"
@@ -31,13 +30,6 @@ import { getOrCreateActiveSession, upsertSet } from "@/lib/supabase-session-sync
 import { supabase } from "@/lib/supabase"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import {
-  clearExerciseNextNote,
-  getExerciseNextNote,
-  markExerciseNextNoteDone,
-  setExerciseNextNote,
-  type NextSessionNote,
-} from "@/lib/next-session-notes"
-import {
   getCurrentInProgressSession,
   deleteSession,
   deleteSetsForSession,
@@ -52,8 +44,6 @@ import {
   updateWorkoutDraft,
   upsertSet as upsertSetDraft,
   getWorkoutDraft,
-  deleteSet as deleteSetDraft,
-  deleteWorkoutDraft,
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
@@ -182,16 +172,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
   const [validationTrigger, setValidationTrigger] = useState(0)
   const [focusedInput, setFocusedInput] = useState<string | null>(null)
-  const [editSetsByExerciseId, setEditSetsByExerciseId] = useState<Record<string, boolean>>({})
-  const [addHoldProgress, setAddHoldProgress] = useState(0)
-  const addHoldTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const addHoldRafRef = useRef<number | null>(null)
-  const addHoldStartRef = useRef<number | null>(null)
   const [uiNow, setUiNow] = useState(() => Date.now())
   const restStartAtRef = useRef<number | null>(null)
-  const [inlineNoteDraft, setInlineNoteDraft] = useState("")
-  const [exerciseNextNote, setExerciseNextNoteState] = useState<NextSessionNote | null>(null)
-  const [exerciseNoteDraft, setExerciseNoteDraft] = useState("")
   const [showPlateCalc, setShowPlateCalc] = useState(() => {
     if (typeof window === "undefined") return true
     const savedPref = localStorage.getItem(`plate_viz_${routine.exercises[0]?.name}`)
@@ -203,17 +185,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [editingField, setEditingField] = useState<"reps" | "weight" | null>(null)
   const editingSetIdRef = useRef<string | null>(null)
   const editingFieldRef = useRef<"reps" | "weight" | null>(null)
-  const [pendingRemoteUpdates, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
+  const [, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingProgrammatically = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
-  const [recentlySaved, setRecentlySaved] = useState(false)
+  const [, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const NOTE_CHAR_LIMIT = 360
   const weightInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const repsInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const restNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -221,13 +202,14 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const [plateDisplayMode, setPlateDisplayMode] = useState<"per-side" | "total">("per-side")
   const [plateStartingWeight, setPlateStartingWeight] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
-  const [syncState, setSyncState] = useState<SyncState>("draft")
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [, setSyncState] = useState<SyncState>("draft")
+  const [, setLastSyncedAt] = useState<string | null>(null)
   const hasSyncedDraftRef = useRef(false)
   const sessionRef = useRef<WorkoutSession | null>(null)
   const exercisesRef = useRef<any[]>([])
   const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
   const currentExerciseIndexRef = useRef(0)
+  const historyRepsCacheRef = useRef<Map<string, number[]>>(new Map())
   const maxSetVolumeByExercise = useMemo(() => {
     const history = getWorkoutHistory()
     const map = new Map<string, number>()
@@ -247,7 +229,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       })
     })
     return map
-  }, [session?.id])
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -263,6 +245,10 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
   useEffect(() => {
     hasSyncedDraftRef.current = false
+  }, [session?.id])
+
+  useEffect(() => {
+    historyRepsCacheRef.current.clear()
   }, [session?.id])
 
   useEffect(() => {
@@ -354,6 +340,21 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }
       return index === lastSetIndex
     })
+  }
+
+  const getCachedHistoryReps = (exerciseName: string) => {
+    const key = normalizeExerciseName(exerciseName)
+    const cached = historyRepsCacheRef.current.get(key)
+    if (cached) return cached
+    const reps = getExerciseHistory(exerciseName).flatMap((workout) =>
+      workout.exercises
+        .filter((ex: any) => ex.name === exerciseName)
+        .flatMap((ex: any) =>
+          ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
+        )
+    )
+    historyRepsCacheRef.current.set(key, reps)
+    return reps
   }
 
   useEffect(() => {
@@ -682,25 +683,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     setUiExerciseIndex(currentExerciseIndex)
   }, [currentExerciseIndex])
   const currentExercise = exercises[currentExerciseIndex]
-  const totalExercises = exercises.length
   const firstIncompleteIndex =
     currentExercise?.sets?.findIndex((set: any) => !set.completed) ?? -1
   const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
-  const syncTimeLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : null
-  const syncStatusText =
-    syncState === "syncing"
-      ? "Syncing..."
-      : syncState === "synced"
-        ? syncTimeLabel
-          ? `Saved ${syncTimeLabel}`
-          : "Saved"
-        : syncState === "pending" || syncState === "error"
-          ? "Not synced"
-          : "Saved locally"
 
   const totalVolume = exercises.reduce((sum: number, exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
@@ -778,49 +765,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const elapsed = Math.floor((uiNow - startAt) / 1000)
     return Math.max(0, restState.remainingSeconds - elapsed)
   })()
-
-  useEffect(() => {
-    if (!currentExercise) {
-      setExerciseNextNoteState(null)
-      setExerciseNoteDraft("")
-      return
-    }
-    const note = getExerciseNextNote(
-      routine.id,
-      routine.name,
-      currentExercise.id,
-      currentExercise.name,
-    )
-    setExerciseNextNoteState(note)
-    setExerciseNoteDraft(note?.text ?? "")
-  }, [routine.id, routine.name, currentExercise?.id, currentExercise?.name])
-
-  const saveExerciseNextNote = () => {
-    if (!currentExercise) return
-    const next = setExerciseNextNote(
-      routine.id,
-      routine.name,
-      currentExercise.id,
-      currentExercise.name,
-      exerciseNoteDraft,
-    )
-    setExerciseNextNoteState(next)
-    setExerciseNoteDraft(next?.text ?? "")
-  }
-
-  const clearExerciseNote = () => {
-    if (!currentExercise) return
-    clearExerciseNextNote(routine.id, routine.name, currentExercise.id, currentExercise.name)
-    setExerciseNextNoteState(null)
-    setExerciseNoteDraft("")
-  }
-
-  const markExerciseNoteDone = () => {
-    if (!currentExercise) return
-    markExerciseNextNoteDone(routine.id, routine.name, currentExercise.id, currentExercise.name)
-    setExerciseNextNoteState(null)
-    setExerciseNoteDraft("")
-  }
 
   const setRestStateAndPersist = async (
     nextState: WorkoutSession["restTimer"] | null
@@ -922,10 +866,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   }, [currentExercise?.id, currentExercise?.sets?.length])
 
   useEffect(() => {
-    cancelAddHold()
-  }, [currentExerciseIndex])
-
-  useEffect(() => {
     if (!scrollContainerRef.current || isScrollingProgrammatically.current) return
     isScrollingProgrammatically.current = true
     const container = scrollContainerRef.current
@@ -938,10 +878,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
     return () => window.clearTimeout(timeout)
   }, [currentExerciseIndex])
-
-  useEffect(() => {
-    setInlineNoteDraft(currentExercise?.sessionNote ?? "")
-  }, [currentExerciseIndex, currentExercise?.sessionNote])
 
   useEffect(() => {
     if (!session?.startedAt) return
@@ -1027,13 +963,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                   reps: mergedReps,
                   weight: mergedWeight,
                   targetReps: exercise.targetReps,
-                  historyReps: getExerciseHistory(exercise.name).flatMap((workout) =>
-                    workout.exercises
-                      .filter((ex: any) => ex.name === exercise.name)
-                      .flatMap((ex: any) =>
-                        ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
-                      )
-                  ),
+                  historyReps: getCachedHistoryReps(exercise.name),
                 })
 
             const resolvedCompleted = row.completed ?? existingSet?.completed ?? false
@@ -1099,10 +1029,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }, [session?.remoteSessionId])
 
-  const updateSetData = async (setIndex: number, field: "reps" | "weight", value: number | null) => {
-    return updateSetDataForExercise(currentExerciseIndex, setIndex, field, value)
-  }
-
   const updateSetDataForExercise = async (
     exerciseIndex: number,
     setIndex: number,
@@ -1116,13 +1042,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         return exercise
       }
 
-      const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
-        workout.exercises
-          .filter((ex: any) => ex.name === exercise.name)
-          .flatMap((ex: any) =>
-            ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
-          )
-      )
+      const historyReps = getCachedHistoryReps(exercise.name)
 
       const newSets = exercise.sets.map((set: any, idx: number) => {
         if (idx !== setIndex) {
@@ -1239,11 +1159,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         return exercise
       }
 
-      const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
-        workout.exercises
-          .filter((ex: any) => ex.name === exercise.name)
-          .flatMap((ex: any) => ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0))
-      )
+      const historyReps = getCachedHistoryReps(exercise.name)
 
       const newSets = exercise.sets.map((set: any, idx: number) => {
         if (idx !== setIndex) {
@@ -1334,246 +1250,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }
 
-  const addSetToExercise = async (exerciseIndex = currentExerciseIndex) => {
-    if (!session) return
-    const workoutId = session.workoutId
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const defaults = getDefaultSetValues({
-      sets: exercise.sets,
-      targetReps: exercise.targetReps,
-      targetWeight: exercise.targetWeight,
-    })
-    const prevSet = exercise.sets[exercise.sets.length - 1]
-    let nextReps = prevSet?.reps ?? defaults.reps
-    const nextWeight = prevSet?.weight ?? defaults.weight
-    if (nextReps === null && nextWeight === 0) {
-      nextReps = REP_MIN
-    }
-    const historyReps = getExerciseHistory(exercise.name).flatMap((workout) =>
-      workout.exercises
-        .filter((ex: any) => ex.name === exercise.name)
-        .flatMap((ex: any) =>
-          ex.sets.filter((set: any) => isSetEligibleForStats(set)).map((set: any) => set.reps ?? 0)
-        )
-    )
-    const outlierInfo = getSetFlags({
-      reps: nextReps,
-      weight: nextWeight,
-      targetReps: exercise.targetReps,
-      historyReps,
-    })
-    const newSet = {
-      id: generateSetId(),
-      reps: nextReps,
-      weight: nextWeight,
-      completed: false,
-      isOutlier: outlierInfo.flags.includes("rep_outlier"),
-      validationFlags: outlierInfo.flags,
-      isIncomplete: outlierInfo.isIncomplete,
-    }
-    const newSets = [
-      ...exercise.sets,
-      newSet,
-    ]
-
-    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== exerciseIndex) {
-        return exercise
-      }
-
-      return {
-        ...exercise,
-        sets: newSets,
-      }
-    })
-
-    setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
-    setSession(updatedSession)
-    await saveSession(updatedSession)
-    if (workoutId) {
-      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
-      void touchDraft(workoutId)
-    }
-    toast("Set added", {
-      action: {
-        label: "Undo",
-        onClick: () => {
-          void deleteSetById(exerciseIndex, newSet.id)
-        },
-      },
-    })
-  }
-
-  const deleteSetById = async (exerciseIndex: number, setId: string) => {
-    if (!session) return
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const deleteIndex = exercise.sets.findIndex((set: any) => set.id === setId)
-    if (deleteIndex === -1) return
-    await deleteSetFromExercise(deleteIndex, exerciseIndex, true)
-  }
-
-  const deleteSetFromExercise = async (
-    setIndex: number,
-    exerciseIndex = currentExerciseIndex,
-    silent = false,
-  ) => {
-    if (!session) return
-    const workoutId = session.workoutId
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const removedSet = exercise.sets[setIndex]
-    const newSets = exercise.sets.filter((_: any, idx: number) => idx !== setIndex)
-
-    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== exerciseIndex) {
-        return exercise
-      }
-
-      return {
-        ...exercise,
-        sets: newSets,
-      }
-    })
-
-    setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
-    setSession(updatedSession)
-    await saveSession(updatedSession)
-    if (workoutId && removedSet?.id) {
-      void deleteSetDraft(workoutId, removedSet.id)
-      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
-      void touchDraft(workoutId)
-    }
-    if (!silent && removedSet) {
-      toast("Set removed", {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void restoreSetAtIndex(exerciseIndex, setIndex, removedSet)
-          },
-        },
-      })
-    }
-  }
-
-  const restoreSetAtIndex = async (exerciseIndex: number, setIndex: number, setData: any) => {
-    if (!session) return
-    const workoutId = session.workoutId
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const newSets = [
-      ...exercise.sets.slice(0, setIndex),
-      setData,
-      ...exercise.sets.slice(setIndex),
-    ]
-
-    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== exerciseIndex) return exercise
-      return { ...exercise, sets: newSets }
-    })
-
-    setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
-    setSession(updatedSession)
-    await saveSession(updatedSession)
-    if (workoutId) {
-      void syncExerciseDraft(workoutId, { ...exercise, sets: newSets }, newSets)
-      void touchDraft(workoutId)
-    }
-  }
-
-  const removeGhostSetsForExercise = async (exerciseIndex: number) => {
-    if (!session) return
-    const workoutId = session.workoutId
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const cleanedSets = exercise.sets.filter((set: any) => !isGhostSet(set))
-    if (cleanedSets.length === exercise.sets.length) return
-    const newExercises = exercises.map((exercise: any, exerciseIdx: number) => {
-      if (exerciseIdx !== exerciseIndex) return exercise
-      return { ...exercise, sets: cleanedSets }
-    })
-    setExercises(newExercises)
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-    setSession(updatedSession)
-    await saveSession(updatedSession)
-    if (workoutId) {
-      void syncExerciseDraft(workoutId, { ...exercise, sets: cleanedSets }, cleanedSets)
-      void touchDraft(workoutId)
-    }
-  }
-
-  const toggleEditSetsForExercise = async (exerciseIndex: number, nextValue?: boolean) => {
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-    const nextState =
-      typeof nextValue === "boolean" ? nextValue : !editSetsByExerciseId[exercise.id]
-    setEditSetsByExerciseId((prev) => ({ ...prev, [exercise.id]: nextState }))
-    if (!nextState) {
-      cancelAddHold()
-      await removeGhostSetsForExercise(exerciseIndex)
-    }
-  }
-
-
-  const startAddHold = (exerciseIndex: number) => {
-    if (!editSetsByExerciseId[exercises[exerciseIndex]?.id]) return
-    if (addHoldTimeoutRef.current) return
-    const start = Date.now()
-    addHoldStartRef.current = start
-    setAddHoldProgress(0)
-    addHoldTimeoutRef.current = setTimeout(() => {
-      addHoldTimeoutRef.current = null
-      addHoldStartRef.current = null
-      setAddHoldProgress(0)
-      void addSetToExercise(exerciseIndex)
-    }, 500)
-
-    const tick = () => {
-      if (!addHoldStartRef.current) return
-      const elapsed = Date.now() - addHoldStartRef.current
-      setAddHoldProgress(Math.min(1, elapsed / 500))
-      if (elapsed < 500) {
-        addHoldRafRef.current = requestAnimationFrame(tick)
-      }
-    }
-    addHoldRafRef.current = requestAnimationFrame(tick)
-  }
-
-  const cancelAddHold = () => {
-    if (addHoldTimeoutRef.current) {
-      clearTimeout(addHoldTimeoutRef.current)
-      addHoldTimeoutRef.current = null
-    }
-    if (addHoldRafRef.current) {
-      cancelAnimationFrame(addHoldRafRef.current)
-      addHoldRafRef.current = null
-    }
-    addHoldStartRef.current = null
-    setAddHoldProgress(0)
-  }
-
   const setExerciseIndex = async (nextIndex: number) => {
     if (!session) return
     if (nextIndex < 0 || nextIndex >= exercises.length) return
@@ -1614,16 +1290,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         }
       }, 120)
     })
-  }
-
-  const retryWorkoutSync = async () => {
-    if (!session?.workoutId) return
-    setSyncState("syncing")
-    const result = await attemptWorkoutSync({ workoutId: session.workoutId })
-    setSyncState(result.status)
-    if (result.status === "synced") {
-      setLastSyncedAt(result.syncedAt ?? new Date().toISOString())
-    }
   }
 
   const finishWorkout = async () => {
@@ -1790,546 +1456,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     router.push("/")
   }
 
-  const renderExerciseContent = (exercise: Exercise, exerciseIndex: number) => {
-    const isCurrentExercise = exerciseIndex === currentExerciseIndex
-    const canEditExercise = isCurrentExercise || exerciseIndex < currentExerciseIndex
-    const exerciseCurrentSetIndex = exercise.sets.findIndex((set) => !set.completed)
-    const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
-    const allSetsRecorded = exercise.sets.every((set) => set.completed && !isSetIncomplete(set))
-    const isCompactSets = showPlateCalc && exercise.sets.length >= 4
-
-    return (
-      <div
-        key={exercise.id}
-        className="flex-shrink-0"
-        style={{
-          width: "100%",
-          paddingLeft: "20px",
-          paddingRight: "20px",
-          paddingTop: "12px",
-          paddingBottom: "120px",
-        }}
-      >
-        <div className="mb-3">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <div
-              className="text-white/25 tracking-widest"
-              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
-            >
-              EXERCISE {exerciseIndex + 1} • {routine.name.toUpperCase()} • {formatSeconds(elapsedSeconds)}
-            </div>
-            <button
-              onClick={() => {
-                if (!isCurrentExercise) return
-                handleTogglePlateCalc()
-              }}
-              className="transition-all duration-200"
-              style={{
-                background: showPlateCalc ? "rgba(255, 255, 255, 0.04)" : "transparent",
-                border: "none",
-                borderRadius: "2px",
-                padding: "2px 6px",
-              }}
-              type="button"
-              aria-pressed={showPlateCalc}
-            >
-              <span
-                className={showPlateCalc ? "text-white/70" : "text-white/30"}
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.08em" }}
-              >
-                PLATES
-              </span>
-            </button>
-          </div>
-
-          <h1
-            className="text-white/95"
-            style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: "1", fontFamily: "'Bebas Neue', sans-serif" }}
-          >
-            {getExerciseLabel(exercise.name)}
-          </h1>
-
-          {exercise.targetReps && (
-            <div
-              className="text-white/20 mt-1.5"
-              style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}
-            >
-              REP RANGE {exercise.targetReps}
-            </div>
-          )}
-
-          <div
-            className="text-white/20"
-            style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif", marginTop: exercise.targetReps ? "4px" : "6px" }}
-          >
-            {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""} • NOW: SET {activeSetIndex + 1}/{exercise.sets.length}
-          </div>
-
-          {isCurrentExercise && isMachineExercise(exercise.name) && (
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={exercise.machineSettings?.seat ?? ""}
-                onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
-                placeholder="Seat"
-                className="flex-1"
-                style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "none",
-                  borderRadius: "2px",
-                  padding: "6px 8px",
-                  fontSize: "10px",
-                  color: "rgba(255, 255, 255, 0.9)",
-                }}
-              />
-            </div>
-          )}
-
-          {isCurrentExercise && allSetsRecorded && (
-            <div
-              className="mt-4 flex items-center gap-2"
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "2px",
-                padding: "10px 14px",
-              }}
-            >
-              <Check size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-              <div className="text-white/30" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
-                All sets recorded
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div
-          className="flex flex-col"
-          style={{ gap: isResting ? (isCompactSets ? "12px" : "16px") : isCompactSets ? "16px" : "24px" }}
-        >
-          {exercise.sets.map((set, index) => {
-            const setKey = set.id ?? `${exercise.id}-${index}`
-            const isCurrentSet = isCurrentExercise && index === activeSetIndex
-            const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
-            const missingWeight = isMissingWeight(set.weight)
-            const missingReps = isMissingReps(set.reps)
-            const showMissing = Boolean(validationTrigger) && isCurrentExercise && (missingWeight || missingReps)
-            const isBlocked = (!set.completed && (isSetIncomplete(set) || repCapError)) || !canEditExercise
-            const isCompactCompleted = set.completed
-            const lastSet = getMostRecentCompletedSetPerformance(exercise.name, index, session?.id)
-            const comparison = getSetComparison(
-              set,
-              lastSet,
-              maxSetVolumeByExercise.get(normalizeExerciseName(exercise.name)) ?? 0
-            )
-            const plates =
-              typeof set.weight === "number"
-                ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
-                : []
-
-            const ariaLabel =
-              isCurrentSet && canEditExercise
-                ? set.completed
-                  ? "Mark Set Incomplete"
-                  : "Complete Set"
-                : `Toggle Set ${index + 1}`
-
-            return (
-              <div key={setKey}>
-                <div
-                  className="text-white/30 tracking-widest mb-3"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                >
-                  SET {index + 1}/{exercise.sets.length}
-                </div>
-
-                <div
-                  className="flex items-center gap-3 mb-3"
-                  style={{ marginBottom: isResting ? (isCompactSets ? "6px" : "10px") : isCompactSets ? "8px" : "12px" }}
-                >
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      value={set.weight ?? ""}
-                      onChange={(e) => {
-                        if (!canEditExercise) return
-                        const raw = e.target.value
-                        if (!raw.trim()) {
-          void updateSetDataForExercise(exerciseIndex, index, "weight", null)
-          return
-        }
-        const parsed = parseNumber(raw)
-        if (parsed === null || parsed < 0) return
-        void updateSetDataForExercise(exerciseIndex, index, "weight", parsed)
-      }}
-                      onFocus={(e) => {
-                        if (set.id) handleSetFieldFocus(set.id, "weight")
-                        handleInputAutoSelect(e)
-                      }}
-                      onBlur={() => set.id && handleSetFieldBlur(set.id, "weight")}
-                      ref={(node) => {
-                        if (set.id) {
-                          weightInputRefs.current.set(set.id, node)
-                        }
-                      }}
-                      disabled={!canEditExercise}
-      placeholder="—"
-                      className="w-full transition-all duration-200"
-                      style={{
-                        background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
-                        border: "none",
-                        borderRadius: "2px",
-                        padding: isCompactCompleted
-                          ? isResting
-                            ? isCompactSets
-                              ? "6px"
-                              : "8px"
-                            : isCompactSets
-                              ? "7px"
-                              : "10px"
-                          : isResting
-                            ? isCompactSets
-                              ? "8px"
-                              : "12px"
-                            : isCompactSets
-                              ? "10px"
-                              : "16px",
-                        fontSize: isCompactCompleted
-                          ? isResting
-                            ? isCompactSets
-                              ? "14px"
-                              : "16px"
-                            : isCompactSets
-                              ? "15px"
-                              : "18px"
-                          : isResting
-                            ? isCompactSets
-                              ? "18px"
-                              : "22px"
-                            : isCompactSets
-                              ? "20px"
-                              : "24px",
-                        fontWeight: 500,
-                        letterSpacing: "-0.02em",
-                        color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
-                        fontVariantNumeric: "tabular-nums",
-                        outline: "none",
-                        textAlign: "center",
-                      }}
-                    />
-                    <div
-                      className="text-white/25 mt-1.5 text-center"
-                      style={{
-                        fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
-                        fontWeight: 400,
-                        letterSpacing: "0.04em",
-                        marginTop: isCompactCompleted ? "4px" : "6px",
-                      }}
-                    >
-                      lbs
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      value={set.reps ?? ""}
-                      onChange={(e) => {
-                        if (!canEditExercise) return
-                        const raw = e.target.value
-                        if (!raw.trim()) {
-          setRepCapErrors((prev) => {
-            if (!setKey) return prev
-            return { ...prev, [setKey]: false }
-          })
-          void updateSetDataForExercise(exerciseIndex, index, "reps", null)
-          return
-        }
-        const parsed = parseNumber(raw)
-        if (parsed === null) return
-        if (parsed > REP_MAX) {
-          setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
-          return
-        }
-        setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
-        const clamped = Math.max(REP_MIN, parsed)
-        void updateSetDataForExercise(exerciseIndex, index, "reps", clamped)
-      }}
-                      onFocus={(e) => {
-                        if (set.id) handleSetFieldFocus(set.id, "reps")
-                        handleInputAutoSelect(e)
-                      }}
-                      onBlur={() => set.id && handleSetFieldBlur(set.id, "reps")}
-                      ref={(node) => {
-                        if (set.id) {
-                          repsInputRefs.current.set(set.id, node)
-                        }
-                      }}
-                      disabled={!canEditExercise}
-      placeholder="—"
-                      className="w-full transition-all duration-200"
-                      style={{
-                        background: set.completed ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.03)",
-                        border: "none",
-                        borderRadius: "2px",
-                        padding: isCompactCompleted
-                          ? isResting
-                            ? isCompactSets
-                              ? "6px"
-                              : "8px"
-                            : isCompactSets
-                              ? "7px"
-                              : "10px"
-                          : isResting
-                            ? isCompactSets
-                              ? "8px"
-                              : "12px"
-                            : isCompactSets
-                              ? "10px"
-                              : "16px",
-                        fontSize: isCompactCompleted
-                          ? isResting
-                            ? isCompactSets
-                              ? "14px"
-                              : "16px"
-                            : isCompactSets
-                              ? "15px"
-                              : "18px"
-                          : isResting
-                            ? isCompactSets
-                              ? "18px"
-                              : "22px"
-                            : isCompactSets
-                              ? "20px"
-                              : "24px",
-                        fontWeight: 500,
-                        letterSpacing: "-0.02em",
-                        color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
-                        fontVariantNumeric: "tabular-nums",
-                        outline: "none",
-                        textAlign: "center",
-                      }}
-                    />
-                    <div
-                      className="text-white/25 mt-1.5 text-center"
-                      style={{
-                        fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
-                        fontWeight: 400,
-                        letterSpacing: "0.04em",
-                        marginTop: isCompactCompleted ? "4px" : "6px",
-                      }}
-                    >
-                      reps
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-center">
-                    <button
-                      onClick={() => {
-                        if (!canEditExercise) return
-                        if (!set.completed && (isSetIncomplete(set) || repCapError)) {
-                          setValidationTrigger(Date.now())
-                          return
-                        }
-                        void completeSet(index, { exerciseIndex, startRest: isCurrentExercise })
-                      }}
-                      disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
-                      className="flex items-center justify-center transition-all duration-200"
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        background: set.completed ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
-                        border: "none",
-                        borderRadius: "2px",
-                        opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.2 : 1,
-                      }}
-                      type="button"
-                      aria-label={ariaLabel}
-                    >
-                      <Check size={12} strokeWidth={2} style={{ color: set.completed ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)" }} />
-                    </button>
-                  </div>
-                </div>
-
-                {(repCapError || showMissing) && (
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={10} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-                      <div style={{ fontSize: "9px", fontWeight: 400, color: "rgba(255, 255, 255, 0.3)" }}>
-                        {repCapError && `Reps cannot exceed ${REP_MAX}`}
-                        {!repCapError && missingWeight && "Enter weight"}
-                        {!repCapError && !missingWeight && missingReps && "Enter reps"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {lastSet && typeof set.weight === "number" && typeof set.reps === "number" && (
-                  <div className="flex items-center gap-2 mb-3" style={{ marginBottom: isCompactSets ? "8px" : "12px" }}>
-                    <div
-                      className="text-white/20"
-                      style={{ fontSize: isCompactSets ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
-                    >
-                      Last: {lastSet.weight} × {lastSet.reps}
-                    </div>
-                    {comparison?.status !== "no-history" && (
-                      <div
-                        className="flex items-center gap-1.5"
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: comparison?.status === "pr" ? 600 : 400,
-                          color:
-                            comparison?.status === "pr"
-                              ? "rgba(255, 255, 255, 0.9)"
-                              : comparison?.status === "progressed"
-                                ? "rgba(255, 255, 255, 0.5)"
-                                : comparison?.status === "recovery"
-                                  ? "rgba(255, 255, 255, 0.25)"
-                                  : "rgba(255, 255, 255, 0.3)",
-                          letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
-                        }}
-                      >
-                        {comparison?.message}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {showPlateCalc && isCurrentSet && !set.completed && plates.length > 0 && (
-                  <div className="mb-3" style={{ marginBottom: isCompactSets ? "6px" : "12px" }}>
-                    <div
-                      className="flex items-center justify-between mb-2"
-                      style={{ marginBottom: isCompactSets ? "4px" : "8px" }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="transition-all duration-200"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.04)",
-                            border: "none",
-                            borderRadius: "2px",
-                            padding: "3px 6px",
-                          }}
-                          onClick={() => {
-                            const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
-                            setPlateDisplayMode(nextMode)
-                            if (currentExercise?.name) {
-                              localStorage.setItem(`plate_mode_${currentExercise.name}`, nextMode)
-                            }
-                          }}
-                          type="button"
-                        >
-                          <span
-                            className="text-white/70"
-                            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}
-                          >
-                            {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
-                          </span>
-                        </button>
-                        <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
-                          START
-                        </span>
-                        <input
-                          type="number"
-                          value={plateStartingWeight || ""}
-                          onChange={(e) => {
-                            const value = Number(e.target.value)
-                            const nextValue = Number.isNaN(value) ? 0 : Math.max(0, value)
-                            setPlateStartingWeight(nextValue)
-                            if (currentExercise?.name) {
-                              localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
-                            }
-                          }}
-                          onFocus={handleInputAutoSelect}
-                          className="transition-all duration-200"
-                          style={{
-                            width: isCompactSets ? "40px" : "48px",
-                            background: "rgba(255, 255, 255, 0.04)",
-                            border: "none",
-                            borderRadius: "2px",
-                            padding: "2px 6px",
-                            fontSize: isCompactSets ? "14px" : "16px",
-                            color: "rgba(255, 255, 255, 0.7)",
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        />
-                      </div>
-                      <div />
-                    </div>
-                    <div
-                      className="flex items-center gap-1 mb-2"
-                      style={{ marginBottom: isCompactSets ? "4px" : "8px" }}
-                    >
-                      {plates.map((plate, plateIndex) => (
-                        <div key={`${setKey}-${plateIndex}`} className="flex items-center gap-1">
-                          {Array.from({ length: plate.count }).map((_, countIndex) => {
-                            const getPlateColor = () => {
-                              if (plate.plate === 45) return "rgba(220, 80, 80, 0.5)"
-                              if (plate.plate === 35) return "rgba(80, 120, 220, 0.5)"
-                              if (plate.plate === 25) return "rgba(80, 200, 120, 0.5)"
-                              if (plate.plate === 10) return "rgba(230, 180, 80, 0.5)"
-                              if (plate.plate === 5) return "rgba(220, 220, 220, 0.5)"
-                              return "rgba(120, 120, 120, 0.5)"
-                            }
-
-                            const getPlateHeight = () => {
-                              if (plate.plate === 45) return isCompactSets ? 20 : 32
-                              if (plate.plate === 35) return isCompactSets ? 18 : 28
-                              if (plate.plate === 25) return isCompactSets ? 16 : 24
-                              if (plate.plate === 10) return isCompactSets ? 12 : 18
-                              if (plate.plate === 5) return isCompactSets ? 10 : 14
-                              return isCompactSets ? 8 : 10
-                            }
-
-                            return (
-                              <div
-                                key={`${setKey}-${plateIndex}-${countIndex}`}
-                                style={{
-                                  width: isCompactSets ? "5px" : "6px",
-                                  height: `${getPlateHeight()}px`,
-                                  background: getPlateColor(),
-                                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                                  borderRadius: "1px",
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))}
-                      <div
-                        style={{
-                          width: isCompactSets ? "24px" : "32px",
-                          height: isCompactSets ? "3px" : "4px",
-                          background: "rgba(160, 160, 160, 0.4)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                          borderRadius: "1px",
-                          marginLeft: "2px",
-                        }}
-                      />
-                    </div>
-
-                    <div
-                      className="text-white/20"
-                      style={{ fontSize: isCompactSets ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
-                    >
-                      {plates.map((plate, plateIndex) => (
-                        <span key={`${setKey}-plate-${plateIndex}`}>
-                          {plateIndex > 0 && " + "}
-                          {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
-                        </span>
-                      ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
 
   const pauseSession = async () => {
     const baseSession = sessionRef.current
@@ -2363,22 +1489,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }, [session?.id, session?.status, restState])
 
-  const handleDiscardWorkout = async () => {
-    if (!session) return
-    const confirmed = window.confirm("Discard this workout? This will delete the active workout from this device.")
-    if (!confirmed) return
-    const workoutId = session.workoutId ?? (isUuid(session.id) ? session.id : null)
-    deleteSetsForSession(session.id)
-    deleteSession(session.id)
-    saveCurrentSessionId(null)
-    setRestState(undefined)
-    setSession(null)
-    setExercises([])
-    if (workoutId) {
-      await deleteWorkoutDraft(workoutId)
-    }
-    router.push("/")
-  }
 
   const handleTogglePlateCalc = () => {
     const newValue = !showPlateCalc

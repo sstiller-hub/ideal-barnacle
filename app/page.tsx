@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertDialog,
@@ -46,7 +46,6 @@ import {
   ArrowDown,
   ArrowUp,
   Settings,
-  ChevronLeft,
   ChevronRight,
   ChevronRight as ChevronRightSmall,
 } from "lucide-react"
@@ -133,13 +132,15 @@ export default function Home() {
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [lastWorkoutSummary, setLastWorkoutSummary] = useState<LastWorkoutSummary | null>(null)
   const [lastWorkoutPrs, setLastWorkoutPrs] = useState<WorkoutPrEvent[]>([])
+  const selectedDateRef = useRef(selectedDate)
+  const userIdRef = useRef(userId)
 
-  const normalizeExerciseName = (name: string) => formatExerciseName(name).toLowerCase()
+  const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
   const formatShortDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" })
   const formatVolume = (value: number) => Math.round(value).toLocaleString()
 
-  const getWeekRange = (date: Date) => {
+  const getWeekRange = useCallback((date: Date) => {
     const start = new Date(date)
     start.setHours(0, 0, 0, 0)
     const day = start.getDay()
@@ -148,7 +149,7 @@ export default function Home() {
     const end = new Date(start)
     end.setDate(start.getDate() + 7)
     return { start, end }
-  }
+  }, [])
 
   const weeklyVolumes = useMemo(() => {
     const endBase = new Date()
@@ -202,7 +203,7 @@ export default function Home() {
     if (Number.isNaN(startedAt.getTime())) return false
     const { start, end } = getWeekRange(new Date())
     return startedAt >= start && startedAt < end
-  }, [isSessionInProgress, session?.startedAt])
+  }, [isSessionInProgress, session?.startedAt, getWeekRange])
 
   const currentWeekVolumeSoFar =
     currentWeekVolume + (isInProgressSessionInCurrentWeek ? inProgressSessionVolume : 0)
@@ -246,10 +247,10 @@ export default function Home() {
     return () => window.removeEventListener("pr-exclusions:updated", handleUpdate)
   }, [])
 
-  const refreshSession = () => {
+  const refreshSession = useCallback(() => {
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
-  }
+  }, [])
 
   const handleDiscardActiveWorkout = async () => {
     if (!session) return
@@ -265,6 +266,14 @@ export default function Home() {
     setSession(null)
     loadDataForDate(selectedDate)
   }
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate
+  }, [selectedDate])
+
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
 
   useEffect(() => {
     if (!session?.startedAt) return
@@ -304,17 +313,21 @@ export default function Home() {
 
   useEffect(() => {
     const handleFocus = () => {
-      loadDataForDate(selectedDate)
-      if (userId) {
-        void loadHomeAnalytics(userId)
+      const currentDate = selectedDateRef.current
+      const currentUserId = userIdRef.current
+      loadDataForDate(currentDate)
+      if (currentUserId) {
+        void loadHomeAnalytics(currentUserId)
       }
       refreshSession()
     }
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        loadDataForDate(selectedDate)
-        if (userId) {
-          void loadHomeAnalytics(userId)
+        const currentDate = selectedDateRef.current
+        const currentUserId = userIdRef.current
+        loadDataForDate(currentDate)
+        if (currentUserId) {
+          void loadHomeAnalytics(currentUserId)
         }
         refreshSession()
       }
@@ -325,7 +338,7 @@ export default function Home() {
       window.removeEventListener("focus", handleFocus)
       document.removeEventListener("visibilitychange", handleVisibility)
     }
-  }, [selectedDate, userId])
+  }, [refreshSession])
 
   useEffect(() => {
     let active = true
@@ -342,7 +355,7 @@ export default function Home() {
     }
   }, [selectedDate, userId])
 
-  const loadHomeAnalytics = async (targetUserId: string) => {
+  const loadHomeAnalytics = useCallback(async (targetUserId: string) => {
     const now = new Date()
     const { start, end } = getWeekRange(now)
     const previousStart = new Date(start)
@@ -414,7 +427,7 @@ export default function Home() {
     if (prsError) return
 
     setLastWorkoutPrs((prsData || []) as WorkoutPrEvent[])
-  }
+  }, [getWeekRange])
 
   useEffect(() => {
     if (!userId) {
@@ -424,7 +437,7 @@ export default function Home() {
       return
     }
     void loadHomeAnalytics(userId)
-  }, [userId])
+  }, [userId, loadHomeAnalytics])
 
   useEffect(() => {
     if (routinePool.length === 0) return
@@ -559,18 +572,18 @@ export default function Home() {
     })
 
     setTodayPRs(sortedPRs)
-  }, [workoutHistory, scheduledRoutine, workoutForDate, userId])
+  }, [workoutHistory, prExcludedNames, normalizeExerciseName])
 
-  const resolveRoutine = (entry: ScheduledWorkout | null | undefined): WorkoutRoutine | null => {
+  const resolveRoutine = useCallback((entry: ScheduledWorkout | null | undefined): WorkoutRoutine | null => {
     if (!entry) return null
     const byId = routinePool.find((routine) => routine.id === entry.routineId)
     if (byId) return byId
     const byName = routinePool.find((routine) => routine.name === entry.routineName)
     if (byName) return byName
     return null
-  }
+  }, [routinePool])
 
-  const loadDataForDate = (date: Date) => {
+  const loadDataForDate = useCallback((date: Date) => {
     const history = getWorkoutHistory()
     setWorkoutHistory(history)
 
@@ -621,7 +634,7 @@ export default function Home() {
     const resolvedRestDay = restDay || !nextRoutine
     setBaseScheduledRoutine(nextRoutine)
     setBaseIsRestDay(resolvedRestDay)
-  }
+  }, [])
 
   const handleStartWorkout = (routineId: string) => {
     if (session) {
@@ -851,7 +864,7 @@ export default function Home() {
     })
 
     return { firstRow, secondRow }
-  }, [todayPRs, actualState, displayExercises])
+  }, [todayPRs, actualState, displayExercises, normalizeExerciseName])
   const activeSessionProgress = useMemo(() => {
     if (!session?.exercises) return null
     let totalSets = 0
@@ -1590,7 +1603,6 @@ export default function Home() {
             previousWeekVolume={previousWeekVolume}
             chartData={weeklyVolumesForCard}
             canCompareWeekOverWeek={canCompareWeekOverWeek}
-            timeframe="7w"
           />
         </button>
       </div>
@@ -1899,13 +1911,11 @@ function TrainingVolumeCard({
   previousWeekVolume,
   chartData,
   canCompareWeekOverWeek,
-  timeframe,
 }: {
   currentWeekVolume: number
   previousWeekVolume: number
   chartData: number[]
   canCompareWeekOverWeek: boolean
-  timeframe: string
 }) {
   const formattedData = chartData.map((value, index) => ({ week: index + 1, volume: value }))
   const delta = currentWeekVolume - previousWeekVolume

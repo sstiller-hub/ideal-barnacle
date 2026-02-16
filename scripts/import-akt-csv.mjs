@@ -3,8 +3,11 @@ import path from "node:path"
 import process from "node:process"
 import { createClient } from "@supabase/supabase-js"
 
-const CSV_PATH = process.argv[2] || "/Users/samstiller/Downloads/akt_import_FINAL.csv"
-const USER_ID = process.argv[3] || "5eef3bfd-d598-4a20-aa66-5bedaebcb376"
+const CSV_PATH =
+  process.argv[2] ||
+  process.env.AKT_IMPORT_CSV_PATH ||
+  path.resolve(process.cwd(), "public/akt_import_FINAL.csv")
+const USER_ID = process.argv[3] || process.env.AKT_USER_ID
 const NO_OVERWRITE = process.argv.includes("--no-overwrite")
 
 const readEnvFile = (filePath) => {
@@ -30,6 +33,12 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || envFromFile.SU
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL in environment.")
+  process.exit(1)
+}
+
+if (!USER_ID) {
+  console.error("Missing user id. Pass as argv[3] or set AKT_USER_ID.")
+  console.error("Usage: node scripts/import-akt-csv.mjs <csv-path> <user-id> [--no-overwrite]")
   process.exit(1)
 }
 

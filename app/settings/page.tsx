@@ -353,7 +353,6 @@ export default function SettingsPage() {
 
         <div className="space-y-4">
           <SettingsSection
-            id="account"
             title="ACCOUNT & SYNC"
             isExpanded={expandedSections.includes("account")}
             onToggle={() => toggleSection("account")}
@@ -594,7 +593,6 @@ export default function SettingsPage() {
           </SettingsSection>
 
         <SettingsSection
-          id="appearance"
           title="APPEARANCE & DEFAULTS"
           isExpanded={expandedSections.includes("appearance")}
           onToggle={() => toggleSection("appearance")}
@@ -664,7 +662,6 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
-          id="schedule"
           title="SCHEDULE & PROGRAMS"
           isExpanded={expandedSections.includes("schedule")}
           onToggle={() => toggleSection("schedule")}
@@ -688,7 +685,6 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
-          id="data"
           title="DATA & INTEGRATIONS"
           isExpanded={expandedSections.includes("data")}
           onToggle={() => toggleSection("data")}
@@ -808,7 +804,6 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
-          id="about"
           title="ABOUT & DEVICE"
           isExpanded={expandedSections.includes("about")}
           onToggle={() => toggleSection("about")}
@@ -874,13 +869,11 @@ export default function SettingsPage() {
 }
 
 function SettingsSection({
-  id,
   title,
   children,
   isExpanded,
   onToggle,
 }: {
-  id: string
   title: string
   children: React.ReactNode
   isExpanded: boolean

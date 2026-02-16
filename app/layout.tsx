@@ -9,8 +9,8 @@ import MobilePreviewWrapper from "@/components/mobile-preview-wrapper"
 import { ThemeProvider } from "@/components/theme-provider"
 import PortraitLock from "@/components/portrait-lock"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 // Added PWA metadata and viewport configuration
 export const metadata: Metadata = {
@@ -59,7 +59,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
-      <body className={`font-sans antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Suspense fallback={children}>
             <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
