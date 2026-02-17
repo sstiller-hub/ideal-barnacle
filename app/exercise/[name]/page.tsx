@@ -5,6 +5,34 @@ import { Button } from "@/components/ui/button"
 import { getExerciseHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 
+function normalizeExerciseNameForMatch(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function isHipAdduction(name: string): boolean {
+  return normalizeExerciseNameForMatch(name) === "hip adduction"
+}
+
+function areEquivalentSets(a: { reps: number | null; weight: number | null; completed: boolean }, b: { reps: number | null; weight: number | null; completed: boolean }): boolean {
+  return (
+    (a.reps ?? null) === (b.reps ?? null) &&
+    (a.weight ?? null) === (b.weight ?? null) &&
+    Boolean(a.completed) === Boolean(b.completed)
+  )
+}
+
+function collapseMirroredSixSetPattern<T extends { reps: number | null; weight: number | null; completed: boolean }>(sets: T[]): T[] {
+  if (sets.length !== 6) return sets
+  if (
+    areEquivalentSets(sets[0], sets[1]) &&
+    areEquivalentSets(sets[2], sets[3]) &&
+    areEquivalentSets(sets[4], sets[5])
+  ) {
+    return [sets[0], sets[2], sets[4]]
+  }
+  return sets
+}
+
 export default function ExerciseHistoryPage() {
   const router = useRouter()
   const params = useParams<{ name?: string }>()
@@ -13,7 +41,7 @@ export default function ExerciseHistoryPage() {
   const rawHistory = getExerciseHistory(exerciseName)
   const seenWorkoutIds = new Set<string>()
   const seenWorkoutKeys = new Set<string>()
-  const history = rawHistory.filter((workout) => {
+  const baseHistory = rawHistory.filter((workout) => {
     if (workout?.id) {
       if (seenWorkoutIds.has(workout.id)) return false
       seenWorkoutIds.add(workout.id)
@@ -42,6 +70,23 @@ export default function ExerciseHistoryPage() {
     if (seenWorkoutKeys.has(compositeKey)) return false
     seenWorkoutKeys.add(compositeKey)
     return true
+  })
+
+  const history = baseHistory.map((workout) => {
+    if (!isHipAdduction(exerciseName)) return workout
+    const exercises = workout.exercises.map((exercise) => {
+      if (!isHipAdduction(exercise.name)) return exercise
+      const collapsedSets = collapseMirroredSixSetPattern(exercise.sets)
+      if (collapsedSets === exercise.sets) return exercise
+      return {
+        ...exercise,
+        sets: collapsedSets,
+      }
+    })
+    return {
+      ...workout,
+      exercises,
+    }
   })
 
   const volumeSeries = history
