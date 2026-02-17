@@ -14,6 +14,29 @@ function median(values: number[]): number {
     : sorted[mid]
 }
 
+function quantile(values: number[], q: number): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const pos = (sorted.length - 1) * q
+  const base = Math.floor(pos)
+  const rest = pos - base
+  if (sorted[base + 1] !== undefined) {
+    return sorted[base] + rest * (sorted[base + 1] - sorted[base])
+  }
+  return sorted[base]
+}
+
+function winsorizeByIqr(values: number[], iqrFactor = 1.5): number[] {
+  if (values.length < 8) return values
+  const q1 = quantile(values, 0.25)
+  const q3 = quantile(values, 0.75)
+  const iqr = q3 - q1
+  if (iqr <= 0) return values
+  const lower = q1 - iqrFactor * iqr
+  const upper = q3 + iqrFactor * iqr
+  return values.map((v) => Math.min(Math.max(v, lower), upper))
+}
+
 function smoothWithHampel(values: number[], windowSize = 3, threshold = 3): number[] {
   if (values.length < 7) return values
   const scale = 1.4826
@@ -31,7 +54,7 @@ function smoothWithHampel(values: number[], windowSize = 3, threshold = 3): numb
 }
 
 function shouldSmoothExercise(name: string): boolean {
-  return name.toLowerCase().replace(/\s+/g, " ").trim() === "hip adduction"
+  return name.toLowerCase().replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim() === "hip adduction"
 }
 
 export default function ExerciseHistoryPage() {
@@ -90,7 +113,7 @@ export default function ExerciseHistoryPage() {
 
   const rawChartData = [...volumeSeries].reverse()
   const smoothedVolumes = shouldSmoothExercise(exerciseName)
-    ? smoothWithHampel(rawChartData.map((d) => d.volume))
+    ? winsorizeByIqr(smoothWithHampel(rawChartData.map((d) => d.volume)))
     : null
   const chartData = smoothedVolumes
     ? rawChartData.map((point, idx) => ({ ...point, volume: smoothedVolumes[idx] }))
