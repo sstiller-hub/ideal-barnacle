@@ -5,14 +5,6 @@ import { Button } from "@/components/ui/button"
 import { getExerciseHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 
-function normalizeExerciseNameForMatch(name: string): string {
-  return name.toLowerCase().replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim()
-}
-
-function isHipAdduction(name: string): boolean {
-  return normalizeExerciseNameForMatch(name) === "hip adduction"
-}
-
 function areEquivalentSets(a: { reps: number | null; weight: number | null; completed: boolean }, b: { reps: number | null; weight: number | null; completed: boolean }): boolean {
   return (
     (a.reps ?? null) === (b.reps ?? null) &&
@@ -73,9 +65,7 @@ export default function ExerciseHistoryPage() {
   })
 
   const history = baseHistory.map((workout) => {
-    if (!isHipAdduction(exerciseName)) return workout
     const exercises = workout.exercises.map((exercise) => {
-      if (!isHipAdduction(exercise.name)) return exercise
       const collapsedSets = collapseMirroredSixSetPattern(exercise.sets)
       if (collapsedSets === exercise.sets) return exercise
       return {

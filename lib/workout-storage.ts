@@ -46,14 +46,6 @@ import type { EvaluatedPR } from "./pr-types"
 import { isSetEligibleForStats, isValidNumber } from "./set-validation"
 import { formatExerciseName } from "./format-exercise-name"
 
-function normalizeExerciseNameForMatch(name: string): string {
-  return name.toLowerCase().replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim()
-}
-
-function isHipAdduction(name: string): boolean {
-  return normalizeExerciseNameForMatch(name) === "hip adduction"
-}
-
 function dedupeMirroredSixSets(sets: WorkoutSet[]): { sets: WorkoutSet[]; changed: boolean } {
   if (sets.length !== 6) return { sets, changed: false }
   const pairs = [
@@ -119,7 +111,6 @@ export function getWorkoutHistory(): CompletedWorkout[] {
   const normalized: CompletedWorkout[] = history.map((workout) => {
     let changed = false
     const migratedExercises = workout.exercises.map((exercise) => {
-      if (!isHipAdduction(exercise.name)) return exercise
       const result = dedupeMirroredSixSets(exercise.sets)
       if (!result.changed) return exercise
       changed = true

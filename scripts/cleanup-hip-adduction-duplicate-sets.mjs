@@ -4,10 +4,13 @@ import process from "node:process"
 import { createClient } from "@supabase/supabase-js"
 
 const USER_ID = process.argv[2]
+const EXERCISE_NAME = (process.argv[3] || "hip adduction").trim()
 const APPLY = process.argv.includes("--apply")
 
 if (!USER_ID) {
-  console.error("Usage: node scripts/cleanup-hip-adduction-duplicate-sets.mjs <USER_ID> [--apply]")
+  console.error(
+    "Usage: node scripts/cleanup-hip-adduction-duplicate-sets.mjs <USER_ID> [exercise-name] [--apply]"
+  )
   process.exit(1)
 }
 
@@ -88,19 +91,20 @@ const run = async () => {
   const { data: exerciseRows, error: exerciseErr } = await supabase
     .from("workout_exercises")
     .select("id, workout_id, name")
-    .ilike("name", "%hip adduction%")
+    .ilike("name", `%${EXERCISE_NAME}%`)
   if (exerciseErr) throw exerciseErr
   const workoutIdSet = new Set(workoutIds)
-  const hipExercises = (exerciseRows || []).filter(
-    (e) => workoutIdSet.has(e.workout_id) && normalize(e.name) === "hip adduction"
+  const targetNormalized = normalize(EXERCISE_NAME)
+  const targetExercises = (exerciseRows || []).filter(
+    (e) => workoutIdSet.has(e.workout_id) && normalize(e.name) === targetNormalized
   )
-  if (!hipExercises.length) {
-    console.log("No Hip Adduction workout_exercises found.")
+  if (!targetExercises.length) {
+    console.log(`No ${EXERCISE_NAME} workout_exercises found.`)
     return
   }
 
   const sets = []
-  for (const ids of chunk(hipExercises.map((e) => e.id), 200)) {
+  for (const ids of chunk(targetExercises.map((e) => e.id), 200)) {
     const { data, error } = await supabase
       .from("workout_sets")
       .select("id, workout_exercise_id, set_index, reps, weight, completed, updated_at")
@@ -119,7 +123,7 @@ const run = async () => {
 
   const toDelete = []
   const flagged = []
-  for (const ex of hipExercises) {
+  for (const ex of targetExercises) {
     const exSets = byExerciseId.get(ex.id) || []
     if (!isMirroredSixSetPattern(exSets)) continue
     flagged.push(ex.id)
@@ -135,7 +139,7 @@ const run = async () => {
     }
   }
 
-  console.log(`Hip Adduction exercise instances scanned: ${hipExercises.length}`)
+  console.log(`${EXERCISE_NAME} exercise instances scanned: ${targetExercises.length}`)
   console.log(`Mirrored 6-set duplicates found: ${flagged.length}`)
   console.log(`Rows to delete: ${toDelete.length}`)
 
