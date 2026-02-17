@@ -5,6 +5,35 @@ import { Button } from "@/components/ui/button"
 import { getExerciseHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid]
+}
+
+function smoothWithHampel(values: number[], windowSize = 3, threshold = 3): number[] {
+  if (values.length < 7) return values
+  const scale = 1.4826
+  return values.map((value, idx) => {
+    const start = Math.max(0, idx - windowSize)
+    const end = Math.min(values.length, idx + windowSize + 1)
+    const window = values.slice(start, end)
+    const med = median(window)
+    const deviations = window.map((v) => Math.abs(v - med))
+    const mad = median(deviations)
+    if (mad === 0) return value
+    const robustZ = Math.abs(value - med) / (scale * mad)
+    return robustZ > threshold ? med : value
+  })
+}
+
+function shouldSmoothExercise(name: string): boolean {
+  return name.toLowerCase().replace(/\s+/g, " ").trim() === "hip adduction"
+}
+
 export default function ExerciseHistoryPage() {
   const router = useRouter()
   const params = useParams<{ name?: string }>()
@@ -59,7 +88,13 @@ export default function ExerciseHistoryPage() {
     })
     .filter(Boolean) as Array<{ date: string; volume: number; workoutName: string }>
 
-  const chartData = [...volumeSeries].reverse()
+  const rawChartData = [...volumeSeries].reverse()
+  const smoothedVolumes = shouldSmoothExercise(exerciseName)
+    ? smoothWithHampel(rawChartData.map((d) => d.volume))
+    : null
+  const chartData = smoothedVolumes
+    ? rawChartData.map((point, idx) => ({ ...point, volume: smoothedVolumes[idx] }))
+    : rawChartData
   const maxVolume = Math.max(...chartData.map((point) => point.volume), 0)
   const minVolume = Math.min(...chartData.map((point) => point.volume), 0)
   const range = maxVolume - minVolume || 1
