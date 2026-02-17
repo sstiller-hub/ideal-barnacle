@@ -46,6 +46,12 @@ import type { EvaluatedPR } from "./pr-types"
 import { isSetEligibleForStats, isValidNumber } from "./set-validation"
 import { formatExerciseName } from "./format-exercise-name"
 
+function canonicalizeExerciseName(name: string): string {
+  const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()
+  if (normalized === "booty builder split squat machine") return "Split Squat"
+  return name
+}
+
 function dedupeMirroredSixSets(sets: WorkoutSet[]): { sets: WorkoutSet[]; changed: boolean } {
   if (sets.length !== 6) return { sets, changed: false }
   const pairs = [
@@ -111,11 +117,13 @@ export function getWorkoutHistory(): CompletedWorkout[] {
   const normalized: CompletedWorkout[] = history.map((workout) => {
     let changed = false
     const migratedExercises = workout.exercises.map((exercise) => {
+      const canonicalName = canonicalizeExerciseName(exercise.name)
       const result = dedupeMirroredSixSets(exercise.sets)
-      if (!result.changed) return exercise
-      changed = true
+      if (canonicalName !== exercise.name || result.changed) changed = true
+      if (!result.changed && canonicalName === exercise.name) return exercise
       return {
         ...exercise,
+        name: canonicalName,
         sets: result.sets,
       }
     })

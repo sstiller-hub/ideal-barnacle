@@ -27,7 +27,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
       ex({ id: "legs1-pendulum", name: "Arsenal Pendulum Squat", type: "strength", targetSets: 3, targetReps: "6-9" }),
       ex({
         id: "legs1-bb-split-squat",
-        name: "Booty Builder Split Squat Machine",
+        name: "Split Squat",
         type: "strength",
         targetSets: 3,
         targetReps: "8-10",
