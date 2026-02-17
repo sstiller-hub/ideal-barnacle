@@ -85,17 +85,15 @@ const run = async () => {
     return
   }
 
-  const exercises = []
-  for (const ids of chunk(workoutIds, 200)) {
-    const { data, error } = await supabase
-      .from("workout_exercises")
-      .select("id, workout_id, name")
-      .in("workout_id", ids)
-    if (error) throw error
-    if (data?.length) exercises.push(...data)
-  }
-
-  const hipExercises = exercises.filter((e) => normalize(e.name) === "hip adduction")
+  const { data: exerciseRows, error: exerciseErr } = await supabase
+    .from("workout_exercises")
+    .select("id, workout_id, name")
+    .ilike("name", "%hip adduction%")
+  if (exerciseErr) throw exerciseErr
+  const workoutIdSet = new Set(workoutIds)
+  const hipExercises = (exerciseRows || []).filter(
+    (e) => workoutIdSet.has(e.workout_id) && normalize(e.name) === "hip adduction"
+  )
   if (!hipExercises.length) {
     console.log("No Hip Adduction workout_exercises found.")
     return

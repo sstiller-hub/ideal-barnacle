@@ -46,6 +46,29 @@ import type { EvaluatedPR } from "./pr-types"
 import { isSetEligibleForStats, isValidNumber } from "./set-validation"
 import { formatExerciseName } from "./format-exercise-name"
 
+function normalizeExerciseNameForMatch(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function isHipAdduction(name: string): boolean {
+  return normalizeExerciseNameForMatch(name) === "hip adduction"
+}
+
+function dedupeMirroredSixSets(sets: WorkoutSet[]): { sets: WorkoutSet[]; changed: boolean } {
+  if (sets.length !== 6) return { sets, changed: false }
+  const pairs = [
+    [sets[0], sets[1]],
+    [sets[2], sets[3]],
+    [sets[4], sets[5]],
+  ] as const
+  const isPairDup = (a: WorkoutSet, b: WorkoutSet) =>
+    (a.reps ?? null) === (b.reps ?? null) &&
+    (a.weight ?? null) === (b.weight ?? null) &&
+    Boolean(a.completed) === Boolean(b.completed)
+  if (!pairs.every(([a, b]) => isPairDup(a, b))) return { sets, changed: false }
+  return { sets: [sets[0], sets[2], sets[4]], changed: true }
+}
+
 export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
   if (typeof window === "undefined") {
     console.warn("[v0] saveWorkout called during SSR, skipping")
@@ -94,6 +117,17 @@ export function getWorkoutHistory(): CompletedWorkout[] {
   let didMigrate = false
 
   const normalized: CompletedWorkout[] = history.map((workout) => {
+    let changed = false
+    const migratedExercises = workout.exercises.map((exercise) => {
+      if (!isHipAdduction(exercise.name)) return exercise
+      const result = dedupeMirroredSixSets(exercise.sets)
+      if (!result.changed) return exercise
+      changed = true
+      return {
+        ...exercise,
+        sets: result.sets,
+      }
+    })
     if (
       workout.durationUnit === "minutes" &&
       typeof workout.duration === "number" &&
@@ -102,8 +136,16 @@ export function getWorkoutHistory(): CompletedWorkout[] {
       didMigrate = true
       return {
         ...workout,
+        exercises: migratedExercises,
         duration: workout.duration * 60,
         durationUnit: "seconds",
+      } as CompletedWorkout
+    }
+    if (changed) {
+      didMigrate = true
+      return {
+        ...workout,
+        exercises: migratedExercises,
       } as CompletedWorkout
     }
     return workout as CompletedWorkout
