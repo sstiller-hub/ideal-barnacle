@@ -3,8 +3,10 @@ import assert from "node:assert/strict"
 import {
   calculateE1rm,
   computeBestE1rmSet,
+  computeExerciseSessionVolumes,
   computeWeekOverWeek,
   computeWorkoutVolume,
+  isCompletedSet,
   isNewBest,
   type CompletedSetRecord,
 } from "../lib/workout-analytics"
@@ -90,4 +92,37 @@ test("computeWeekOverWeek handles zero previous volume", () => {
   const result = computeWeekOverWeek(1000, 0)
   assert.equal(result.delta, 1000)
   assert.equal(result.percent, 0)
+})
+
+test("computeWeekOverWeek returns negative delta for volume drop", () => {
+  const result = computeWeekOverWeek(800, 1000)
+  assert.equal(result.delta, -200)
+  assert.ok(Math.abs(result.percent - -20) < 0.001)
+})
+
+test("computeExerciseSessionVolumes groups volume by exerciseId", () => {
+  const sets: CompletedSetRecord[] = [
+    { reps: 10, weight: 100, completed: true, exerciseId: "ex-1", exerciseName: "Bench", workoutId: "w-1" },
+    { reps: 8, weight: 100, completed: true, exerciseId: "ex-1", exerciseName: "Bench", workoutId: "w-1" },
+    { reps: 5, weight: 200, completed: true, exerciseId: "ex-2", exerciseName: "Squat", workoutId: "w-1" },
+    { reps: 0, weight: 100, completed: true, exerciseId: "ex-1", exerciseName: "Bench", workoutId: "w-1" },
+  ]
+  const volumes = computeExerciseSessionVolumes(sets)
+  assert.equal(volumes.get("ex-1"), 10 * 100 + 8 * 100) // zero-rep set excluded
+  assert.equal(volumes.get("ex-2"), 5 * 200)
+})
+
+test("isCompletedSet rejects sets with zero reps or zero weight", () => {
+  assert.equal(
+    isCompletedSet({ reps: 0, weight: 100, completed: true, exerciseId: "e", exerciseName: "E", workoutId: "w" }),
+    false,
+  )
+  assert.equal(
+    isCompletedSet({ reps: 5, weight: 0, completed: true, exerciseId: "e", exerciseName: "E", workoutId: "w" }),
+    false,
+  )
+  assert.equal(
+    isCompletedSet({ reps: 5, weight: 100, completed: true, exerciseId: "e", exerciseName: "E", workoutId: "w" }),
+    true,
+  )
 })

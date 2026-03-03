@@ -30,6 +30,108 @@ test("validateWorkoutCommitPayload accepts a minimal valid payload", () => {
   assert.equal(parsed.sets.length, 1)
 })
 
+test("validateWorkoutCommitPayload rejects non-UUID workout_id", () => {
+  assert.throws(() =>
+    validateWorkoutCommitPayload({
+      workout: {
+        workout_id: "not-a-uuid",
+        started_at: "2025-01-01T10:00:00.000Z",
+        completed_at: "2025-01-01T11:00:00.000Z",
+        updated_at_client: 1710000000000,
+        schema_version: 1,
+      },
+      sets: [
+        {
+          set_id: "550e8400-e29b-41d4-a716-446655440001",
+          exercise_id: "bench",
+          exercise_name: "Bench Press",
+          set_index: 0,
+          reps: 8,
+          weight: 135,
+          completed: true,
+        },
+      ],
+    }),
+  )
+})
+
+test("validateWorkoutCommitPayload rejects completed_at before started_at", () => {
+  assert.throws(
+    () =>
+      validateWorkoutCommitPayload({
+        workout: {
+          workout_id: "550e8400-e29b-41d4-a716-446655440000",
+          started_at: "2025-01-01T11:00:00.000Z",
+          completed_at: "2025-01-01T10:00:00.000Z",
+          updated_at_client: 1710000000000,
+          schema_version: 1,
+        },
+        sets: [
+          {
+            set_id: "550e8400-e29b-41d4-a716-446655440001",
+            exercise_id: "bench",
+            exercise_name: "Bench Press",
+            set_index: 0,
+            reps: 8,
+            weight: 135,
+            completed: true,
+          },
+        ],
+      }),
+    /completed_at must be after started_at/,
+  )
+})
+
+test("validateWorkoutCommitPayload rejects a completed set missing reps", () => {
+  assert.throws(() =>
+    validateWorkoutCommitPayload({
+      workout: {
+        workout_id: "550e8400-e29b-41d4-a716-446655440000",
+        started_at: "2025-01-01T10:00:00.000Z",
+        completed_at: "2025-01-01T11:00:00.000Z",
+        updated_at_client: 1710000000000,
+        schema_version: 1,
+      },
+      sets: [
+        {
+          set_id: "550e8400-e29b-41d4-a716-446655440001",
+          exercise_id: "bench",
+          exercise_name: "Bench Press",
+          set_index: 0,
+          reps: null,
+          weight: 135,
+          completed: true,
+        },
+      ],
+    }),
+  )
+})
+
+test("validateWorkoutCommitPayload allows null completed_at", () => {
+  const payload = {
+    workout: {
+      workout_id: "550e8400-e29b-41d4-a716-446655440000",
+      started_at: "2025-01-01T10:00:00.000Z",
+      completed_at: null,
+      updated_at_client: 1710000000000,
+      schema_version: 1,
+    },
+    sets: [
+      {
+        set_id: "550e8400-e29b-41d4-a716-446655440001",
+        exercise_id: "bench",
+        exercise_name: "Bench Press",
+        set_index: 0,
+        reps: 8,
+        weight: 135,
+        completed: false,
+      },
+    ],
+  }
+  const parsed = validateWorkoutCommitPayload(payload)
+  assert.equal(parsed.workout.completed_at, null)
+})
+
 test("validateWorkoutCommitPayload rejects negative weights", () => {
   const payload = {
     workout: {
