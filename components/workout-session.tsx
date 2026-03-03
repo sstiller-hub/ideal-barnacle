@@ -1354,10 +1354,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const completedAt = completedAtDate.toISOString()
     const localDateForDisplay = new Date(completedAtDate)
     localDateForDisplay.setHours(12, 0, 0, 0)
+    const durationSeconds = Math.floor(
+      (completedAtDate.getTime() - new Date(session.startedAt).getTime()) / 1000
+    )
     const completedWorkout = {
       id: completedWorkoutId,
       name: routine.name,
       date: localDateForDisplay.toISOString(),
+      startedAt: session.startedAt,
+      endedAt: completedAt,
+      duration: durationSeconds,
+      durationUnit: "seconds" as const,
       exercises: cleanedExercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,

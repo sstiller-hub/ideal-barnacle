@@ -65,10 +65,34 @@ export default function WorkoutDetailPage() {
       month: "long",
       day: "numeric",
       year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
     })
   }
+
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m} min`
+  }
+
+  const durationSeconds =
+    workout?.duration ??
+    (workout?.startedAt && workout?.endedAt
+      ? Math.floor((new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()) / 1000)
+      : null)
+
+  const timeRangeLabel =
+    workout?.startedAt && workout?.endedAt
+      ? `${formatTime(workout.startedAt)} – ${formatTime(workout.endedAt)}`
+      : null
+
+  // Use startedAt for accurate time display; date is noon-normalized for grouping
+  const headerDateLabel = workout
+    ? formatDate(workout.startedAt ?? workout.date)
+    : ""
 
   const performanceSummary = useMemo<{
     excludedSets: number
@@ -220,7 +244,7 @@ export default function WorkoutDetailPage() {
           <div>
             <p className="text-xs text-muted-foreground">Workout Summary</p>
             <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
-            <p className="text-xs text-muted-foreground">{formatDate(workout.date)}</p>
+            <p className="text-xs text-muted-foreground">{headerDateLabel}</p>
           </div>
         </div>
       </div>
@@ -235,10 +259,23 @@ export default function WorkoutDetailPage() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-muted-foreground">Workout date</div>
-              <div className="text-sm font-medium text-foreground">
-                {new Date(workout.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </div>
+              {durationSeconds !== null && (
+                <>
+                  <div className="text-xs text-muted-foreground">Duration</div>
+                  <div className="text-sm font-medium text-foreground">{formatDuration(durationSeconds)}</div>
+                </>
+              )}
+              {timeRangeLabel && (
+                <div className="text-xs text-muted-foreground mt-0.5">{timeRangeLabel}</div>
+              )}
+              {durationSeconds === null && (
+                <>
+                  <div className="text-xs text-muted-foreground">Workout date</div>
+                  <div className="text-sm font-medium text-foreground">
+                    {new Date(workout.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">

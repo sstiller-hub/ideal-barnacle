@@ -27,6 +27,8 @@ export type CompletedWorkout = {
   id: string
   name: string
   date: string
+  startedAt?: string
+  endedAt?: string
   duration?: number
   durationUnit?: "seconds" | "minutes"
   exercises: Exercise[]

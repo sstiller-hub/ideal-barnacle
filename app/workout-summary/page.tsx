@@ -15,6 +15,9 @@ type WorkoutRow = {
   date?: string
   routine_id?: string | null
   routineId?: string | null
+  startedAt?: string
+  endedAt?: string
+  duration?: number
 }
 
 type WorkoutExerciseRow = {
@@ -135,6 +138,9 @@ export default function WorkoutSummaryPage() {
         name: workoutRecord.name,
         performed_at: workoutRecord.date,
         date: workoutRecord.date,
+        startedAt: workoutRecord.startedAt,
+        endedAt: workoutRecord.endedAt,
+        duration: workoutRecord.duration,
       }
 
       const assembledExercises = buildSummaryExercises(workoutRecord)
@@ -332,7 +338,9 @@ export default function WorkoutSummaryPage() {
     month: "short",
     day: "numeric",
   })
-  const fullDateLabel = new Date(performedAt).toLocaleDateString("en-US", {
+  // Use startedAt for the actual time display (date is noon-normalized for grouping only)
+  const headerTimeSource = workout.startedAt ?? performedAt
+  const fullDateLabel = new Date(headerTimeSource).toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
     day: "numeric",
@@ -340,6 +348,27 @@ export default function WorkoutSummaryPage() {
     hour: "numeric",
     minute: "2-digit",
   })
+
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m} min`
+  }
+
+  const durationSeconds =
+    workout.duration ??
+    (workout.startedAt && workout.endedAt
+      ? Math.floor((new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()) / 1000)
+      : null)
+
+  const timeRangeLabel =
+    workout.startedAt && workout.endedAt
+      ? `${formatTime(workout.startedAt)} – ${formatTime(workout.endedAt)}`
+      : null
 
   const deltaLabel =
     summary.baselineTotalVolume > 0
@@ -376,8 +405,21 @@ export default function WorkoutSummaryPage() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-muted-foreground">Workout date</div>
-              <div className="text-sm font-medium text-foreground">{dateLabel}</div>
+              {durationSeconds !== null && (
+                <>
+                  <div className="text-xs text-muted-foreground">Duration</div>
+                  <div className="text-sm font-medium text-foreground">{formatDuration(durationSeconds)}</div>
+                </>
+              )}
+              {timeRangeLabel && (
+                <div className="text-xs text-muted-foreground mt-0.5">{timeRangeLabel}</div>
+              )}
+              {durationSeconds === null && (
+                <>
+                  <div className="text-xs text-muted-foreground">Workout date</div>
+                  <div className="text-sm font-medium text-foreground">{dateLabel}</div>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
