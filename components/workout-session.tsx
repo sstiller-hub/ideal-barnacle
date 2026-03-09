@@ -97,6 +97,12 @@ function getExerciseLabel(name: string): string {
   return name
 }
 
+function parseRepRange(targetReps: string): { low: number; high: number } | null {
+  const match = targetReps.match(/^(\d+)\s*[-–]\s*(\d+)$/)
+  if (!match) return null
+  return { low: parseInt(match[1], 10), high: parseInt(match[2], 10) }
+}
+
 function isMachineExercise(name: string): boolean {
   const lower = name.toLowerCase()
   return (
@@ -1111,6 +1117,77 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     signalAutoSaved()
   }
 
+  const applyProgressiveOverload = async (exerciseIndex: number) => {
+    if (!session) return
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+
+    const repRange = parseRepRange(exercise.targetReps ?? "")
+    if (!repRange) return
+
+    const workoutId = session.workoutId
+    const historyReps = getCachedHistoryReps(exercise.name)
+
+    const newExercises = exercises.map((ex: any, idx: number) => {
+      if (idx !== exerciseIndex) return ex
+
+      const newSets = ex.sets.map((set: any, setIdx: number) => {
+        const newWeight = typeof set.weight === "number" ? set.weight + 5 : 5
+        const newReps = repRange.low
+
+        const newSet = { ...set, weight: newWeight, reps: newReps, completed: false }
+
+        const flagsResult = getSetFlags({
+          reps: newSet.reps,
+          weight: newSet.weight,
+          targetReps: ex.targetReps,
+          historyReps,
+        })
+
+        const updatedSet = {
+          ...newSet,
+          isOutlier: flagsResult.flags.includes("rep_outlier"),
+          validationFlags: flagsResult.flags,
+          isIncomplete: flagsResult.isIncomplete,
+        }
+
+        if (workoutId) {
+          void persistSetDraft(workoutId, ex, updatedSet, setIdx)
+          void touchDraft(workoutId)
+        }
+        if (session?.remoteSessionId) {
+          void upsertSet({
+            sessionId: session.remoteSessionId,
+            setId: updatedSet.id,
+            exerciseId: ex.id,
+            setIndex: setIdx,
+            reps: updatedSet.reps,
+            weight: updatedSet.weight,
+            completed: updatedSet.completed,
+            validationFlags: updatedSet.validationFlags,
+          })
+        }
+
+        return updatedSet
+      })
+
+      return { ...ex, sets: newSets, completed: false }
+    })
+
+    setExercises(newExercises)
+
+    const updatedSession: WorkoutSession = {
+      ...session,
+      exercises: newExercises,
+    }
+
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    signalAutoSaved()
+
+    toast.success("+5 lbs applied", { duration: 2000 })
+  }
+
   const updateExerciseMachineSetting = async (
     exerciseIndex: number,
     field: "seat",
@@ -1842,6 +1919,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
             const isCompactSets = showPlateCalc && exercise.sets.length >= 4
             const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
+            const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
+            const showProgressiveOverload =
+              exerciseIndex === currentExerciseIndex &&
+              exerciseRepRange !== null &&
+              exercise.sets.length > 0 &&
+              exercise.sets.every(
+                (set: any) =>
+                  set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
+              )
 
             return (
               <div
@@ -2372,6 +2458,39 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     )
                   })}
                 </div>
+
+                <AnimatePresence>
+                  {showProgressiveOverload && (
+                    <motion.div
+                      key="progressive-overload"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
+                    >
+                      <button
+                        onClick={() => void applyProgressiveOverload(exerciseIndex)}
+                        type="button"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.04)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderRadius: "3px",
+                          padding: "7px 16px",
+                          fontSize: "8px",
+                          fontWeight: 600,
+                          letterSpacing: "0.1em",
+                          color: "rgba(255, 255, 255, 0.4)",
+                          boxShadow: "0 0 14px rgba(255, 255, 255, 0.05)",
+                          cursor: "pointer",
+                          fontFamily: "'Archivo Narrow', sans-serif",
+                        }}
+                      >
+                        PROGRESSIVE OVERLOAD ↑
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )
           })}
