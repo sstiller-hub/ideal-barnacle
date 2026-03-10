@@ -47,6 +47,12 @@ import {
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
+import {
+  clearPendingOverloadIntent,
+  getPendingOverloadIntent,
+  setPendingOverloadIntent,
+  sweepExpiredOverloadIntents,
+} from "@/lib/progressive-overload-intents"
 import { ArrowLeft, AlertCircle, Check } from "lucide-react"
 
 type Exercise = {
@@ -193,6 +199,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   const editingFieldRef = useRef<"reps" | "weight" | null>(null)
   const [, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
+  const [pendingOverloadExerciseNames, setPendingOverloadExerciseNames] = useState<Set<string>>(new Set())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingProgrammatically = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
@@ -242,6 +249,15 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     const stored = localStorage.getItem("progressive_autofill_enabled")
     if (stored === null) return
     setProgressiveAutofillEnabled(stored === "true")
+  }, [])
+
+  useEffect(() => {
+    const normalizeName = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
+    const names = new Set<string>()
+    for (const ex of routine.exercises) {
+      if (getPendingOverloadIntent(ex.name)) names.add(normalizeName(ex.name))
+    }
+    setPendingOverloadExerciseNames(names)
   }, [])
 
   useEffect(() => {
@@ -436,9 +452,18 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           progressiveAutofillEnabled && !isWarmup
             ? applyProgressiveOverload(getRecentPerformanceSnapshots(exercise.name, normalizedHistory, 3))
             : { reps: null, weight: null, mode: null }
+
+        const pendingIntent = !isWarmup ? getPendingOverloadIntent(exercise.name) : null
+        const latestSnap = pendingIntent
+          ? getRecentPerformanceSnapshots(exercise.name, normalizedHistory, 1)[0]
+          : null
+        const intentWeight = pendingIntent && latestSnap ? latestSnap.weight + pendingIntent.weightDelta : null
+        const intentReps = pendingIntent?.repsOverride ?? null
+        if (pendingIntent) clearPendingOverloadIntent(exercise.name)
+
         const defaults = {
-          reps: progressiveDefaults.reps ?? baseDefaults.reps,
-          weight: progressiveDefaults.weight ?? baseDefaults.weight,
+          reps: intentReps ?? progressiveDefaults.reps ?? baseDefaults.reps,
+          weight: intentWeight ?? progressiveDefaults.weight ?? baseDefaults.weight,
         }
         if (defaults.reps === null && defaults.weight === 0) {
           defaults.reps = REP_MIN
@@ -529,6 +554,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
 
     const initSession = async () => {
+      sweepExpiredOverloadIntents()
       let currentSession = getCurrentInProgressSession()
       if (currentSession) {
         if (currentSession.status === "paused") {
@@ -1117,75 +1143,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     signalAutoSaved()
   }
 
-  const applyProgressiveOverload = async (exerciseIndex: number) => {
-    if (!session) return
+  const applyProgressiveOverload = (exerciseIndex: number) => {
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
 
     const repRange = parseRepRange(exercise.targetReps ?? "")
     if (!repRange) return
 
-    const workoutId = session.workoutId
-    const historyReps = getCachedHistoryReps(exercise.name)
-
-    const newExercises = exercises.map((ex: any, idx: number) => {
-      if (idx !== exerciseIndex) return ex
-
-      const newSets = ex.sets.map((set: any, setIdx: number) => {
-        const newWeight = typeof set.weight === "number" ? set.weight + 5 : 5
-        const newReps = repRange.low
-
-        const newSet = { ...set, weight: newWeight, reps: newReps, completed: false }
-
-        const flagsResult = getSetFlags({
-          reps: newSet.reps,
-          weight: newSet.weight,
-          targetReps: ex.targetReps,
-          historyReps,
-        })
-
-        const updatedSet = {
-          ...newSet,
-          isOutlier: flagsResult.flags.includes("rep_outlier"),
-          validationFlags: flagsResult.flags,
-          isIncomplete: flagsResult.isIncomplete,
-        }
-
-        if (workoutId) {
-          void persistSetDraft(workoutId, ex, updatedSet, setIdx)
-          void touchDraft(workoutId)
-        }
-        if (session?.remoteSessionId) {
-          void upsertSet({
-            sessionId: session.remoteSessionId,
-            setId: updatedSet.id,
-            exerciseId: ex.id,
-            setIndex: setIdx,
-            reps: updatedSet.reps,
-            weight: updatedSet.weight,
-            completed: updatedSet.completed,
-            validationFlags: updatedSet.validationFlags,
-          })
-        }
-
-        return updatedSet
-      })
-
-      return { ...ex, sets: newSets, completed: false }
-    })
-
-    setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
-    setSession(updatedSession)
-    await saveSession(updatedSession)
-    signalAutoSaved()
-
-    toast.success("+5 lbs applied", { duration: 2000 })
+    const normalized = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
+    setPendingOverloadIntent(exercise.name, repRange.low)
+    setPendingOverloadExerciseNames((prev) => new Set(prev).add(normalized(exercise.name)))
+    toast.success("Will apply +5 lbs to next workout", { duration: 3000 })
   }
 
   const updateExerciseMachineSetting = async (
@@ -1920,14 +1888,17 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
             const isCompactSets = showPlateCalc && exercise.sets.length >= 4
             const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
             const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
+            const normalizeExName = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
+            const overloadIsPending = pendingOverloadExerciseNames.has(normalizeExName(exercise.name))
             const showProgressiveOverload =
-              exerciseIndex === currentExerciseIndex &&
-              exerciseRepRange !== null &&
-              exercise.sets.length > 0 &&
-              exercise.sets.every(
-                (set: any) =>
-                  set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
-              )
+              overloadIsPending ||
+              (exerciseIndex === currentExerciseIndex &&
+                exerciseRepRange !== null &&
+                exercise.sets.length > 0 &&
+                exercise.sets.every(
+                  (set: any) =>
+                    set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
+                ))
 
             return (
               <div
@@ -2470,11 +2441,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
                     >
                       <button
-                        onClick={() => void applyProgressiveOverload(exerciseIndex)}
+                        onClick={() => { if (!overloadIsPending) applyProgressiveOverload(exerciseIndex) }}
                         type="button"
                         style={{
-                          background: "rgba(255, 255, 255, 0.04)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          background: overloadIsPending ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.04)",
+                          border: overloadIsPending ? "1px solid rgba(255, 255, 255, 0.25)" : "1px solid rgba(255, 255, 255, 0.1)",
                           borderRadius: "3px",
                           padding: "7px 16px",
                           fontSize: "8px",
@@ -2482,11 +2453,11 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                           letterSpacing: "0.1em",
                           color: "rgba(255, 255, 255, 0.4)",
                           boxShadow: "0 0 14px rgba(255, 255, 255, 0.05)",
-                          cursor: "pointer",
+                          cursor: overloadIsPending ? "default" : "pointer",
                           fontFamily: "'Archivo Narrow', sans-serif",
                         }}
                       >
-                        PROGRESSIVE OVERLOAD ↑
+                        {overloadIsPending ? "NEXT WORKOUT +5 LBS ✓" : "PROGRESSIVE OVERLOAD ↑"}
                       </button>
                     </motion.div>
                   )}
