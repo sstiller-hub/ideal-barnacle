@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { getExerciseHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -28,6 +28,8 @@ function collapseMirroredSixSetPattern<T extends { reps: number | null; weight: 
 export default function ExerciseHistoryPage() {
   const router = useRouter()
   const params = useParams<{ name?: string }>()
+  const searchParams = useSearchParams()
+  const fromSession = searchParams.get("from") === "session"
   const rawName = typeof params?.name === "string" ? params.name : ""
   const exerciseName = rawName ? decodeURIComponent(rawName) : "Unknown exercise"
   const rawHistory = getExerciseHistory(exerciseName)
@@ -120,7 +122,7 @@ export default function ExerciseHistoryPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.back()}
+              onClick={() => fromSession ? router.push("/workout/session") : router.back()}
               style={{ color: "rgba(255, 255, 255, 0.7)" }}
             >
               ‹

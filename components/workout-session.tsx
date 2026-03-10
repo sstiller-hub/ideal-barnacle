@@ -2007,7 +2007,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       letterSpacing: "-0.02em",
                       lineHeight: "0.95",
                       fontFamily: "'Bebas Neue', sans-serif",
+                      cursor: "pointer",
                     }}
+                    onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}?from=session`)}
                   >
                     {getExerciseLabel(exercise.name)}
                   </h1>
