@@ -47,6 +47,7 @@ import {
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
+import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { ArrowLeft, AlertCircle, Check } from "lucide-react"
 
 type Exercise = {
@@ -493,6 +494,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           })
         }
 
+        const savedMachineSettings = getMachineSettings(exercise.name)
         return {
           id: exercise.id,
           name: exercise.name,
@@ -501,6 +503,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           targetWeight: exercise.targetWeight,
           restTime,
           completed: false,
+          machineSettings: Object.keys(savedMachineSettings).length > 0 ? savedMachineSettings : undefined,
           sets: isWarmup
             ? warmupSets
             : Array.from({ length: targetSets }, (_, setIndex) => {
@@ -1203,6 +1206,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         ...(exercise.machineSettings || {}),
         [field]: normalizedValue,
       }
+      saveMachineSettings(exercise.name, nextSettings)
       return { ...exercise, machineSettings: nextSettings }
     })
 
