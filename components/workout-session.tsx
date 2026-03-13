@@ -1143,7 +1143,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     signalAutoSaved()
   }
 
-  const applyProgressiveOverload = (exerciseIndex: number) => {
+  const scheduleProgressiveOverload = (exerciseIndex: number) => {
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
 
@@ -2441,7 +2441,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                       style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
                     >
                       <button
-                        onClick={() => { if (!overloadIsPending) applyProgressiveOverload(exerciseIndex) }}
+                        onClick={() => { if (!overloadIsPending) scheduleProgressiveOverload(exerciseIndex) }}
                         type="button"
                         style={{
                           background: overloadIsPending ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.04)",
