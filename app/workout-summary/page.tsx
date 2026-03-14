@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
+import { copyWorkoutToClipboard } from "@/lib/workout-export"
+import { toast } from "sonner"
 
 type WorkoutRow = {
   id: string
@@ -79,6 +81,7 @@ export default function WorkoutSummaryPage() {
   const workoutId = searchParams.get("workoutId") ?? searchParams.get("id")
 
   const [workout, setWorkout] = useState<WorkoutRow | null>(null)
+  const [rawWorkout, setRawWorkout] = useState<CompletedWorkout | null>(null)
   const [exercises, setExercises] = useState<SummaryExercise[]>([])
   const [baselineExercises, setBaselineExercises] = useState<SummaryExercise[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -149,6 +152,7 @@ export default function WorkoutSummaryPage() {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
 
       setWorkout(workoutRow)
+      setRawWorkout(workoutRecord)
       setExercises(assembledExercises)
       setBaselineExercises(baselineWorkout ? buildSummaryExercises(baselineWorkout) : null)
       setLoading(false)
@@ -471,6 +475,22 @@ export default function WorkoutSummaryPage() {
             <Button variant="secondary" size="sm" onClick={() => router.push(`/history/${workout.id}`)}>
               View workout details
             </Button>
+            {rawWorkout && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await copyWorkoutToClipboard(rawWorkout)
+                    toast.success("Workout copied to clipboard")
+                  } catch {
+                    toast.error("Failed to copy workout")
+                  }
+                }}
+              >
+                Copy workout
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => router.push("/history")}>
               All workouts
             </Button>
