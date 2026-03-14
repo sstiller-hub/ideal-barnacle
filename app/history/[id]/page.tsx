@@ -7,6 +7,8 @@ import { useState, useEffect, useMemo } from "react"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
+import { copyWorkoutToClipboard } from "@/lib/workout-export"
+import { toast } from "sonner"
 
 function normalizeExerciseName(name: string) {
   return name.toLowerCase().trim().replace(/\s+/g, " ")
@@ -241,11 +243,26 @@ export default function WorkoutDetailPage() {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
             <span className="text-xl">‹</span>
           </Button>
-          <div>
+          <div className="flex-1">
             <p className="text-xs text-muted-foreground">Workout Summary</p>
             <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
             <p className="text-xs text-muted-foreground">{headerDateLabel}</p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={async () => {
+              try {
+                await copyWorkoutToClipboard(workout)
+                toast.success("Workout copied to clipboard")
+              } catch {
+                toast.error("Failed to copy workout")
+              }
+            }}
+          >
+            Copy
+          </Button>
         </div>
       </div>
 
