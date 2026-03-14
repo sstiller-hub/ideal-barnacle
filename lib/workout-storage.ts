@@ -51,6 +51,7 @@ import { formatExerciseName } from "./format-exercise-name"
 function canonicalizeExerciseName(name: string): string {
   const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()
   if (normalized === "booty builder split squat machine") return "Split Squat"
+  if (normalized === "machine rear delt fly") return "Rear Delt Fly (single-arm machine)"
   return name
 }
 
