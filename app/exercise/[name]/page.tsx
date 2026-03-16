@@ -18,15 +18,11 @@ function areEquivalentSets(a: { reps: number | null; weight: number | null; comp
 }
 
 function collapseMirroredSixSetPattern<T extends { reps: number | null; weight: number | null; completed: boolean }>(sets: T[]): T[] {
-  if (sets.length !== 6) return sets
-  if (
-    areEquivalentSets(sets[0], sets[1]) &&
-    areEquivalentSets(sets[2], sets[3]) &&
-    areEquivalentSets(sets[4], sets[5])
-  ) {
-    return [sets[0], sets[2], sets[4]]
+  if (sets.length < 4 || sets.length % 2 !== 0) return sets
+  for (let i = 0; i < sets.length; i += 2) {
+    if (!areEquivalentSets(sets[i], sets[i + 1])) return sets
   }
-  return sets
+  return sets.filter((_, i) => i % 2 === 0)
 }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {

@@ -56,18 +56,15 @@ function canonicalizeExerciseName(name: string): string {
 }
 
 function dedupeMirroredSixSets(sets: WorkoutSet[]): { sets: WorkoutSet[]; changed: boolean } {
-  if (sets.length !== 6) return { sets, changed: false }
-  const pairs = [
-    [sets[0], sets[1]],
-    [sets[2], sets[3]],
-    [sets[4], sets[5]],
-  ] as const
+  if (sets.length < 4 || sets.length % 2 !== 0) return { sets, changed: false }
   const isPairDup = (a: WorkoutSet, b: WorkoutSet) =>
     (a.reps ?? null) === (b.reps ?? null) &&
     (a.weight ?? null) === (b.weight ?? null) &&
     Boolean(a.completed) === Boolean(b.completed)
-  if (!pairs.every(([a, b]) => isPairDup(a, b))) return { sets, changed: false }
-  return { sets: [sets[0], sets[2], sets[4]], changed: true }
+  for (let i = 0; i < sets.length; i += 2) {
+    if (!isPairDup(sets[i], sets[i + 1])) return { sets, changed: false }
+  }
+  return { sets: sets.filter((_, i) => i % 2 === 0), changed: true }
 }
 
 export function saveWorkout(workout: CompletedWorkout): EvaluatedPR[] {
