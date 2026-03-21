@@ -58,6 +58,7 @@ export async function setScheduleOverride(date: Date, workout: ScheduledWorkout 
     user_id: userId,
     status: "scheduled",
     scheduled_date: dateKey,
+    started_at: null,
     routine_id: workout?.routineId ?? null,
     routine_name: workout?.routineName ?? null,
     is_override: true,
