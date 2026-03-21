@@ -703,15 +703,17 @@ export default function Home() {
           isOverride: true,
           workoutType: deriveWorkoutType(routineName),
         })
-        }
-      } else {
-        if (workout) {
-          setScheduledWorkout(selectedDate, workout)
-        } else {
-          setRestDay(selectedDate)
-        }
         loadDataForDate(selectedDate)
         window.dispatchEvent(new Event("schedule:updated"))
+      }
+    } else {
+      if (workout) {
+        setScheduledWorkout(selectedDate, workout)
+      } else {
+        setRestDay(selectedDate)
+      }
+      loadDataForDate(selectedDate)
+      window.dispatchEvent(new Event("schedule:updated"))
     }
     setShowWorkoutPicker(false)
   }
@@ -885,6 +887,7 @@ export default function Home() {
   const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
 
   const handleDaySwipeStart = (event: React.TouchEvent) => {
+    if (showWorkoutPicker) return
     if (event.touches.length !== 1) return
     swipeStartRef.current = {
       x: event.touches[0].clientX,
