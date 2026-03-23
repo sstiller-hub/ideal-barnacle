@@ -48,6 +48,7 @@ import {
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
+import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
 import { ArrowLeft, AlertCircle, Check } from "lucide-react"
 
 type Exercise = {
@@ -854,6 +855,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (currentExercise?.name && typeof window !== "undefined") {
       const savedPref = localStorage.getItem(`plate_viz_${currentExercise.name}`)
       setShowPlateCalc(savedPref !== null ? JSON.parse(savedPref) : true)
+      // Apply localStorage values first (instant), then overlay with Supabase values
       const savedMode = localStorage.getItem(`plate_mode_${currentExercise.name}`)
       if (savedMode === "total" || savedMode === "per-side") {
         setPlateDisplayMode(savedMode)
@@ -867,8 +869,32 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       } else {
         setPlateStartingWeight(0)
       }
+      if (userId) {
+        void loadExerciseSettings(userId, currentExercise.name).then((remote) => {
+          if (!remote) return
+          if (remote.barWeight !== undefined) {
+            setPlateStartingWeight(remote.barWeight)
+            localStorage.setItem(`plate_start_${currentExercise.name}`, String(remote.barWeight))
+          }
+          if (remote.plateDisplayMode) {
+            setPlateDisplayMode(remote.plateDisplayMode)
+            localStorage.setItem(`plate_mode_${currentExercise.name}`, remote.plateDisplayMode)
+          }
+          if (remote.seat !== undefined) {
+            const machineSeat = remote.seat
+            setExercises((prev: any[]) =>
+              prev.map((ex: any) =>
+                ex.name === currentExercise.name
+                  ? { ...ex, machineSettings: { ...(ex.machineSettings ?? {}), seat: machineSeat } }
+                  : ex
+              )
+            )
+            saveMachineSettings(currentExercise.name, { seat: machineSeat })
+          }
+        })
+      }
     }
-  }, [currentExercise?.name])
+  }, [currentExercise?.name, userId])
 
   useEffect(() => {
     setRepCapErrors({})
@@ -1207,6 +1233,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         [field]: normalizedValue,
       }
       saveMachineSettings(exercise.name, nextSettings)
+      if (userId && field === "seat") {
+        void saveExerciseSettings(userId, exercise.name, { seat: normalizedValue })
+      }
       return { ...exercise, machineSettings: nextSettings }
     })
 
@@ -2356,6 +2385,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                   setPlateDisplayMode(nextMode)
                                   if (currentExercise?.name) {
                                     localStorage.setItem(`plate_mode_${currentExercise.name}`, nextMode)
+                                    if (userId) {
+                                      void saveExerciseSettings(userId, currentExercise.name, { plateDisplayMode: nextMode })
+                                    }
                                   }
                                 }}
                                 type="button"
@@ -2379,6 +2411,9 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                                   setPlateStartingWeight(nextValue)
                                   if (currentExercise?.name) {
                                     localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
+                                    if (userId) {
+                                      void saveExerciseSettings(userId, currentExercise.name, { barWeight: nextValue })
+                                    }
                                   }
                                 }}
                                 onFocus={handleInputAutoSelect}
