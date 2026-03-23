@@ -776,7 +776,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
   })()
 
   const setRestStateAndPersist = async (
-    nextState: WorkoutSession["restTimer"] | null
+    nextState: WorkoutSession["restTimer"] | null,
+    latestExercises?: any[]
   ) => {
     const nextWithStart = nextState
       ? {
@@ -800,6 +801,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     if (session) {
       const updatedSession: WorkoutSession = {
         ...session,
+        ...(latestExercises !== undefined ? { exercises: latestExercises } : {}),
         restTimer: nextWithStart || undefined,
       }
       setSession(updatedSession)
@@ -1326,7 +1328,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         exerciseIndex: targetExerciseIndex,
         setIndex,
         remainingSeconds: restSeconds,
-      })
+      }, newExercises)
       scheduleRestNotification(restSeconds)
     }
   }
