@@ -50,6 +50,8 @@ import {
   ChevronRight as ChevronRightSmall,
 } from "lucide-react"
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
+import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
+import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -134,6 +136,7 @@ export default function Home() {
   const [lastWorkoutPrs, setLastWorkoutPrs] = useState<WorkoutPrEvent[]>([])
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
+  const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
 
   const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
   const formatShortDate = (dateStr: string) =>
@@ -1181,6 +1184,7 @@ export default function Home() {
       </div>
 
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
+        <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
         {weeklySummary && (
           <div className="px-5 mb-2">
             <div
