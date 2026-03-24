@@ -1136,6 +1136,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }
     })
 
+    exercisesRef.current = newExercises
     setExercises(newExercises)
 
     const updatedSession: WorkoutSession = {
@@ -1143,6 +1144,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       exercises: newExercises,
     }
 
+    sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
@@ -1205,6 +1207,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return { ...ex, sets: newSets, completed: false }
     })
 
+    exercisesRef.current = newExercises
     setExercises(newExercises)
 
     const updatedSession: WorkoutSession = {
@@ -1212,6 +1215,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       exercises: newExercises,
     }
 
+    sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
@@ -1241,6 +1245,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       return { ...exercise, machineSettings: nextSettings }
     })
 
+    exercisesRef.current = newExercises
     setExercises(newExercises)
 
     const updatedSession: WorkoutSession = {
@@ -1248,6 +1253,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       exercises: newExercises,
     }
 
+    sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
@@ -1337,6 +1343,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       }
     })
 
+    exercisesRef.current = newExercises
     setExercises(newExercises)
 
     const updatedSession: WorkoutSession = {
@@ -1344,6 +1351,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
       exercises: newExercises,
     }
 
+    sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
