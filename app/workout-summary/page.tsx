@@ -9,6 +9,8 @@ import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import { copyWorkoutToClipboard } from "@/lib/workout-export"
 import { toast } from "sonner"
+import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
+import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 
 type WorkoutRow = {
   id: string
@@ -80,6 +82,7 @@ export default function WorkoutSummaryPage() {
   const searchParams = useSearchParams()
   const workoutId = searchParams.get("workoutId") ?? searchParams.get("id")
 
+  const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
   const [workout, setWorkout] = useState<WorkoutRow | null>(null)
   const [rawWorkout, setRawWorkout] = useState<CompletedWorkout | null>(null)
   const [exercises, setExercises] = useState<SummaryExercise[]>([])
@@ -400,6 +403,9 @@ export default function WorkoutSummaryPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {workoutAlerts.length > 0 && (
+          <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} className="" />
+        )}
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
