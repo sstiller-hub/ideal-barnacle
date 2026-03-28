@@ -346,13 +346,26 @@ export default function WorkoutDetailPage() {
               <Card key={idx} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
-                      className="text-base font-semibold text-foreground hover:underline"
-                    >
-                      {exercise.name}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                        className="text-base font-semibold text-foreground hover:underline"
+                      >
+                        {exercise.name}
+                      </button>
+                      {exercise.rating && (
+                        <span
+                          className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                            exercise.rating === "thumbs_up"
+                              ? "bg-emerald-500/10 text-emerald-700"
+                              : "bg-amber-500/10 text-amber-700"
+                          }`}
+                        >
+                          {exercise.rating === "thumbs_up" ? "Felt good" : "Felt rough"}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {completedSets.length}/{(exercise.sets ?? []).length} sets completed
                     </p>

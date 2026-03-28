@@ -463,8 +463,26 @@ export default function ExerciseHistoryPage() {
             >
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-white/90" style={{ fontSize: "13px", fontWeight: 500 }}>
-                    {formattedDate}
+                  <div className="flex items-center gap-2">
+                    <div className="text-white/90" style={{ fontSize: "13px", fontWeight: 500 }}>
+                      {formattedDate}
+                    </div>
+                    {exercise.rating && (
+                      <span
+                        style={{
+                          fontSize: "8px",
+                          fontWeight: 500,
+                          letterSpacing: "0.08em",
+                          padding: "2px 6px",
+                          borderRadius: "6px",
+                          background: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.1)" : "rgba(251, 191, 36, 0.1)",
+                          color: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.7)" : "rgba(251, 191, 36, 0.7)",
+                          fontFamily: "'Archivo Narrow', sans-serif",
+                        }}
+                      >
+                        {exercise.rating === "thumbs_up" ? "GOOD" : "ROUGH"}
+                      </span>
+                    )}
                   </div>
                   <div className="text-white/35" style={{ fontSize: "10px" }}>
                     {workout.name}
