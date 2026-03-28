@@ -163,7 +163,12 @@ export function deleteSession(sessionId: string): void {
 export function loadSets(): WorkoutSet[] {
   if (typeof window === "undefined") return []
   const stored = localStorage.getItem(SETS_KEY)
-  return stored ? JSON.parse(stored) : []
+  if (!stored) return []
+  try {
+    return JSON.parse(stored) as WorkoutSet[]
+  } catch {
+    return []
+  }
 }
 
 export function saveSets(sets: WorkoutSet[]): void {
