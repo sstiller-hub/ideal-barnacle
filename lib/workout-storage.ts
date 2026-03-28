@@ -7,6 +7,8 @@ export type WorkoutSet = {
   isIncomplete?: boolean
 }
 
+export type ExerciseRating = "thumbs_up" | "thumbs_down" | null
+
 export type Exercise = {
   id: string
   name: string
@@ -15,6 +17,7 @@ export type Exercise = {
   targetWeight?: string
   restTime: number
   completed: boolean
+  rating?: ExerciseRating
   sets: WorkoutSet[]
   previousPerformance?: {
     weight: number

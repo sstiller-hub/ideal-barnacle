@@ -49,7 +49,9 @@ import {
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
-import { ArrowLeft, AlertCircle, Check } from "lucide-react"
+import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown } from "lucide-react"
+
+type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
 type Exercise = {
   id: string
@@ -59,6 +61,7 @@ type Exercise = {
   targetWeight?: string
   restTime: number
   completed: boolean
+  rating?: ExerciseRating
   machineSettings?: {
     seat?: string
   }
@@ -1370,6 +1373,21 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
     }
   }
 
+  const rateExercise = async (exerciseIndex: number, rating: ExerciseRating) => {
+    if (!session) return
+    const newExercises = exercises.map((exercise: any, idx: number) => {
+      if (idx !== exerciseIndex) return exercise
+      return { ...exercise, rating: exercise.rating === rating ? null : rating }
+    })
+    exercisesRef.current = newExercises
+    setExercises(newExercises)
+    const updatedSession: WorkoutSession = { ...session, exercises: newExercises }
+    sessionRef.current = updatedSession
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    signalAutoSaved()
+  }
+
   const setExerciseIndex = async (nextIndex: number) => {
     if (!session) return
     if (nextIndex < 0 || nextIndex >= exercises.length) return
@@ -1493,6 +1511,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         targetWeight: ex.targetWeight,
         restTime: ex.restTime,
         completed: ex.completed,
+        rating: ex.rating ?? null,
         sets: ex.sets,
         previousPerformance: ex.previousPerformance,
       })),
@@ -2509,6 +2528,113 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
                     )
                   })}
                 </div>
+
+                <AnimatePresence>
+                  {exerciseIndex === currentExerciseIndex &&
+                    exercise.completed &&
+                    !exercise.rating && (
+                    <motion.div
+                      key="exercise-rating"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      style={{ marginTop: "24px" }}
+                    >
+                      <div
+                        className="text-white/25 text-center"
+                        style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif", marginBottom: "12px" }}
+                      >
+                        HOW DID THIS FEEL?
+                      </div>
+                      <div className="flex items-center justify-center gap-4">
+                        <button
+                          onClick={() => void rateExercise(exerciseIndex, "thumbs_down")}
+                          type="button"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.03)",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "3px",
+                            padding: "10px 20px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                            ROUGH
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => void rateExercise(exerciseIndex, "thumbs_up")}
+                          type="button"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.03)",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            borderRadius: "3px",
+                            padding: "10px 20px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                            GOOD
+                          </span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {exerciseIndex === currentExerciseIndex &&
+                    exercise.completed &&
+                    exercise.rating && (
+                    <motion.div
+                      key="exercise-rating-confirmed"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      style={{ marginTop: "24px" }}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        {exercise.rating === "thumbs_up" ? (
+                          <ThumbsUp size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
+                        ) : (
+                          <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
+                        )}
+                        <span
+                          className="text-white/25"
+                          style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                        >
+                          {exercise.rating === "thumbs_up" ? "FELT GOOD" : "FELT ROUGH"}
+                        </span>
+                        <button
+                          onClick={() => void rateExercise(exerciseIndex, exercise.rating!)}
+                          type="button"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: "2px 4px",
+                            cursor: "pointer",
+                            fontSize: "8px",
+                            color: "rgba(255, 255, 255, 0.2)",
+                            fontFamily: "'Archivo Narrow', sans-serif",
+                            letterSpacing: "0.08em",
+                          }}
+                        >
+                          UNDO
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <AnimatePresence>
                   {showProgressiveOverload && (

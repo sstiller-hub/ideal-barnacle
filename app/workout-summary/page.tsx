@@ -508,13 +508,14 @@ export default function WorkoutSummaryPage() {
 
         <div className="space-y-3">
           {summary.exerciseSummaries.map(
-            ({ exercise, volume, volumeDelta, bestSet, excluded, prBadges, isWarmup, baselineHasData }) => {
+            ({ exercise, volume, volumeDelta, bestSet, excluded, prBadges, isWarmup, baselineHasData }, idx) => {
               const visibleBadges = isWarmup ? [] : prBadges.slice(0, 2)
               const overflowCount = isWarmup ? 0 : Math.max(prBadges.length - visibleBadges.length, 0)
               const delta =
                 baselineHasData && !isWarmup
                   ? `${volumeDelta >= 0 ? "+" : ""}${Math.round(volumeDelta).toLocaleString()} lb`
                   : null
+              const exerciseRating = rawWorkout?.exercises?.[idx]?.rating ?? null
 
               return (
                 <Card
@@ -532,23 +533,36 @@ export default function WorkoutSummaryPage() {
                       </button>
                       <p className="text-xs text-muted-foreground">Exercise history</p>
                     </div>
-                    {!isWarmup && visibleBadges.length > 0 && (
-                      <div className="flex flex-wrap gap-2 justify-end">
-                        {visibleBadges.map((badge) => (
-                          <span
-                            key={badge}
-                            className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700"
-                          >
-                            {badge}
-                          </span>
-                        ))}
-                        {overflowCount > 0 && (
-                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
-                            +{overflowCount}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 justify-end items-center">
+                      {exerciseRating && (
+                        <span
+                          className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                            exerciseRating === "thumbs_up"
+                              ? "bg-emerald-500/10 text-emerald-700"
+                              : "bg-amber-500/10 text-amber-700"
+                          }`}
+                        >
+                          {exerciseRating === "thumbs_up" ? "Felt good" : "Felt rough"}
+                        </span>
+                      )}
+                      {!isWarmup && visibleBadges.length > 0 && (
+                        <>
+                          {visibleBadges.map((badge) => (
+                            <span
+                              key={badge}
+                              className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700"
+                            >
+                              {badge}
+                            </span>
+                          ))}
+                          {overflowCount > 0 && (
+                            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
+                              +{overflowCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
