@@ -7,6 +7,8 @@ import {
   saveSession,
   saveSet,
   deleteSet,
+  deleteSession,
+  deleteSetsForSession,
   saveCurrentSessionId,
   getCurrentInProgressSession,
   getSetsForSession,
@@ -72,18 +74,11 @@ export function useWorkoutSessionManager() {
 
   // Update a set
   const updateSet = useCallback((setId: string, updates: Partial<WorkoutSet>) => {
-    setSets((prev) => {
-      const updated = prev.map((s) => (s.id === setId ? { ...s, ...updates } : s))
-
-      // Save to localStorage
-      const setToSave = updated.find((s) => s.id === setId)
-      if (setToSave) {
-        saveSet(setToSave)
-      }
-
-      return updated
-    })
-  }, [])
+    const updated = sets.map((s) => (s.id === setId ? { ...s, ...updates } : s))
+    const setToSave = updated.find((s) => s.id === setId)
+    if (setToSave) saveSet(setToSave)
+    setSets(updated)
+  }, [sets])
 
   // Remove a set
   const removeSet = useCallback((setId: string) => {
@@ -127,6 +122,8 @@ export function useWorkoutSessionManager() {
   const cancelWorkout = useCallback(() => {
     if (!currentSession) return
 
+    deleteSetsForSession(currentSession.id)
+    deleteSession(currentSession.id)
     saveCurrentSessionId(null)
     setCurrentSession(null)
     setSets([])
