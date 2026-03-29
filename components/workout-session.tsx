@@ -43,7 +43,9 @@ import {
   markWorkoutPending,
   updateWorkoutDraft,
   upsertSet as upsertSetDraft,
+  upsertAllSets,
   getWorkoutDraft,
+  type WorkoutSetDraft,
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
@@ -1109,7 +1111,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         }
         if (workoutId) {
           void persistSetDraft(workoutId, exercise, updatedSet, idx)
-          void touchDraft(workoutId)
         }
         if (session?.remoteSessionId) {
           void upsertSet({
@@ -1189,7 +1190,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
 
         if (workoutId) {
           void persistSetDraft(workoutId, ex, updatedSet, setIdx)
-          void touchDraft(workoutId)
         }
         if (session?.remoteSessionId) {
           void upsertSet({
@@ -1313,7 +1313,6 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         }
         if (workoutId) {
           void persistSetDraft(workoutId, exercise, updatedSet, idx)
-          void touchDraft(workoutId)
         }
         if (session?.remoteSessionId) {
           void upsertSet({
@@ -1550,12 +1549,25 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           routine_name: routine.name,
         })
         await markWorkoutPending(completedWorkoutId)
-        const syncTasks: Promise<void>[] = []
+        const allSetDrafts: WorkoutSetDraft[] = []
         cleanedExercises.forEach((exercise: any) => {
           if (!exercise?.sets) return
-          syncTasks.push(syncExerciseDraft(completedWorkoutId, exercise, exercise.sets))
+          exercise.sets.forEach((set: any, idx: number) => {
+            if (!set?.id) return
+            allSetDrafts.push({
+              set_id: set.id,
+              workout_id: completedWorkoutId,
+              exercise_id: exercise.id,
+              exercise_name: exercise.name,
+              set_index: idx,
+              reps: set.reps ?? null,
+              weight: set.weight ?? null,
+              completed: Boolean(set.completed),
+              updated_at_client: Date.now(),
+            })
+          })
         })
-        await Promise.all(syncTasks)
+        await upsertAllSets(completedWorkoutId, allSetDrafts)
         setSyncState("syncing")
         const result = await attemptWorkoutSync({ workoutId: completedWorkoutId })
         setSyncState(result.status)
