@@ -175,6 +175,9 @@ function asPayloadFromCompleted(
   const resolvedWorkoutId = ensureWorkoutUuid(workout.id, map)
   const coerceToDatetime = (value: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00.000Z`
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)) return value
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
     return value
   }
   const startedAt = coerceToDatetime(workout.startedAt ?? workout.date)
