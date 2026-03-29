@@ -140,6 +140,30 @@ export async function upsertSet(workoutId: string, setDraft: WorkoutSetDraft): P
   await db.put(WORKOUT_STORE, updated)
 }
 
+export async function upsertAllSets(workoutId: string, newSets: WorkoutSetDraft[]): Promise<void> {
+  const db = await getDb()
+  if (!db) return
+  const current = (await db.get(WORKOUT_STORE, workoutId)) as ActiveWorkoutDraft | undefined
+  if (!current) return
+
+  const sets = Array.isArray(current.sets) ? [...current.sets] : []
+  for (const setDraft of newSets) {
+    const nextSet: WorkoutSetDraft = {
+      ...setDraft,
+      workout_id: workoutId,
+      updated_at_client: setDraft.updated_at_client ?? nowClient(),
+    }
+    const index = sets.findIndex((s) => s.set_id === nextSet.set_id)
+    if (index >= 0) {
+      sets[index] = { ...sets[index], ...nextSet }
+    } else {
+      sets.push(nextSet)
+    }
+  }
+
+  await db.put(WORKOUT_STORE, { ...current, sets, updated_at_client: nowClient() })
+}
+
 export async function deleteSet(workoutId: string, setId: string): Promise<void> {
   const db = await getDb()
   if (!db) return
