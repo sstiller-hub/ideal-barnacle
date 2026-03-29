@@ -173,9 +173,13 @@ function asPayloadFromCompleted(
   map: ManualIdMap
 ): { workout: any; sets: WorkoutSetDraft[] } {
   const resolvedWorkoutId = ensureWorkoutUuid(workout.id, map)
-  const startedAt = workout.date
-  const completedAt = workout.date
-  const updatedAtClient = Date.parse(workout.date) || Date.now()
+  const coerceToDatetime = (value: string): string => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00.000Z`
+    return value
+  }
+  const startedAt = coerceToDatetime(workout.startedAt ?? workout.date)
+  const completedAt = coerceToDatetime(workout.endedAt ?? workout.date)
+  const updatedAtClient = Date.parse(completedAt) || Date.now()
 
   const sets: WorkoutSetDraft[] = []
   workout.exercises.forEach((exercise) => {
