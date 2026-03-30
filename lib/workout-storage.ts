@@ -179,6 +179,16 @@ export function getExerciseHistory(exerciseName: string): CompletedWorkout[] {
   return history.filter((workout) => workout.exercises.some((ex) => ex.name === exerciseName))
 }
 
+export function getExerciseIdForName(exerciseName: string): string | null {
+  const history = getWorkoutHistory()
+  for (const workout of history) {
+    for (const ex of workout.exercises) {
+      if (ex.name === exerciseName && ex.id) return ex.id
+    }
+  }
+  return null
+}
+
 export function getLatestPerformance(exerciseName: string): Exercise | null {
   const exerciseHistory = getExerciseHistory(exerciseName)
   if (exerciseHistory.length === 0) return null

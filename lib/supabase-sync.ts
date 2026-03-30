@@ -416,6 +416,122 @@ export async function syncNow(options?: PushOptions) {
   return { push, pull }
 }
 
+/**
+ * Fetches all logged workouts (performed_at IS NOT NULL) that contain a specific
+ * exercise_id and merges them into localStorage. This is the targeted fix for the
+ * exercise history view, which was previously limited to name-matching against stale
+ * local data and therefore missed workouts where the exercise had been renamed or
+ * imported directly into Supabase (e.g., via CSV migration).
+ *
+ * Query: workout_exercises.exercise_id = ? AND workouts.performed_at IS NOT NULL
+ */
+export async function pullWorkoutsForExerciseId(exerciseId: string): Promise<void> {
+  const user = await ensureAuthed()
+  if (!user) return
+
+  // Step 1: Find workout IDs that have this exercise_id, scoped to logged workouts only.
+  // The !inner join + performed_at IS NOT NULL filter is the key fix — previously the
+  // client-side query only matched by exercise name, which excluded workouts whose
+  // exercise name differed from the current canonical name (e.g. old "Pendulum squat"
+  // rows that the DB migration renamed to "Arsenal Pendulum Squat" / exercise_id
+  // 'legs1-pendulum').
+  const { data: matches, error: matchErr } = await supabase
+    .from("workout_exercises")
+    .select("workout_id, workouts!inner(id, user_id, performed_at)")
+    .eq("exercise_id", exerciseId)
+    .eq("workouts.user_id", user.id)
+    .not("workouts.performed_at", "is", null)
+
+  if (matchErr || !matches || matches.length === 0) return
+
+  const workoutIds = [...new Set(matches.map((row: any) => row.workout_id as string))]
+  if (workoutIds.length === 0) return
+
+  // Step 2: Fetch full workout rows for those IDs.
+  const { data: workouts, error: wErr } = await supabase
+    .from("workouts")
+    .select("id, name, performed_at, duration_seconds, stats")
+    .in("id", workoutIds)
+
+  if (wErr || !workouts || workouts.length === 0) return
+
+  // Step 3: For each workout, fetch ALL its exercises and their sets (same shape as
+  // pullSupabaseToLocal so the merged entries are complete, not one-exercise stubs).
+  const cloudWorkouts: WorkoutPayload[] = []
+
+  for (const w of workouts) {
+    const { data: ex, error: exErr } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id, name, target_sets, target_reps, target_weight, sort_index")
+      .eq("workout_id", w.id)
+      .order("sort_index", { ascending: true })
+
+    if (exErr) continue
+    const exercises = ex || []
+    const exerciseIds = exercises.map((e) => e.id)
+
+    const setsByExerciseId = new Map<
+      string,
+      Array<{ setIndex: number; reps: number | null; weight: number | null; completed: boolean }>
+    >()
+
+    if (exerciseIds.length > 0) {
+      const { data: sets, error: sErr } = await supabase
+        .from("workout_sets")
+        .select("workout_exercise_id, set_index, reps, weight, completed")
+        .in("workout_exercise_id", exerciseIds)
+        .order("set_index", { ascending: true })
+
+      if (!sErr) {
+        ;(sets || []).forEach((s) => {
+          const list = setsByExerciseId.get(s.workout_exercise_id) || []
+          list.push({
+            setIndex: s.set_index,
+            reps: s.reps,
+            weight: s.weight,
+            completed: s.completed,
+          })
+          setsByExerciseId.set(s.workout_exercise_id, list)
+        })
+      }
+    }
+
+    cloudWorkouts.push({
+      id: w.id,
+      name: w.name,
+      date: w.performed_at,
+      durationSeconds: w.duration_seconds,
+      stats: w.stats || {},
+      exercises: exercises.map((e: any) => ({
+        id: e.exercise_id,
+        name: e.name,
+        targetSets: e.target_sets ?? undefined,
+        targetReps: e.target_reps ?? undefined,
+        targetWeight: e.target_weight ?? undefined,
+        sets: setsByExerciseId.get(e.id) || [],
+        completed: true,
+      })),
+    })
+  }
+
+  if (cloudWorkouts.length === 0) return
+
+  // Step 4: Merge cloud data into localStorage (cloud wins by ID, same as pullSupabaseToLocal).
+  if (typeof window !== "undefined") {
+    const local = getWorkoutHistory() as CompletedWorkout[]
+    const byId = new Map<string, CompletedWorkout | WorkoutPayload>()
+    local.forEach((w) => { if (w.id) byId.set(w.id, w) })
+    cloudWorkouts.forEach((w) => { if (w.id) byId.set(w.id, w) })
+
+    const getWorkoutTime = (workout: CompletedWorkout | WorkoutPayload) => {
+      const date = "performed_at" in workout ? workout.performed_at : workout.date
+      return new Date(date ?? 0).getTime()
+    }
+    const merged = Array.from(byId.values()).sort((a, b) => getWorkoutTime(b) - getWorkoutTime(a))
+    localStorage.setItem("workout_history", JSON.stringify(merged))
+  }
+}
+
 export function trySyncSoon() {
   if (typeof window === "undefined") return
   setTimeout(() => {
