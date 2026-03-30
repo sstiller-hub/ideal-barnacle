@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { getExerciseHistory } from "@/lib/workout-storage"
+import { getExerciseHistory, getExerciseIdForName } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { getVolumeSeriesForExercise } from "@/lib/volume-analytics"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
@@ -43,7 +43,22 @@ export default function ExerciseHistoryPage() {
   const fromSession = searchParams.get("from") === "session"
   const rawName = typeof params?.name === "string" ? params.name : ""
   const exerciseName = rawName ? decodeURIComponent(rawName) : "Unknown exercise"
-  const rawHistory = getExerciseHistory(exerciseName)
+  const [rawHistory, setRawHistory] = useState(() => getExerciseHistory(exerciseName))
+
+  useEffect(() => {
+    const exerciseId = getExerciseIdForName(exerciseName)
+    if (!exerciseId) return
+
+    import("@/lib/supabase-sync")
+      .then(({ pullWorkoutsForExerciseId }) =>
+        pullWorkoutsForExerciseId(exerciseId).then(() => {
+          setRawHistory(getExerciseHistory(exerciseName))
+        })
+      )
+      .catch(() => {
+        // Sync unavailable — local data is sufficient
+      })
+  }, [exerciseName])
 
   const [timeRange, setTimeRange] = useState<TimeRange>("All")
   const [aggregation, setAggregation] = useState<Aggregation>("session")
