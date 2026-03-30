@@ -433,7 +433,7 @@ export default function SettingsPage() {
               <div>
                 <h2 className="font-bold text-base mb-2">Send all workouts to cloud</h2>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Force upload any workouts saved on this device. This is a recovery tool.
+                  Upload all workouts from this device to the cloud.
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-3">
