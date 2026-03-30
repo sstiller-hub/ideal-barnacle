@@ -46,11 +46,5 @@ export function validateWorkoutCommitPayload(payload: unknown): WorkoutCommitPay
     }
   }
 
-  parsed.sets.forEach((set) => {
-    if (set.completed && (set.reps === null || set.weight === null)) {
-      throw new Error("Completed sets must include reps and weight")
-    }
-  })
-
   return parsed
 }
