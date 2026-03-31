@@ -28,6 +28,21 @@ export default function HistoryPage() {
     }
   }
 
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m} min`
+  }
+
+  const getWorkoutDurationSeconds = (workout: CompletedWorkout): number | null => {
+    if (typeof workout.duration === "number") return workout.duration
+    if (workout.startedAt && workout.endedAt) {
+      return Math.floor((new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()) / 1000)
+    }
+    return null
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const today = new Date()
@@ -105,7 +120,17 @@ export default function HistoryPage() {
                     <p className="text-xs text-muted-foreground">{formatDate(workout.date)}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-muted-foreground">completed</div>
+                    {(() => {
+                      const secs = getWorkoutDurationSeconds(workout)
+                      return secs !== null ? (
+                        <>
+                          <div className="text-sm font-medium text-foreground">{formatDuration(secs)}</div>
+                          <div className="text-xs text-muted-foreground">duration</div>
+                        </>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">completed</div>
+                      )
+                    })()}
                   </div>
                 </div>
 
