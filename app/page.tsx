@@ -1205,6 +1205,48 @@ export default function Home() {
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
         <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
 
+        {isDeload && deloadEndsAt && (
+          <div className="px-5 mb-3">
+            <div
+              style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+                padding: "10px 12px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.10em",
+                  color: "rgba(255, 255, 255, 0.35)",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  textTransform: "uppercase",
+                }}
+              >
+                Deload Week Active
+              </span>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 400,
+                  color: "rgba(255, 255, 255, 0.20)",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  marginLeft: "8px",
+                }}
+              >
+                ends{" "}
+                {deloadEndsAt.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
+          </div>
+        )}
+
         {showDeloadCompleteBanner && (
           <div className="px-5 mb-3">
             <div

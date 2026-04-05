@@ -27,7 +27,7 @@ export default function WorkoutSessionPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const routineId = searchParams.get("routineId")
-  const { isDeload } = useDeloadWeek()
+  const { isDeload, loading: deloadLoading } = useDeloadWeek()
   const [routine, setRoutine] = useState<WorkoutRoutine | null>(null)
   const [activeSession, setActiveSession] = useState<AutosaveWorkoutSession | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
@@ -205,7 +205,7 @@ export default function WorkoutSessionPage() {
     )
   }
 
-  if (!routine) {
+  if (!routine || deloadLoading) {
     return (
       <div
         className="min-h-screen"

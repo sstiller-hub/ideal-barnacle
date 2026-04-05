@@ -1984,30 +1984,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             />
           </div>
 
-          {isDeload && (
-            <div
-              style={{
-                margin: "12px 20px 0",
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
-                padding: "7px 12px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "9px",
-                  fontWeight: 500,
-                  letterSpacing: "0.12em",
-                  color: "rgba(255, 255, 255, 0.30)",
-                  fontFamily: "'Archivo Narrow', sans-serif",
-                  textTransform: "uppercase",
-                }}
-              >
-                Deload Week — Recovery Mode
-              </span>
-            </div>
-          )}
         </div>
 
         <div
@@ -2105,6 +2081,32 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       </button>
                     </div>
                   </div>
+
+                  {isDeload && (
+                    <div
+                      style={{
+                        display: "inline-block",
+                        marginBottom: "6px",
+                        background: "rgba(255, 255, 255, 0.04)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        borderRadius: "3px",
+                        padding: "3px 8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "8px",
+                          fontWeight: 500,
+                          letterSpacing: "0.12em",
+                          color: "rgba(255, 255, 255, 0.28)",
+                          fontFamily: "'Archivo Narrow', sans-serif",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Deload Week
+                      </span>
+                    </div>
+                  )}
 
                   <h1
                     className="text-white/95"
