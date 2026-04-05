@@ -176,7 +176,7 @@ function applyProgressiveOverload(
   return { reps: latest.reps, weight: latest.weight, mode: null }
 }
 
-export default function WorkoutSessionComponent({ routine }: { routine: WorkoutRoutine }) {
+export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
   const router = useRouter()
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [exercises, setExercises] = useState<any[]>([])
@@ -409,6 +409,8 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
         }
 
         const targetSets = exercise.targetSets ?? 3
+        // Deload: reduce sets by ~50% (round up so minimum is 1)
+        const effectiveSets = isDeload ? Math.max(1, Math.ceil(targetSets / 2)) : targetSets
         const targetReps = exercise.targetReps ?? "8-10"
         const restTime = extractRestSeconds(exercise.notes)
 
@@ -479,7 +481,7 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           validationFlags: string[]
           isIncomplete: boolean
         }> = []
-        for (let idx = 0; idx < targetSets; idx += 1) {
+        for (let idx = 0; idx < effectiveSets; idx += 1) {
           const prev = warmupSets[idx - 1]
           const reps = prev?.reps ?? warmupDefaults.reps ?? null
           const weight = prev?.weight ?? warmupDefaults.weight ?? null
@@ -512,10 +514,16 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
           machineSettings: Object.keys(savedMachineSettings).length > 0 ? savedMachineSettings : undefined,
           sets: isWarmup
             ? warmupSets
-            : Array.from({ length: targetSets }, (_, setIndex) => {
+            : Array.from({ length: effectiveSets }, (_, setIndex) => {
                 const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, session?.id)
                 const nextReps = lastSet?.reps ?? defaults.reps
-                const nextWeight = lastSet?.weight ?? defaults.weight
+                const rawWeight = lastSet?.weight ?? defaults.weight
+                // Deload: scale weight to 72.5% of working weight, rounded to nearest 5 lbs.
+                // Only applied when there is an actual previous weight to scale from.
+                const nextWeight =
+                  isDeload && rawWeight
+                    ? Math.round((rawWeight * 0.725) / 5) * 5
+                    : rawWeight
                 const flagsResult = getSetFlags({
                   reps: nextReps,
                   weight: nextWeight,
@@ -1975,6 +1983,31 @@ export default function WorkoutSessionComponent({ routine }: { routine: WorkoutR
               }}
             />
           </div>
+
+          {isDeload && (
+            <div
+              style={{
+                margin: "12px 20px 0",
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+                padding: "7px 12px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 500,
+                  letterSpacing: "0.12em",
+                  color: "rgba(255, 255, 255, 0.30)",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  textTransform: "uppercase",
+                }}
+              >
+                Deload Week — Recovery Mode
+              </span>
+            </div>
+          )}
         </div>
 
         <div

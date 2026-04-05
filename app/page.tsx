@@ -52,6 +52,7 @@ import {
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
+import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -137,6 +138,24 @@ export default function Home() {
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
   const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
+  const { isDeload, deloadEndsAt } = useDeloadWeek()
+  const [showDeloadCompleteBanner, setShowDeloadCompleteBanner] = useState(false)
+
+  useEffect(() => {
+    if (!deloadEndsAt || isDeload) return
+    const ended = deloadEndsAt < new Date()
+    if (!ended) return
+    const seenKey = "deload_completed_banner_seen"
+    const seen = typeof window !== "undefined" && localStorage.getItem(seenKey) === deloadEndsAt.toISOString()
+    if (!seen) setShowDeloadCompleteBanner(true)
+  }, [isDeload, deloadEndsAt])
+
+  const dismissDeloadCompleteBanner = () => {
+    if (deloadEndsAt && typeof window !== "undefined") {
+      localStorage.setItem("deload_completed_banner_seen", deloadEndsAt.toISOString())
+    }
+    setShowDeloadCompleteBanner(false)
+  }
 
   const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
   const formatShortDate = (dateStr: string) =>
@@ -1185,6 +1204,50 @@ export default function Home() {
 
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
         <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
+
+        {showDeloadCompleteBanner && (
+          <div className="px-5 mb-3">
+            <div
+              style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+                padding: "10px 12px",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 400,
+                    color: "rgba(255, 255, 255, 0.50)",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  Deload complete — back to full training
+                </span>
+                <button
+                  onClick={dismissDeloadCompleteBanner}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "0 2px",
+                    cursor: "pointer",
+                    color: "rgba(255, 255, 255, 0.22)",
+                    fontSize: "16px",
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                  aria-label="Dismiss"
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {weeklySummary && (
           <div className="px-5 mb-2">
             <div

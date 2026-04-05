@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import WorkoutSession from "@/components/workout-session"
+import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { getRoutineById, type WorkoutRoutine } from "@/lib/routine-storage"
 import {
@@ -26,6 +27,7 @@ export default function WorkoutSessionPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const routineId = searchParams.get("routineId")
+  const { isDeload } = useDeloadWeek()
   const [routine, setRoutine] = useState<WorkoutRoutine | null>(null)
   const [activeSession, setActiveSession] = useState<AutosaveWorkoutSession | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
@@ -215,5 +217,5 @@ export default function WorkoutSessionPage() {
     )
   }
 
-  return <WorkoutSession routine={routine} />
+  return <WorkoutSession routine={routine} isDeload={isDeload} />
 }
