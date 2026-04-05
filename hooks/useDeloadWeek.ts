@@ -1,95 +1,105 @@
 /**
- * Kova App — Deload Week Integration
+ * Kova App — Deload Week
  *
- * Tracks whether the current user has an active deload week.
- * A deload reduces set count (~50%) and weights (~72.5%) for recovery.
- * The is_active column in deload_weeks is a generated column that expires
- * automatically once ends_at passes — no cron job needed.
+ * localStorage-first (matches the rest of the app's offline-first architecture).
+ * Supabase is synced opportunistically when the user is authenticated, but the
+ * feature works fully without a logged-in account.
  */
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
-export interface DeloadWeek {
-  id: string
-  started_at: string
-  ends_at: string
+const DELOAD_KEY = "deload_week"
+const DELOAD_ENDED_KEY = "deload_week_last_ended"
+
+interface StoredDeload {
+  id?: string       // Supabase row id, if synced
+  startedAt: string // ISO string
+  endsAt: string    // ISO string
 }
 
-/**
- * Fetch the current user's active deload week, if any.
- */
-export async function fetchActiveDeload(): Promise<DeloadWeek | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+// ─── localStorage helpers ────────────────────────────────────────────────────
 
-  const now = new Date().toISOString()
-  const { data, error } = await supabase
-    .from("deload_weeks")
-    .select("id, started_at, ends_at")
-    .eq("user_id", user.id)
-    .lte("started_at", now)
-    .gt("ends_at", now)
-    .maybeSingle()
-
-  if (error) {
-    console.error("Failed to fetch deload week:", error)
+function getLocalDeload(): StoredDeload | null {
+  if (typeof window === "undefined") return null
+  const raw = localStorage.getItem(DELOAD_KEY)
+  if (!raw) return null
+  try {
+    const d = JSON.parse(raw) as StoredDeload
+    const now = new Date()
+    if (new Date(d.endsAt) > now && new Date(d.startedAt) <= now) return d
+    // Expired — save the end date for the post-deload banner, then clean up
+    localStorage.setItem(DELOAD_ENDED_KEY, d.endsAt)
+    localStorage.removeItem(DELOAD_KEY)
+    return null
+  } catch {
     return null
   }
-
-  return data ?? null
 }
 
-/**
- * Fetch the most recently ended deload week (for the post-deload banner).
- * Returns null if no completed deload exists.
- */
-export async function fetchLastCompletedDeload(): Promise<DeloadWeek | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+function setLocalDeload(d: StoredDeload | null): void {
+  if (typeof window === "undefined") return
+  if (d) localStorage.setItem(DELOAD_KEY, JSON.stringify(d))
+  else localStorage.removeItem(DELOAD_KEY)
+}
 
-  const { data, error } = await supabase
-    .from("deload_weeks")
-    .select("id, started_at, ends_at")
-    .eq("user_id", user.id)
-    .lt("ends_at", new Date().toISOString())
-    .order("ends_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+// ─── Supabase sync (best-effort, runs after localStorage is already updated) ─
 
-  if (error) {
-    console.error("Failed to fetch last completed deload:", error)
+async function syncStartToSupabase(startedAt: string, endsAt: string): Promise<string | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data, error } = await supabase
+      .from("deload_weeks")
+      .insert({ user_id: user.id, started_at: startedAt, ends_at: endsAt })
+      .select("id")
+      .single()
+    if (error) return null
+    return data?.id ?? null
+  } catch {
     return null
   }
-
-  return data ?? null
 }
 
+async function syncCancelToSupabase(id: string): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase
+      .from("deload_weeks")
+      .update({ ends_at: new Date().toISOString() })
+      .eq("id", id)
+  } catch {
+    // ignore — localStorage already updated
+  }
+}
+
+// ─── Hook ────────────────────────────────────────────────────────────────────
+
 /**
- * React hook — use on any screen that needs to know deload state.
+ * React hook — use anywhere deload state is needed.
+ *
+ * isDeload is computed synchronously from localStorage on first render,
+ * so there is no loading flash and no Supabase dependency for the feature to work.
  *
  * Example:
  *   const { isDeload, deloadEndsAt, startDeload, cancelDeload } = useDeloadWeek()
  */
 export function useDeloadWeek() {
-  const [deload, setDeload] = useState<DeloadWeek | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [deload, setDeload] = useState<StoredDeload | null>(() => getLocalDeload())
+  const lastCompletedEndsAt: Date | null = (() => {
+    if (typeof window === "undefined") return null
+    const raw = localStorage.getItem(DELOAD_ENDED_KEY)
+    return raw ? new Date(raw) : null
+  })()
 
-  const refresh = useCallback(async () => {
-    const data = await fetchActiveDeload()
-    setDeload(data)
-    setLoading(false)
+  // Re-check on tab focus (another device/tab may have updated localStorage)
+  const refresh = useCallback(() => {
+    setDeload(getLocalDeload())
   }, [])
 
   useEffect(() => {
-    refresh()
-
-    // Re-check whenever the user returns to the tab
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") refresh()
     }
@@ -98,51 +108,45 @@ export function useDeloadWeek() {
   }, [refresh])
 
   /**
-   * Start a 7-day deload week starting now.
+   * Start a 7-day deload. Updates localStorage immediately, then syncs to
+   * Supabase in the background (if authenticated).
    */
-  const startDeload = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
+  const startDeload = useCallback(async () => {
+    const startedAt = new Date().toISOString()
     const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { error } = await supabase.from("deload_weeks").insert({
-      user_id: user.id,
-      ends_at: endsAt,
-    })
+    const stored: StoredDeload = { startedAt, endsAt }
 
-    if (error) {
-      console.error("Failed to start deload week:", error)
-      return
+    // Persist locally first — UI updates immediately
+    setLocalDeload(stored)
+    setDeload(stored)
+
+    // Sync to Supabase in background
+    const id = await syncStartToSupabase(startedAt, endsAt)
+    if (id) {
+      const withId = { ...stored, id }
+      setLocalDeload(withId)
+      setDeload(withId)
     }
-
-    await refresh()
-  }
+  }, [])
 
   /**
-   * Cancel the active deload by setting ends_at to now.
+   * Cancel the active deload. Updates localStorage immediately, then syncs to
+   * Supabase in the background.
    */
-  const cancelDeload = async () => {
-    if (!deload) return
-
-    const { error } = await supabase
-      .from("deload_weeks")
-      .update({ ends_at: new Date().toISOString() })
-      .eq("id", deload.id)
-
-    if (error) {
-      console.error("Failed to cancel deload week:", error)
-      return
-    }
-
+  const cancelDeload = useCallback(async () => {
+    const current = deload
+    setLocalDeload(null)
     setDeload(null)
-  }
+
+    if (current?.id) {
+      await syncCancelToSupabase(current.id)
+    }
+  }, [deload])
 
   return {
     isDeload: deload !== null,
-    deloadEndsAt: deload ? new Date(deload.ends_at) : null,
-    loading,
+    deloadEndsAt: deload ? new Date(deload.endsAt) : null,
+    lastCompletedDeloadEndsAt,
     startDeload,
     cancelDeload,
     refresh,

@@ -138,21 +138,19 @@ export default function Home() {
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
   const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
-  const { isDeload, deloadEndsAt } = useDeloadWeek()
+  const { isDeload, deloadEndsAt, lastCompletedDeloadEndsAt } = useDeloadWeek()
   const [showDeloadCompleteBanner, setShowDeloadCompleteBanner] = useState(false)
 
   useEffect(() => {
-    if (!deloadEndsAt || isDeload) return
-    const ended = deloadEndsAt < new Date()
-    if (!ended) return
+    if (!lastCompletedDeloadEndsAt || isDeload) return
     const seenKey = "deload_completed_banner_seen"
-    const seen = typeof window !== "undefined" && localStorage.getItem(seenKey) === deloadEndsAt.toISOString()
+    const seen = typeof window !== "undefined" && localStorage.getItem(seenKey) === lastCompletedDeloadEndsAt.toISOString()
     if (!seen) setShowDeloadCompleteBanner(true)
-  }, [isDeload, deloadEndsAt])
+  }, [isDeload, lastCompletedDeloadEndsAt])
 
   const dismissDeloadCompleteBanner = () => {
-    if (deloadEndsAt && typeof window !== "undefined") {
-      localStorage.setItem("deload_completed_banner_seen", deloadEndsAt.toISOString())
+    if (lastCompletedDeloadEndsAt && typeof window !== "undefined") {
+      localStorage.setItem("deload_completed_banner_seen", lastCompletedDeloadEndsAt.toISOString())
     }
     setShowDeloadCompleteBanner(false)
   }
