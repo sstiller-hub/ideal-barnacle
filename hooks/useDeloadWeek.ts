@@ -146,7 +146,7 @@ export function useDeloadWeek() {
   return {
     isDeload: deload !== null,
     deloadEndsAt: deload ? new Date(deload.endsAt) : null,
-    lastCompletedDeloadEndsAt,
+    lastCompletedDeloadEndsAt: lastCompletedEndsAt,
     startDeload,
     cancelDeload,
     refresh,
