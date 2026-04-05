@@ -1,11 +1,10 @@
 -- Deload week tracking: one active row per user during a deload period.
--- is_active is a generated column — expires automatically when ends_at passes.
+-- is_active is computed at query time (now() is volatile, can't be a generated column).
 create table if not exists public.deload_weeks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   started_at timestamptz not null default now(),
   ends_at timestamptz not null,
-  is_active boolean generated always as (now() between started_at and ends_at) stored,
   created_at timestamptz default now()
 );
 

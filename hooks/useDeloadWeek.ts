@@ -15,7 +15,6 @@ export interface DeloadWeek {
   id: string
   started_at: string
   ends_at: string
-  is_active: boolean
 }
 
 /**
@@ -27,11 +26,13 @@ export async function fetchActiveDeload(): Promise<DeloadWeek | null> {
   } = await supabase.auth.getUser()
   if (!user) return null
 
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("deload_weeks")
-    .select("id, started_at, ends_at, is_active")
+    .select("id, started_at, ends_at")
     .eq("user_id", user.id)
-    .eq("is_active", true)
+    .lte("started_at", now)
+    .gt("ends_at", now)
     .maybeSingle()
 
   if (error) {
@@ -54,9 +55,8 @@ export async function fetchLastCompletedDeload(): Promise<DeloadWeek | null> {
 
   const { data, error } = await supabase
     .from("deload_weeks")
-    .select("id, started_at, ends_at, is_active")
+    .select("id, started_at, ends_at")
     .eq("user_id", user.id)
-    .eq("is_active", false)
     .lt("ends_at", new Date().toISOString())
     .order("ends_at", { ascending: false })
     .limit(1)
@@ -140,7 +140,7 @@ export function useDeloadWeek() {
   }
 
   return {
-    isDeload: deload?.is_active ?? false,
+    isDeload: deload !== null,
     deloadEndsAt: deload ? new Date(deload.ends_at) : null,
     loading,
     startDeload,
