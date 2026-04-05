@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
@@ -841,7 +842,10 @@ export default function SettingsPage() {
                     {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   </p>
                   <button
-                    onClick={() => void cancelDeload()}
+                    onClick={async () => {
+                    await cancelDeload()
+                    toast("Deload cancelled", { duration: 2000 })
+                  }}
                     style={{
                       background: "transparent",
                       border: "none",
@@ -925,6 +929,7 @@ export default function SettingsPage() {
                 onClick={async () => {
                   await startDeload()
                   setDeloadConfirmOpen(false)
+                  toast.success("Deload week started", { duration: 3000 })
                 }}
               >
                 Start Deload
