@@ -35,6 +35,7 @@ import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
 import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
 import { getPrExcludedExercises, setPrExcludedExercises } from "@/lib/pr-exclusions"
+import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -71,6 +72,8 @@ export default function SettingsPage() {
   } | null>(null)
   const [prExclusionInput, setPrExclusionInput] = useState("")
   const [prExclusionSaved, setPrExclusionSaved] = useState(false)
+  const { isDeload, deloadEndsAt, startDeload, cancelDeload } = useDeloadWeek()
+  const [deloadConfirmOpen, setDeloadConfirmOpen] = useState(false)
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
@@ -804,6 +807,67 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          title="TRAINING"
+          isExpanded={expandedSections.includes("training")}
+          onToggle={() => toggleSection("training")}
+        >
+          <SettingItem label="Deload Week" />
+          <div className="mt-3 space-y-4">
+            <div>
+              <h2 className="font-bold text-base mb-2">Deload Week</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Reduces your training volume and intensity for 7 days to promote recovery. Sets are halved and weights
+                are pre-filled at ~72% of your working weights — you can still edit everything manually.
+              </p>
+
+              {isDeload ? (
+                <div
+                  style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "4px",
+                    padding: "12px 14px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "rgba(255, 255, 255, 0.55)",
+                      marginBottom: "8px",
+                      fontFamily: "'Archivo Narrow', sans-serif",
+                    }}
+                  >
+                    Deload active — ends{" "}
+                    {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  </p>
+                  <button
+                    onClick={() => void cancelDeload()}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      fontSize: "11px",
+                      color: "rgba(255, 255, 255, 0.28)",
+                      fontFamily: "'Archivo Narrow', sans-serif",
+                      letterSpacing: "0.06em",
+                      textDecoration: "underline",
+                    }}
+                    type="button"
+                  >
+                    Cancel deload
+                  </button>
+                </div>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={() => setDeloadConfirmOpen(true)}>
+                  Start Deload Week
+                </Button>
+              )}
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
           title="ABOUT & DEVICE"
           isExpanded={expandedSections.includes("about")}
           onToggle={() => toggleSection("about")}
@@ -844,6 +908,30 @@ export default function SettingsPage() {
           </div>
         </SettingsSection>
         </div>
+
+        <AlertDialog open={deloadConfirmOpen} onOpenChange={setDeloadConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Start Deload Week</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deload week reduces your volume and intensity for 7 days to promote recovery. Your workouts will
+                auto-adjust — sets are halved and weights are pre-filled at ~72% of your working weights. You can
+                still edit everything manually.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  await startDeload()
+                  setDeloadConfirmOpen(false)
+                }}
+              >
+                Start Deload
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={manualSyncConfirmOpen} onOpenChange={setManualSyncConfirmOpen}>
           <AlertDialogContent>
