@@ -9,6 +9,90 @@ import { filterByTimeRange, filterByWorkoutType, getVolumeSeriesGlobal } from "@
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
 import { VolumeControls } from "@/components/volume-controls"
 
+// Catmull-Rom → cubic bezier smooth path through an array of [x, y] points
+function buildSmoothPath(pts: [number, number][]): string {
+  if (pts.length === 0) return ""
+  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 1; i < pts.length; i++) {
+    const pm1 = pts[Math.max(i - 2, 0)]
+    const p0 = pts[i - 1]
+    const p1 = pts[i]
+    const p2 = pts[Math.min(i + 1, pts.length - 1)]
+    const cp1x = p0[0] + (p1[0] - pm1[0]) / 6
+    const cp1y = p0[1] + (p1[1] - pm1[1]) / 6
+    const cp2x = p1[0] - (p2[0] - p0[0]) / 6
+    const cp2y = p1[1] - (p2[1] - p0[1]) / 6
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`
+  }
+  return d
+}
+
+// Line path with gaps at zero-volume points
+function buildSegmentedLinePath(
+  series: { volume: number }[],
+  toX: (i: number) => number,
+  toY: (v: number) => number
+): string {
+  const segments: [number, number][][] = []
+  let cur: [number, number][] = []
+  series.forEach((p, i) => {
+    if (p.volume > 0) {
+      cur.push([toX(i), toY(p.volume)])
+    } else {
+      if (cur.length > 0) { segments.push(cur); cur = [] }
+    }
+  })
+  if (cur.length > 0) segments.push(cur)
+  return segments.map(buildSmoothPath).join(" ")
+}
+
+// Area fill path with gaps at zero-volume points (separate closed island per segment)
+function buildSegmentedAreaPath(
+  series: { volume: number }[],
+  toX: (i: number) => number,
+  toY: (v: number) => number,
+  chartH: number
+): string {
+  const segments: { pts: [number, number][]; firstX: number; lastX: number }[] = []
+  let cur: [number, number][] = []
+  series.forEach((p, i) => {
+    if (p.volume > 0) {
+      cur.push([toX(i), toY(p.volume)])
+    } else {
+      if (cur.length > 0) {
+        segments.push({ pts: cur, firstX: cur[0][0], lastX: cur[cur.length - 1][0] })
+        cur = []
+      }
+    }
+  })
+  if (cur.length > 0) segments.push({ pts: cur, firstX: cur[0][0], lastX: cur[cur.length - 1][0] })
+  return segments
+    .map(({ pts, firstX, lastX }) =>
+      `${buildSmoothPath(pts)} L ${lastX.toFixed(1)},${chartH} L ${firstX.toFixed(1)},${chartH} Z`
+    )
+    .join(" ")
+}
+
+// Smooth path for mini sparklines (no gaps needed)
+function buildSparklinePath(series: { volume: number }[], w: number, h: number): string {
+  if (series.length === 0) return ""
+  const max = Math.max(...series.map((p) => p.volume), 0)
+  const min = Math.min(...series.map((p) => p.volume), 0)
+  const range = max - min || 1
+  const pts: [number, number][] = series.map((p, idx) => [
+    (idx / Math.max(series.length - 1, 1)) * w,
+    h - ((p.volume - min) / range) * (h * 0.75) - h * 0.125,
+  ])
+  return buildSmoothPath(pts)
+}
+
+function formatMaxVol(v: number): string {
+  if (v >= 10000) return `${Math.round(v / 1000)}k lbs`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k lbs`
+  return `${Math.round(v)} lbs`
+}
+
 type VolumePoint = { date: string; volume: number }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {
@@ -68,23 +152,25 @@ export default function VolumeHistoryPage() {
 
   // Build global chart SVG coords
   const chartW = 400
-  const chartH = 80
+  const chartH = 110
   const maxVol = Math.max(...globalSeries.map((p) => p.volume), 1)
-  const minVol = Math.min(...globalSeries.filter((p) => p.volume > 0).map((p) => p.volume), 0)
+  const minVol = 0
   const volRange = maxVol - minVol || 1
 
   function toX(i: number) {
     return (i / Math.max(globalSeries.length - 1, 1)) * chartW
   }
   function toY(v: number) {
-    return chartH - ((v - minVol) / volRange) * (chartH - 10) - 5
+    return chartH - ((v - minVol) / volRange) * (chartH - 14) - 7
   }
 
-  const areaPoints = globalSeries.map((p, i) => `${toX(i)},${toY(p.volume)}`).join(" ")
-  const rollingPoints = globalSeries
-    .map((p, i) => (p.rollingAvg !== null ? `${toX(i)},${toY(p.rollingAvg)}` : null))
-    .filter(Boolean)
-    .join(" ")
+  const linePath = buildSegmentedLinePath(globalSeries, toX, toY)
+  const areaPath = buildSegmentedAreaPath(globalSeries, toX, toY, chartH)
+  const rollingPath = buildSmoothPath(
+    globalSeries
+      .map((p, i) => (p.rollingAvg !== null ? [toX(i), toY(p.rollingAvg)] as [number, number] : null))
+      .filter((p): p is [number, number] => p !== null)
+  )
 
   return (
     <div
@@ -158,11 +244,21 @@ export default function VolumeHistoryPage() {
             </div>
 
             <div style={{ position: "relative" }}>
+              {globalSeries.length > 0 && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, zIndex: 1,
+                  fontSize: "8px", color: "rgba(255,255,255,0.20)",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  lineHeight: 1, pointerEvents: "none",
+                }}>
+                  {formatMaxVol(maxVol)}
+                </div>
+              )}
               <svg
                 width="100%"
                 viewBox={`0 0 ${chartW} ${chartH}`}
                 preserveAspectRatio="none"
-                style={{ display: "block", height: "80px" }}
+                style={{ display: "block", height: "110px" }}
               >
                 <defs>
                   <linearGradient id="globalVolFill" x1="0" y1="0" x2="0" y2="1">
@@ -173,21 +269,20 @@ export default function VolumeHistoryPage() {
 
                 {globalSeries.length > 1 && (
                   <>
-                    <polygon
-                      points={`0,${chartH} ${areaPoints} ${chartW},${chartH}`}
-                      fill="url(#globalVolFill)"
-                    />
-                    <polyline
-                      points={areaPoints}
+                    <path d={areaPath} fill="url(#globalVolFill)" />
+                    <path
+                      d={linePath}
                       fill="none"
                       stroke="rgba(255,255,255,0.65)"
                       strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                    {rollingPoints && (
-                      <polyline
-                        points={rollingPoints}
+                    {rollingPath && (
+                      <path
+                        d={rollingPath}
                         fill="none"
-                        stroke="rgba(255,255,255,0.25)"
+                        stroke="rgba(255,255,255,0.45)"
                         strokeWidth="1.2"
                         strokeDasharray="4 3"
                       />
@@ -395,16 +490,7 @@ export default function VolumeHistoryPage() {
         {/* Exercise list */}
         {exercises.map((exercise) => {
           const series = exercise.timeline.slice(-7)
-          const max = Math.max(...series.map((p) => p.volume), 0)
-          const min = Math.min(...series.map((p) => p.volume), 0)
-          const range = max - min || 1
-          const points = series
-            .map((point, idx) => {
-              const x = (idx / Math.max(series.length - 1, 1)) * 120
-              const y = 40 - ((point.volume - min) / range) * 30 - 5
-              return `${x},${y}`
-            })
-            .join(" ")
+          const sparkPath = buildSparklinePath(series, 120, 40)
 
           return (
             <button
@@ -435,11 +521,13 @@ export default function VolumeHistoryPage() {
                     </div>
                   )}
                   <svg width="120" height="40" viewBox="0 0 120 40">
-                    <polyline
-                      points={points}
+                    <path
+                      d={sparkPath}
                       fill="none"
                       stroke="rgba(255, 255, 255, 0.6)"
                       strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
                   </svg>
                 </div>

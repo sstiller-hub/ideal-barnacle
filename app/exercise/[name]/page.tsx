@@ -1,6 +1,76 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+
+// Catmull-Rom → cubic bezier smooth path
+function buildSmoothPath(pts: [number, number][]): string {
+  if (pts.length === 0) return ""
+  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 1; i < pts.length; i++) {
+    const pm1 = pts[Math.max(i - 2, 0)]
+    const p0 = pts[i - 1]
+    const p1 = pts[i]
+    const p2 = pts[Math.min(i + 1, pts.length - 1)]
+    const cp1x = p0[0] + (p1[0] - pm1[0]) / 6
+    const cp1y = p0[1] + (p1[1] - pm1[1]) / 6
+    const cp2x = p1[0] - (p2[0] - p0[0]) / 6
+    const cp2y = p1[1] - (p2[1] - p0[1]) / 6
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`
+  }
+  return d
+}
+
+function buildSegmentedLinePath(
+  series: { volume: number }[],
+  toX: (i: number) => number,
+  toY: (v: number) => number
+): string {
+  const segments: [number, number][][] = []
+  let cur: [number, number][] = []
+  series.forEach((p, i) => {
+    if (p.volume > 0) {
+      cur.push([toX(i), toY(p.volume)])
+    } else {
+      if (cur.length > 0) { segments.push(cur); cur = [] }
+    }
+  })
+  if (cur.length > 0) segments.push(cur)
+  return segments.map(buildSmoothPath).join(" ")
+}
+
+function buildSegmentedAreaPath(
+  series: { volume: number }[],
+  toX: (i: number) => number,
+  toY: (v: number) => number,
+  chartH: number
+): string {
+  const segments: { pts: [number, number][]; firstX: number; lastX: number }[] = []
+  let cur: [number, number][] = []
+  series.forEach((p, i) => {
+    if (p.volume > 0) {
+      cur.push([toX(i), toY(p.volume)])
+    } else {
+      if (cur.length > 0) {
+        segments.push({ pts: cur, firstX: cur[0][0], lastX: cur[cur.length - 1][0] })
+        cur = []
+      }
+    }
+  })
+  if (cur.length > 0) segments.push({ pts: cur, firstX: cur[0][0], lastX: cur[cur.length - 1][0] })
+  return segments
+    .map(({ pts, firstX, lastX }) =>
+      `${buildSmoothPath(pts)} L ${lastX.toFixed(1)},${chartH} L ${firstX.toFixed(1)},${chartH} Z`
+    )
+    .join(" ")
+}
+
+function formatMaxVol(v: number): string {
+  if (v >= 10000) return `${Math.round(v / 1000)}k lbs`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k lbs`
+  return `${Math.round(v)} lbs`
+}
+
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { getExerciseHistory, getExerciseIdForName } from "@/lib/workout-storage"
@@ -115,21 +185,21 @@ export default function ExerciseHistoryPage() {
   const chartW = 400
   const chartH = 100
   const maxVolume = Math.max(...annotatedSeries.map((p) => p.volume), 0)
-  const minVolume = Math.min(...annotatedSeries.filter((p) => p.volume > 0).map((p) => p.volume), 0)
-  const range = maxVolume - minVolume || 1
 
   function toX(i: number) {
     return (i / Math.max(annotatedSeries.length - 1, 1)) * chartW
   }
   function toY(v: number) {
-    return chartH - ((v - minVolume) / range) * 80 - 10
+    return chartH - (v / (maxVolume || 1)) * 80 - 10
   }
 
-  const areaPoints = annotatedSeries.map((p, i) => `${toX(i)},${toY(p.volume)}`).join(" ")
-  const rollingPoints = annotatedSeries
-    .map((p, i) => (p.rollingAvg !== null ? `${toX(i)},${toY(p.rollingAvg)}` : null))
-    .filter(Boolean)
-    .join(" ")
+  const linePath = buildSegmentedLinePath(annotatedSeries, toX, toY)
+  const areaPath = buildSegmentedAreaPath(annotatedSeries, toX, toY, chartH)
+  const rollingPath = buildSmoothPath(
+    annotatedSeries
+      .map((p, i) => (p.rollingAvg !== null ? [toX(i), toY(p.rollingAvg)] as [number, number] : null))
+      .filter((p): p is [number, number] => p !== null)
+  )
 
   const historyForDrilldown = history
 
@@ -209,6 +279,16 @@ export default function ExerciseHistoryPage() {
             </div>
 
             <div className="relative h-32">
+              {annotatedSeries.length > 0 && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, zIndex: 1,
+                  fontSize: "8px", color: "rgba(255,255,255,0.20)",
+                  fontFamily: "'Archivo Narrow', sans-serif",
+                  lineHeight: 1, pointerEvents: "none",
+                }}>
+                  {formatMaxVol(maxVolume)}
+                </div>
+              )}
               <svg
                 className="w-full h-full"
                 viewBox={`0 0 ${chartW} ${chartH}`}
@@ -223,21 +303,20 @@ export default function ExerciseHistoryPage() {
 
                 {annotatedSeries.length > 1 ? (
                   <>
-                    <polygon
-                      points={`0,${chartH} ${areaPoints} ${chartW},${chartH}`}
-                      fill="url(#volumeFill)"
-                    />
-                    <polyline
-                      points={areaPoints}
+                    <path d={areaPath} fill="url(#volumeFill)" />
+                    <path
+                      d={linePath}
                       fill="none"
                       stroke="rgba(255, 255, 255, 0.7)"
                       strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                    {rollingPoints && (
-                      <polyline
-                        points={rollingPoints}
+                    {rollingPath && (
+                      <path
+                        d={rollingPath}
                         fill="none"
-                        stroke="rgba(255,255,255,0.30)"
+                        stroke="rgba(255,255,255,0.45)"
                         strokeWidth="1.2"
                         strokeDasharray="4 3"
                       />
