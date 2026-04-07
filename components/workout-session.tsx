@@ -567,6 +567,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         const normalizedSession: WorkoutSession = {
           ...currentSession,
           id: currentSession.id || (currentSession as any).sessionId || Date.now().toString(),
+          startedAt: currentSession.startedAt ?? new Date().toISOString(),
           status: normalizedStatus,
           activeDurationSeconds: currentSession.activeDurationSeconds ?? 0,
           workoutId: currentSession.workoutId,
@@ -1502,14 +1503,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const completedAt = completedAtDate.toISOString()
     const localDateForDisplay = new Date(completedAtDate)
     localDateForDisplay.setHours(12, 0, 0, 0)
+    const sessionStartedAt = session.startedAt ?? completedAt
     const durationSeconds = Math.floor(
-      (completedAtDate.getTime() - new Date(session.startedAt).getTime()) / 1000
+      (completedAtDate.getTime() - new Date(sessionStartedAt).getTime()) / 1000
     )
     const completedWorkout = {
       id: completedWorkoutId,
       name: routine.name,
       date: localDateForDisplay.toISOString(),
-      startedAt: session.startedAt,
+      startedAt: sessionStartedAt,
       endedAt: completedAt,
       duration: durationSeconds,
       durationUnit: "seconds" as const,

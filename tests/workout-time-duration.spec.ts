@@ -321,3 +321,88 @@ test.describe("History detail – time and duration", () => {
     await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)\\s*–\\s*\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Session completion regression — missing startedAt on session
+// ---------------------------------------------------------------------------
+
+test.describe("Session completion — timing saved correctly", () => {
+  const routine = {
+    id: "routine-timing-test",
+    name: "Timing Regression Routine",
+    description: "",
+    estimatedTime: "30 min",
+    category: "Test",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    exercises: [
+      {
+        id: "ex-timing-1",
+        name: "Squat",
+        type: "strength",
+        targetSets: 1,
+        targetReps: "5",
+        restTime: 60,
+        notes: "",
+      },
+    ],
+  }
+
+  test("workout completed from a session without startedAt still saves timing data", async ({ page }) => {
+    // Simulate the pre-existing bug: a session stored without startedAt
+    // (e.g. created before the field was introduced, or via a code path that missed it)
+    const sessionId = "session-no-startedAt"
+    const workoutId = "workout-from-no-startedat"
+
+    await page.addInitScript(
+      ({ routineSeed, sessionSeed }: { routineSeed: any; sessionSeed: any }) => {
+        localStorage.setItem("workout_routines_v2", JSON.stringify([routineSeed]))
+        localStorage.setItem("workoutSessions", JSON.stringify([sessionSeed]))
+        localStorage.setItem("currentSessionId", sessionSeed.id)
+      },
+      {
+        routineSeed: routine,
+        sessionSeed: {
+          id: sessionId,
+          workoutId,
+          routineId: routine.id,
+          routineName: routine.name,
+          status: "in_progress",
+          // startedAt intentionally omitted to reproduce the bug
+          activeDurationSeconds: 0,
+          currentExerciseIndex: 0,
+          exercises: [
+            {
+              id: "ex-timing-1",
+              name: "Squat",
+              targetSets: 1,
+              targetReps: "5",
+              restTime: 60,
+              completed: false,
+              sets: [{ id: "s1", reps: 5, weight: 135, completed: true }],
+            },
+          ],
+        },
+      },
+    )
+
+    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await expect(page.getByText("SQUAT")).toBeVisible()
+
+    // Click the FINISH button (no confirmation dialog — it calls finishWorkout() directly)
+    const finishBtn = page.getByRole("button", { name: "FINISH" })
+    await expect(finishBtn).toBeVisible({ timeout: 10000 })
+    await expect(finishBtn).toBeEnabled()
+    await finishBtn.click()
+
+    // Should navigate to workout summary
+    await expect(page).toHaveURL(/workout-summary/, { timeout: 15000 })
+    await expect(page.getByText("Workout Complete")).toBeVisible()
+
+    // Duration should be shown (0 min is acceptable — session had no prior startedAt
+    // so both startedAt and endedAt are set to completion time → 0 min duration)
+    // What must NOT happen: "Workout date" fallback (means duration was lost entirely)
+    await expect(page.getByText("Workout date")).not.toBeVisible()
+    await expect(page.getByText("Duration")).toBeVisible()
+  })
+})
