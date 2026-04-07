@@ -377,6 +377,32 @@ test.describe("Migration — backfill startedAt for old workouts", () => {
     await expect(page.getByText("30 min")).toBeVisible()
     await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)\\s*–\\s*\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
   })
+
+  test("history detail shows time when only endedAt is present (duration was null/NaN)", async ({ page }) => {
+    // Most common pre-fix case: session was resumed, duration was NaN → stored as null.
+    // Only endedAt was reliably saved. Should still show time (startedAt = endedAt = 0 min duration).
+    const endedAt = new Date("2026-03-15T14:30:00").toISOString()
+    const workout = {
+      id: "legacy-null-duration",
+      name: "Legacy Null Duration",
+      date: new Date("2026-03-15T12:00:00").toISOString(),
+      // no startedAt, no duration (NaN was serialized to null and stripped)
+      endedAt,
+      exercises: [BASE_EXERCISE],
+      stats: BASE_STATS,
+    }
+    await seedWorkouts(page, [workout])
+
+    await page.goto(`/history/${workout.id}`)
+    await expect(page.getByText("Legacy Null Duration")).toBeVisible()
+
+    // With backfill, startedAt = endedAt so duration = 0 min — still better than "Workout date" fallback
+    await expect(page.getByText("Workout date")).not.toBeVisible()
+    // "0 min" is the formatted duration when startedAt = endedAt
+    await expect(page.getByText("0 min")).toBeVisible()
+    // Time should show (both times = endedAt since duration is 0)
+    await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
+  })
 })
 
 // ---------------------------------------------------------------------------
