@@ -25,6 +25,8 @@ export interface WorkoutAlert {
  * Call on app open / home screen mount.
  */
 export async function fetchUnseenAlerts(): Promise<WorkoutAlert[]> {
+  if (!supabase) return []
+
   const { data, error } = await supabase
     .from("workout_alerts")
     .select("id, exercise_name, flag, tier, message, action, created_at, workout_id")
@@ -71,6 +73,7 @@ export function useWorkoutAlerts() {
   }, [])
 
   const dismiss = async (alertId?: string) => {
+    if (!supabase) return
     const ids = alertId ? [alertId] : alerts.map((a) => a.id)
     await markAlertsSeen(ids)
     setAlerts((prev) => (alertId ? prev.filter((a) => a.id !== alertId) : []))

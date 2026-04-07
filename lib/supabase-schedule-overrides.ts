@@ -16,6 +16,7 @@ function getDateKey(date: Date): string {
 }
 
 async function requireUserId(): Promise<string | null> {
+  if (!supabase) return null
   const { data } = await supabase.auth.getUser()
   return data?.user?.id ?? null
 }

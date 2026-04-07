@@ -22,6 +22,7 @@ const attemptCounts = new Map<string, number>()
 let listenerRegistered = false
 
 async function getAccessToken(): Promise<string | null> {
+  if (!supabase) return null
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? null
 }

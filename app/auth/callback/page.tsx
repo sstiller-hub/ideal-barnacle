@@ -10,6 +10,10 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const run = async () => {
+      if (!supabase) {
+        setMsg("Supabase is not configured.")
+        return
+      }
       try {
         const url = new URL(window.location.href)
 

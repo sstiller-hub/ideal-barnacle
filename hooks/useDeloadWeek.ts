@@ -48,6 +48,7 @@ function setLocalDeload(d: StoredDeload | null): void {
 
 async function syncStartToSupabase(startedAt: string, endsAt: string): Promise<string | null> {
   try {
+    if (!supabase) return null
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data, error } = await supabase
@@ -64,6 +65,7 @@ async function syncStartToSupabase(startedAt: string, endsAt: string): Promise<s
 
 async function syncCancelToSupabase(id: string): Promise<void> {
   try {
+    if (!supabase) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase

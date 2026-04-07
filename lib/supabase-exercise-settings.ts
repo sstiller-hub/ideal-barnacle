@@ -10,6 +10,7 @@ export async function loadExerciseSettings(
   userId: string,
   exerciseName: string
 ): Promise<ExerciseSettings | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from("user_exercise_settings")
     .select("seat, bar_weight, plate_display_mode")
@@ -35,6 +36,7 @@ export async function saveExerciseSettings(
   exerciseName: string,
   settings: ExerciseSettings
 ): Promise<void> {
+  if (!supabase) return
   const { error } = await supabase.from("user_exercise_settings").upsert(
     {
       user_id: userId,
