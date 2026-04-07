@@ -143,6 +143,24 @@ export function getWorkoutHistory(): CompletedWorkout[] {
         durationUnit: "seconds",
       } as CompletedWorkout
     }
+    // Backfill startedAt for workouts that have endedAt + duration but no startedAt.
+    // This recovers timing for workouts saved before the startedAt bug was fixed.
+    if (
+      !workout.startedAt &&
+      workout.endedAt &&
+      typeof workout.duration === "number" &&
+      workout.duration > 0
+    ) {
+      const derivedStartedAt = new Date(
+        new Date(workout.endedAt).getTime() - workout.duration * 1000
+      ).toISOString()
+      didMigrate = true
+      return {
+        ...workout,
+        exercises: migratedExercises,
+        startedAt: derivedStartedAt,
+      } as CompletedWorkout
+    }
     if (changed) {
       didMigrate = true
       return {

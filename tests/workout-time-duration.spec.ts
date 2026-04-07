@@ -323,6 +323,63 @@ test.describe("History detail – time and duration", () => {
 })
 
 // ---------------------------------------------------------------------------
+// Migration — backfill startedAt from endedAt + duration for old workouts
+// ---------------------------------------------------------------------------
+
+test.describe("Migration — backfill startedAt for old workouts", () => {
+  test("history detail derives startedAt from endedAt and duration when startedAt is missing", async ({ page }) => {
+    // Simulate a workout saved before the fix: has endedAt + duration but no startedAt
+    const endedAt = new Date("2026-04-07T11:00:00").toISOString()
+    const duration = 2700 // 45 min
+    const workout = {
+      id: "legacy-no-startedat",
+      name: "Legacy Workout",
+      date: new Date("2026-04-07T12:00:00").toISOString(),
+      // no startedAt
+      endedAt,
+      duration,
+      durationUnit: "seconds",
+      exercises: [BASE_EXERCISE],
+      stats: BASE_STATS,
+    }
+    await seedWorkouts(page, [workout])
+
+    await page.goto(`/history/${workout.id}`)
+    await expect(page.getByText("Legacy Workout")).toBeVisible()
+
+    // Duration should show (backfilled)
+    await expect(page.getByText("Duration")).toBeVisible()
+    await expect(page.getByText("45 min")).toBeVisible()
+    // Time range should show (startedAt derived as endedAt - duration = 10:15 AM)
+    await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)\\s*–\\s*\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
+  })
+
+  test("workout summary derives startedAt from endedAt and duration when startedAt is missing", async ({ page }) => {
+    const endedAt = new Date("2026-04-07T09:30:00").toISOString()
+    const duration = 1800 // 30 min
+    const workout = {
+      id: "legacy-summary-no-startedat",
+      name: "Legacy Summary Workout",
+      date: new Date("2026-04-07T12:00:00").toISOString(),
+      // no startedAt
+      endedAt,
+      duration,
+      durationUnit: "seconds",
+      exercises: [BASE_EXERCISE],
+      stats: BASE_STATS,
+    }
+    await seedWorkouts(page, [workout])
+
+    await page.goto(`/workout-summary?workoutId=${workout.id}`)
+    await expect(page.getByText("Workout Complete")).toBeVisible()
+
+    await expect(page.getByText("Duration")).toBeVisible()
+    await expect(page.getByText("30 min")).toBeVisible()
+    await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)\\s*–\\s*\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Session completion regression — missing startedAt on session
 // ---------------------------------------------------------------------------
 
