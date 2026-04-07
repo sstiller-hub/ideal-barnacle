@@ -94,6 +94,8 @@ export default function SettingsPage() {
   }, [])
 
   useEffect(() => {
+    if (!supabase) return
+
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
 
     const {
@@ -375,7 +377,7 @@ export default function SettingsPage() {
                     className="mt-3"
                     variant="outline"
                     onClick={async () => {
-                      await supabase.auth.signOut()
+                      await supabase?.auth.signOut()
                     }}
                   >
                     Sign out

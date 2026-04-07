@@ -152,6 +152,7 @@ function toClientId(workout: WorkoutPayload): string {
 }
 
 async function ensureAuthed() {
+  if (!supabase) return null
   const { data } = await supabase.auth.getUser()
   return data?.user ?? null
 }

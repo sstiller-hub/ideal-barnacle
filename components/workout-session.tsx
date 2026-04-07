@@ -253,7 +253,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     ensureWorkoutSync()
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+    }
   }, [])
 
   useEffect(() => {
@@ -965,6 +967,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     if (!session?.remoteSessionId) return
+    if (!supabase) return
 
     const channel = supabase.channel(`workout-session-${session.remoteSessionId}`)
 

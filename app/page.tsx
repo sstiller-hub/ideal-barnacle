@@ -308,6 +308,8 @@ export default function Home() {
   }, [session?.id, session?.startedAt])
 
   useEffect(() => {
+    if (!supabase) return
+
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
 
     const {
@@ -376,6 +378,7 @@ export default function Home() {
   }, [selectedDate, userId])
 
   const loadHomeAnalytics = useCallback(async (targetUserId: string) => {
+    if (!supabase) return
     const now = new Date()
     const { start, end } = getWeekRange(now)
     const previousStart = new Date(start)
