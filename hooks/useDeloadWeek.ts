@@ -109,6 +109,18 @@ export function useDeloadWeek() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
   }, [refresh])
 
+  // Auto-expire: dismiss the banner exactly when endsAt is reached
+  useEffect(() => {
+    if (!deload) return
+    const ms = new Date(deload.endsAt).getTime() - Date.now()
+    if (ms <= 0) {
+      refresh()
+      return
+    }
+    const timer = setTimeout(refresh, ms)
+    return () => clearTimeout(timer)
+  }, [deload, refresh])
+
   /**
    * Start a 7-day deload. Updates localStorage immediately, then syncs to
    * Supabase in the background (if authenticated).
