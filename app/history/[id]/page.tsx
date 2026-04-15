@@ -397,8 +397,8 @@ export default function WorkoutDetailPage() {
                           typeof set.reps === "number" &&
                           typeof baselineSet.weight === "number" &&
                           typeof baselineSet.reps === "number"
-                        const weightDelta = canCompare ? set.weight - (baselineSet?.weight ?? 0) : null
-                        const repsDelta = canCompare ? set.reps - (baselineSet?.reps ?? 0) : null
+                        const weightDelta = canCompare ? (set.weight ?? 0) - (baselineSet?.weight ?? 0) : null
+                        const repsDelta = canCompare ? (set.reps ?? 0) - (baselineSet?.reps ?? 0) : null
                         const weightDeltaLabel = canCompare ? formatWeightDelta(weightDelta) : null
                         const repsDeltaLabel = canCompare ? formatRepsDelta(repsDelta) : null
                         return (

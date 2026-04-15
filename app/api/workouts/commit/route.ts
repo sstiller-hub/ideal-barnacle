@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
 import { validateWorkoutCommitPayload } from "@/lib/workout-commit-validation"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 type WorkoutExerciseInsert = {
   workout_id: string
@@ -24,6 +25,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const userId = authData.user.id
+
+    const rateLimit = checkRateLimit(`commit:${userId}`, 30, 60_000)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+      )
+    }
 
     let payload: ReturnType<typeof validateWorkoutCommitPayload>
     try {

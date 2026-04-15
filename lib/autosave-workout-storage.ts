@@ -70,7 +70,8 @@ export function loadSessions(): WorkoutSession[] {
       localStorage.setItem(SESSIONS_KEY, JSON.stringify(normalized))
     }
     return normalized
-  } catch {
+  } catch (err) {
+    console.warn("[workout-storage] Failed to parse sessions from localStorage — data may be corrupted. Returning empty list.", err)
     return []
   }
 }
@@ -80,16 +81,28 @@ export function saveSessions(sessions: WorkoutSession[]): void {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
 }
 
-export function saveSession(session: WorkoutSession): void {
-  const sessions = loadSessions()
+// Perform a locked read-modify-write of the sessions list.
+// Uses the Web Locks API for cross-tab mutual exclusion when available.
+export async function saveSession(session: WorkoutSession): Promise<void> {
+  if (typeof window === "undefined") return
   const normalizedSession = normalizeSession(session)
-  const index = sessions.findIndex((s) => s.id === normalizedSession.id)
-  if (index >= 0) {
-    sessions[index] = normalizedSession
-  } else {
-    sessions.push(normalizedSession)
+
+  const doSave = () => {
+    const sessions = loadSessions()
+    const index = sessions.findIndex((s) => s.id === normalizedSession.id)
+    if (index >= 0) {
+      sessions[index] = normalizedSession
+    } else {
+      sessions.push(normalizedSession)
+    }
+    saveSessions(sessions)
   }
-  saveSessions(sessions)
+
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    await navigator.locks.request("workout-sessions-write", doSave)
+  } else {
+    doSave()
+  }
 }
 
 export function getSessionById(sessionId: string): WorkoutSession | null {
@@ -113,7 +126,11 @@ export function updateSetForSession(
     return { ...exercise, sets }
   })
   const updated = { ...session, exercises }
-  saveSession(updated)
+  // Write directly since we already hold the full updated snapshot in this call.
+  const sessions = loadSessions()
+  const idx = sessions.findIndex((s) => s.id === updated.id)
+  if (idx >= 0) sessions[idx] = updated; else sessions.push(updated)
+  saveSessions(sessions)
   return updated
 }
 
@@ -130,7 +147,10 @@ export function addSetToSession(
     return { ...exercise, sets }
   })
   const updated = { ...session, exercises }
-  saveSession(updated)
+  const sessions = loadSessions()
+  const idx = sessions.findIndex((s) => s.id === updated.id)
+  if (idx >= 0) sessions[idx] = updated; else sessions.push(updated)
+  saveSessions(sessions)
   return updated
 }
 
@@ -149,7 +169,10 @@ export function removeSetFromSession(
     return { ...exercise, sets }
   })
   const updated = { ...session, exercises }
-  saveSession(updated)
+  const sessions = loadSessions()
+  const idx = sessions.findIndex((s) => s.id === updated.id)
+  if (idx >= 0) sessions[idx] = updated; else sessions.push(updated)
+  saveSessions(sessions)
   return updated
 }
 

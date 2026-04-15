@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test"
 import AxeBuilder from "@axe-core/playwright"
 
 const runA11y = async (page: Page, name: string) => {
-  const results = await new AxeBuilder({ page })
+  const results = await new AxeBuilder({ page: page as any })
     .disableRules(["color-contrast"])
     .analyze()
   expect(results.violations, `${name} has accessibility violations`).toEqual([])

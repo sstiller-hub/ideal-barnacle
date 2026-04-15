@@ -53,7 +53,8 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback
   try {
     return JSON.parse(raw) as T
-  } catch {
+  } catch (err) {
+    console.warn("[supabase-sync] Failed to parse localStorage value — data may be corrupted. Falling back to default.", err)
     return fallback
   }
 }
@@ -158,6 +159,7 @@ async function ensureAuthed() {
 }
 
 async function upsertWorkoutGraph(workout: WorkoutPayload, userId: string) {
+  if (!supabase) throw new Error("Supabase client not initialized")
   // Upsert workout
   const workoutId = ensureWorkoutUuid(workout)
   const workoutRow = {
@@ -316,7 +318,7 @@ export async function pushLocalChangesToSupabase(options?: PushOptions) {
 
 export async function pullSupabaseToLocal() {
   const user = await ensureAuthed()
-  if (!user) return { success: false, message: "Not signed in" }
+  if (!user || !supabase) return { success: false, message: "Not signed in" }
 
   const { data: workouts, error: wErr } = await supabase
     .from("workouts")
@@ -428,7 +430,7 @@ export async function syncNow(options?: PushOptions) {
  */
 export async function pullWorkoutsForExerciseId(exerciseId: string): Promise<void> {
   const user = await ensureAuthed()
-  if (!user) return
+  if (!user || !supabase) return
 
   // Step 1: Find workout IDs that have this exercise_id, scoped to logged workouts only.
   // The !inner join + performed_at IS NOT NULL filter is the key fix — previously the

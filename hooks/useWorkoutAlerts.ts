@@ -46,6 +46,7 @@ export async function fetchUnseenAlerts(): Promise<WorkoutAlert[]> {
  * Mark one or more alerts as seen (dismiss from banner).
  */
 export async function markAlertsSeen(alertIds: string[]): Promise<void> {
+  if (!supabase) return
   const { error } = await supabase
     .from("workout_alerts")
     .update({ seen_at: new Date().toISOString() })
