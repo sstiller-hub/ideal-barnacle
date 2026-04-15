@@ -44,7 +44,7 @@ const buildHistory = (weight: number, reps: number) => [
 
 const seedBaseStorage = (page: any, options?: { history?: any[]; session?: any }) =>
   page.addInitScript(
-    ({ routineSeed, historySeed, sessionSeed }) => {
+    ({ routineSeed, historySeed, sessionSeed }: { routineSeed: any; historySeed: any; sessionSeed: any }) => {
       if (localStorage.getItem("__pw_seeded") === "true") return
       localStorage.clear()
       localStorage.setItem("workout_routines_v2", JSON.stringify([routineSeed]))

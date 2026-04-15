@@ -1079,7 +1079,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     channel.subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase?.removeChannel(channel)
     }
   }, [session?.remoteSessionId])
 
@@ -1166,7 +1166,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     signalAutoSaved()
   }
 
-  const applyProgressiveOverload = async (exerciseIndex: number) => {
+  const handleApplyProgressiveOverload = async (exerciseIndex: number) => {
     if (!session) return
     const exercise = exercises[exerciseIndex]
     if (!exercise) return
@@ -2699,7 +2699,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
                     >
                       <button
-                        onClick={() => void applyProgressiveOverload(exerciseIndex)}
+                        onClick={() => void handleApplyProgressiveOverload(exerciseIndex)}
                         type="button"
                         style={{
                           background: "rgba(255, 255, 255, 0.04)",

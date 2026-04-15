@@ -24,6 +24,7 @@ async function requireUserId(): Promise<string | null> {
 }
 
 export async function resolveMultipleActiveSessions(userId: string): Promise<WorkoutSessionRow | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from("workout_sessions")
     .select("*")
@@ -67,6 +68,7 @@ export async function getOrCreateActiveSession(): Promise<WorkoutSessionRow | nu
     updated_at: now,
   }
 
+  if (!supabase) return null
   const { data, error } = await supabase
     .from("workout_sessions")
     .insert(insertRow)
@@ -110,6 +112,7 @@ export async function upsertSet(params: {
     updated_at: now,
   }
 
+  if (!supabase) return null
   const { error } = await supabase.from("workout_sets").upsert(row, { onConflict: "id" })
   if (error) {
     console.warn("upsertSet failed", error)

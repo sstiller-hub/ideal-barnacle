@@ -7,6 +7,7 @@ import {
   isNewBest,
   type CompletedSetRecord,
 } from "@/lib/workout-analytics"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 type WorkoutExerciseRow = {
   id: string
@@ -41,6 +42,14 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   const userId = authData.user.id
+
+  const rateLimit = checkRateLimit(`complete:${userId}`, 20, 60_000)
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    )
+  }
 
   const { data: workout, error: workoutError } = await supabase
     .from("workouts")

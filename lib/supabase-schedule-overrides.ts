@@ -23,7 +23,7 @@ async function requireUserId(): Promise<string | null> {
 
 export async function getScheduleOverrideForDate(date: Date): Promise<ScheduleOverrideResult | undefined> {
   const userId = await requireUserId()
-  if (!userId) return undefined
+  if (!userId || !supabase) return undefined
 
   const dateKey = getDateKey(date)
   const { data, error } = await supabase
@@ -50,7 +50,7 @@ export async function getScheduleOverrideForDate(date: Date): Promise<ScheduleOv
 
 export async function setScheduleOverride(date: Date, workout: ScheduledWorkout | null): Promise<boolean> {
   const userId = await requireUserId()
-  if (!userId) return false
+  if (!userId || !supabase) return false
 
   const dateKey = getDateKey(date)
   const now = new Date().toISOString()
@@ -81,7 +81,7 @@ export async function setScheduleOverride(date: Date, workout: ScheduledWorkout 
 
 export async function clearScheduleOverride(date: Date): Promise<boolean> {
   const userId = await requireUserId()
-  if (!userId) return false
+  if (!userId || !supabase) return false
 
   const dateKey = getDateKey(date)
   const { error } = await supabase

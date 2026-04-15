@@ -13,7 +13,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import process from "node:process"
-import { execSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 
 const readEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) return {}
@@ -40,11 +40,12 @@ const sql = fs.readFileSync(migrationPath, "utf8")
 
 if (DB_URL) {
   console.log("Applying migration via psql...")
-  try {
-    execSync(`psql "${DB_URL}" -f "${migrationPath}"`, { stdio: "inherit" })
+  // Use spawnSync with an explicit args array to avoid shell interpolation of DB_URL.
+  const result = spawnSync("psql", [DB_URL, "-f", migrationPath], { stdio: "inherit" })
+  if (result.status === 0) {
     console.log("Migration applied successfully.")
     process.exit(0)
-  } catch {
+  } else {
     console.error("psql failed. Make sure psql is installed and SUPABASE_DB_URL is correct.")
     process.exit(1)
   }

@@ -11,37 +11,42 @@ function getBestSet(exercise: Exercise, metric: PRMetric): { set: WorkoutSet; se
 
   if (completedSets.length === 0) return null
 
-  let bestSet = completedSets[0]
-  let bestValue = 0
-
   switch (metric) {
-    case "weight":
-      // Find the set with the highest weight
-      bestValue = completedSets.reduce((max, current) => {
-        return (current.set.weight ?? 0) > max ? (current.set.weight ?? 0) : max
-      }, 0)
-      bestSet = completedSets.find(({ set }) => (set.weight ?? 0) === bestValue)!
-      break
+    case "weight": {
+      // Only consider sets with a positive weight
+      const setsWithWeight = completedSets.filter(({ set }) => (set.weight ?? 0) > 0)
+      if (setsWithWeight.length === 0) return null
+      const best = setsWithWeight.reduce((acc, current) =>
+        (current.set.weight ?? 0) > (acc.set.weight ?? 0) ? current : acc
+      )
+      return { set: best.set, setIndex: best.index, value: best.set.weight ?? 0 }
+    }
 
-    case "reps":
-      // Find the set with the most reps
-      bestValue = completedSets.reduce((max, current) => {
-        return (current.set.reps ?? 0) > max ? (current.set.reps ?? 0) : max
-      }, 0)
-      bestSet = completedSets.find(({ set }) => (set.reps ?? 0) === bestValue)!
-      break
+    case "reps": {
+      // Only consider sets with a positive rep count
+      const setsWithReps = completedSets.filter(({ set }) => (set.reps ?? 0) > 0)
+      if (setsWithReps.length === 0) return null
+      const best = setsWithReps.reduce((acc, current) =>
+        (current.set.reps ?? 0) > (acc.set.reps ?? 0) ? current : acc
+      )
+      return { set: best.set, setIndex: best.index, value: best.set.reps ?? 0 }
+    }
 
-    case "volume":
-      // Find the set with the highest volume (weight × reps)
-      bestValue = completedSets.reduce((max, current) => {
-        const volume = (current.set.weight ?? 0) * (current.set.reps ?? 0)
-        return volume > max ? volume : max
-      }, 0)
-      bestSet = completedSets.find(({ set }) => (set.weight ?? 0) * (set.reps ?? 0) === bestValue)!
-      break
+    case "volume": {
+      // Only consider sets with both positive weight and reps
+      const setsWithVolume = completedSets.filter(
+        ({ set }) => (set.weight ?? 0) > 0 && (set.reps ?? 0) > 0
+      )
+      if (setsWithVolume.length === 0) return null
+      const best = setsWithVolume.reduce((acc, current) => {
+        const currentVol = (current.set.weight ?? 0) * (current.set.reps ?? 0)
+        const accVol = (acc.set.weight ?? 0) * (acc.set.reps ?? 0)
+        return currentVol > accVol ? current : acc
+      })
+      const value = (best.set.weight ?? 0) * (best.set.reps ?? 0)
+      return { set: best.set, setIndex: best.index, value }
+    }
   }
-
-  return { set: bestSet.set, setIndex: bestSet.index, value: bestValue }
 }
 
 // Evaluate a single exercise for a specific metric
