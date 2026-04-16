@@ -1,6 +1,7 @@
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { deriveWorkoutType } from "@/lib/workout-type"
 import type { WorkoutType } from "@/lib/workout-type"
+import { normalizeExerciseName } from "@/lib/workout-storage"
 
 export type TimeRange = "4W" | "8W" | "3M" | "6M" | "1Y" | "All"
 export type Aggregation = "session" | "week" | "month"
@@ -75,7 +76,8 @@ export function aggregateToSessions(history: MinimalWorkout[], exerciseName?: st
   for (const workout of sorted) {
     let volume = 0
     if (exerciseName) {
-      const ex = workout.exercises.find((e) => e.name === exerciseName)
+      const normalizedName = normalizeExerciseName(exerciseName)
+      const ex = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizedName)
       if (!ex) continue
       volume = ex.sets
         .filter((s) => isSetEligibleForStats(s))
