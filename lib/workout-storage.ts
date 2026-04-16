@@ -198,14 +198,16 @@ export function deleteWorkout(workoutId: string): void {
 
 export function getExerciseHistory(exerciseName: string): CompletedWorkout[] {
   const history = getWorkoutHistory()
-  return history.filter((workout) => workout.exercises.some((ex) => ex.name === exerciseName))
+  const normalizedName = normalizeExerciseName(exerciseName)
+  return history.filter((workout) => workout.exercises.some((ex) => normalizeExerciseName(ex.name) === normalizedName))
 }
 
 export function getExerciseIdForName(exerciseName: string): string | null {
   const history = getWorkoutHistory()
+  const normalizedName = normalizeExerciseName(exerciseName)
   for (const workout of history) {
     for (const ex of workout.exercises) {
-      if (ex.name === exerciseName && ex.id) return ex.id
+      if (normalizeExerciseName(ex.name) === normalizedName && ex.id) return ex.id
     }
   }
   return null
@@ -216,16 +218,18 @@ export function getLatestPerformance(exerciseName: string): Exercise | null {
   if (exerciseHistory.length === 0) return null
 
   const latestWorkout = exerciseHistory[0]
-  const exercise = latestWorkout.exercises.find((ex) => ex.name === exerciseName)
+  const normalizedName = normalizeExerciseName(exerciseName)
+  const exercise = latestWorkout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)
   return exercise || null
 }
 
 export function calculateExerciseStats(exerciseName: string) {
   const history = getExerciseHistory(exerciseName).slice(0, 10)
   if (history.length === 0) return null
+  const normalizedName = normalizeExerciseName(exerciseName)
 
   const dataPoints = history.map((workout) => {
-    const exercise = workout.exercises.find((ex) => ex.name === exerciseName)!
+    const exercise = workout.exercises.find((ex) => normalizeExerciseName(ex.name) === normalizedName)!
     const validSets = exercise.sets.filter((s) => isSetEligibleForStats(s))
     const maxWeight = validSets.length > 0 ? Math.max(...validSets.map((s) => s.weight ?? 0)) : 0
     const totalVolume = validSets.reduce((acc, set) => acc + (set.weight ?? 0) * (set.reps ?? 0), 0)
@@ -325,7 +329,7 @@ export type PerformanceMetrics = {
   setCount: number
 }
 
-function normalizeExerciseName(name: string): string {
+export function normalizeExerciseName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ")
 }
 

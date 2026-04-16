@@ -73,7 +73,7 @@ function formatMaxVol(v: number): string {
 
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { getExerciseHistory, getExerciseIdForName } from "@/lib/workout-storage"
+import { getExerciseHistory, getExerciseIdForName, normalizeExerciseName } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { getVolumeSeriesForExercise } from "@/lib/volume-analytics"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
@@ -149,7 +149,7 @@ export default function ExerciseHistoryPage() {
       : "unknown-date"
     const workoutName = workout?.name || "Unknown"
 
-    const exercise = workout.exercises.find((e) => e.name === exerciseName)
+    const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))
     const setSignature = exercise
       ? exercise.sets
           .filter((set) => set.completed)
@@ -450,7 +450,7 @@ export default function ExerciseHistoryPage() {
             {/* Set breakdown for session aggregation */}
             {aggregation === "session" && selectedPoint.workoutId && (() => {
               const workout = historyForDrilldown.find((w) => w.id === selectedPoint.workoutId)
-              const exercise = workout?.exercises.find((e) => e.name === exerciseName)
+              const exercise = workout?.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))
               if (!exercise) return null
               return (
                 <div>
@@ -504,7 +504,7 @@ export default function ExerciseHistoryPage() {
                   {(selectedPoint.workoutIds ?? []).map((wid) => {
                     const workout = rawHistory.find((w) => w.id === wid)
                     if (!workout) return null
-                    const exercise = workout.exercises.find((e) => e.name === exerciseName)
+                    const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))
                     const vol = exercise
                       ? exercise.sets
                           .filter((s) => isSetEligibleForStats(s))
@@ -538,7 +538,7 @@ export default function ExerciseHistoryPage() {
 
         {/* Workout history list */}
         {history.map((workout) => {
-          const exercise = workout.exercises.find((e) => e.name === exerciseName)!
+          const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))!
           const date = new Date(workout.date)
           const formattedDate = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
           const volume = exercise.sets
