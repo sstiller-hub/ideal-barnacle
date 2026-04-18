@@ -939,7 +939,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
     if (!hasInitialScrollRef.current) {
       hasInitialScrollRef.current = true
-      container.scrollLeft = scrollLeft
+      container.scrollTo({ left: scrollLeft, behavior: "instant" })
       return
     }
 
