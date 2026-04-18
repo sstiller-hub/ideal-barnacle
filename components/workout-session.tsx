@@ -202,6 +202,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingProgrammatically = useRef(false)
+  const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
@@ -919,10 +920,18 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   }, [currentExercise?.id, currentExercise?.sets?.length])
 
   useEffect(() => {
-    if (!scrollContainerRef.current || isScrollingProgrammatically.current) return
-    isScrollingProgrammatically.current = true
+    if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
     const scrollLeft = currentExerciseIndex * container.offsetWidth
+
+    if (!hasInitialScrollRef.current) {
+      hasInitialScrollRef.current = true
+      container.scrollLeft = scrollLeft
+      return
+    }
+
+    if (isScrollingProgrammatically.current) return
+    isScrollingProgrammatically.current = true
     container.scrollTo({ left: scrollLeft, behavior: "smooth" })
 
     const timeout = window.setTimeout(() => {
