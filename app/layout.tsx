@@ -61,12 +61,13 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Suspense fallback={children}>
-            <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
-          </Suspense>
-          <PortraitLock />
-          <SonnerProvider />
-          <UpdateAvailableBanner />
+          <PortraitLock>
+            <Suspense fallback={children}>
+              <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
+            </Suspense>
+            <SonnerProvider />
+            <UpdateAvailableBanner />
+          </PortraitLock>
         </ThemeProvider>
       </body>
     </html>

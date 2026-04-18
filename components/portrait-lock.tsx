@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 
 const LANDSCAPE_MOBILE_QUERY = "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)"
 
-export default function PortraitLock() {
+export default function PortraitLock({ children }: { children: React.ReactNode }) {
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
 
   useEffect(() => {
@@ -34,13 +34,23 @@ export default function PortraitLock() {
     }
   }, [])
 
-  if (!isLandscapeMobile) return null
+  if (!isLandscapeMobile) return <>{children}</>
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-background text-foreground flex items-center justify-center p-8 text-center">
-      <div className="max-w-xs space-y-3">
-        <h2 className="text-xl font-semibold">Portrait Mode Only</h2>
-        <p className="text-sm text-muted-foreground">Rotate your device back to portrait to continue.</p>
+    <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: "100vh",
+          height: "100vw",
+          transform: "translate(-50%, -50%) rotate(-90deg)",
+          transformOrigin: "center center",
+          overflow: "hidden",
+        }}
+      >
+        {children}
       </div>
     </div>
   )
