@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 const LANDSCAPE_MOBILE_QUERY = "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)"
 
 export default function PortraitLock({ children }: { children: React.ReactNode }) {
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
+  const pathname = usePathname()
+  const isWorkoutSession = pathname?.startsWith("/workout/session") ?? false
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -21,7 +24,7 @@ export default function PortraitLock({ children }: { children: React.ReactNode }
     const orientationApi = screen.orientation as ScreenOrientation & {
       lock?: (orientation: "portrait") => Promise<void>
     }
-    if (orientationApi.lock) {
+    if (orientationApi.lock && !isWorkoutSession) {
       orientationApi.lock("portrait").catch(() => {
         // Many browsers (especially iOS Safari) block orientation lock.
       })
@@ -32,9 +35,9 @@ export default function PortraitLock({ children }: { children: React.ReactNode }
       window.removeEventListener("orientationchange", update)
       window.removeEventListener("resize", update)
     }
-  }, [])
+  }, [isWorkoutSession])
 
-  if (!isLandscapeMobile) return <>{children}</>
+  if (!isLandscapeMobile || isWorkoutSession) return <>{children}</>
 
   return (
     <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden" }}>
