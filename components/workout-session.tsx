@@ -952,7 +952,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }, 400)
 
     return () => window.clearTimeout(timeout)
-  }, [currentExerciseIndex])
+  }, [currentExerciseIndex, isHydrated])
 
   useEffect(() => {
     if (!session?.startedAt) return
