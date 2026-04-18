@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 
 const LANDSCAPE_MOBILE_QUERY = "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)"
 
-export default function PortraitLock() {
+export default function PortraitLock({ children }: { children: ReactNode }) {
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
 
   useEffect(() => {
@@ -18,15 +18,6 @@ export default function PortraitLock() {
     window.addEventListener("orientationchange", update)
     window.addEventListener("resize", update)
 
-    const orientationApi = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: "portrait") => Promise<void>
-    }
-    if (orientationApi.lock) {
-      orientationApi.lock("portrait").catch(() => {
-        // Many browsers (especially iOS Safari) block orientation lock.
-      })
-    }
-
     return () => {
       mediaQuery.removeEventListener("change", update)
       window.removeEventListener("orientationchange", update)
@@ -34,13 +25,25 @@ export default function PortraitLock() {
     }
   }, [])
 
-  if (!isLandscapeMobile) return null
+  if (!isLandscapeMobile) return <>{children}</>
 
+  // Rotate the portrait-designed content -90° to fill the landscape viewport.
+  // In landscape: vw > vh. We size the inner box as (100vh × 100vw) — portrait
+  // dimensions — then center and rotate so it visually fills the landscape screen.
   return (
-    <div className="fixed inset-0 z-[9999] bg-background text-foreground flex items-center justify-center p-8 text-center">
-      <div className="max-w-xs space-y-3">
-        <h2 className="text-xl font-semibold">Portrait Mode Only</h2>
-        <p className="text-sm text-muted-foreground">Rotate your device back to portrait to continue.</p>
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "black" }}>
+      <div
+        style={{
+          position: "fixed",
+          width: "100vh",
+          height: "100vw",
+          top: "calc((100vh - 100vw) / 2)",
+          left: "calc((100vw - 100vh) / 2)",
+          transform: "rotate(-90deg)",
+          overflow: "hidden",
+        }}
+      >
+        {children}
       </div>
     </div>
   )
