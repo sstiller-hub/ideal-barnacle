@@ -51,6 +51,7 @@ import {
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
+import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
 import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown } from "lucide-react"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
@@ -183,6 +184,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
+  const [restExtensionTrend, setRestExtensionTrend] = useState<RestExtensionTrend | null>(null)
   const [validationTrigger, setValidationTrigger] = useState(0)
   const [focusedInput, setFocusedInput] = useState<string | null>(null)
   const [uiNow, setUiNow] = useState(() => Date.now())
@@ -851,6 +853,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       setUiNow(Date.now())
     }, 1000)
     return () => clearInterval(interval)
+  }, [isResting])
+
+  useEffect(() => {
+    if (isResting) {
+      setRestExtensionTrend(getRestExtensionTrend())
+    } else {
+      setRestExtensionTrend(null)
+    }
   }, [isResting])
 
   useEffect(() => {
@@ -1842,7 +1852,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 animate={{ opacity: restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1 }}
                 transition={restRemainingSeconds <= 10 ? { duration: 1, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
               >
-                <div className="text-white/35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em", paddingBottom: "3px" }}>REST</div>
+                <div className="flex flex-col items-start" style={{ paddingBottom: "3px" }}>
+                  <div className="text-white/35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
+                  {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
+                    <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "2px" }}>
+                      {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
+                    </div>
+                  )}
+                </div>
                 <div className="text-white leading-none" style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}>
                   {formatSeconds(restRemainingSeconds)}
                 </div>
@@ -1854,6 +1871,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     const next = restRemainingSeconds + 30
                     void setRestStateAndPersist({ ...restState, remainingSeconds: next })
                     scheduleRestNotification(next)
+                    recordRestExtension(session?.id ?? "unknown")
+                    setRestExtensionTrend(getRestExtensionTrend())
                   }}
                   style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "2px", padding: "5px 8px" }}
                   type="button"
@@ -2156,17 +2175,23 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     : { duration: 0.2, ease: "linear" }
                 }
               >
-                <div
-                  className="text-white/35"
-                  style={{
-                    fontSize: "8px",
-                    fontWeight: 600,
-                    letterSpacing: "0.12em",
-                    lineHeight: 1,
-                    paddingBottom: "5px",
-                  }}
-                >
-                  REST
+                <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
+                  <div
+                    className="text-white/35"
+                    style={{
+                      fontSize: "8px",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      lineHeight: 1,
+                    }}
+                  >
+                    REST
+                  </div>
+                  {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
+                    <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "3px" }}>
+                      {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
+                    </div>
+                  )}
                 </div>
                 <div
                   className="text-white leading-none"
@@ -2192,6 +2217,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       remainingSeconds: next,
                     })
                     scheduleRestNotification(next)
+                    recordRestExtension(session?.id ?? "unknown")
+                    setRestExtensionTrend(getRestExtensionTrend())
                   }}
                   className="transition-colors duration-150 hover:bg-white/10"
                   style={{
