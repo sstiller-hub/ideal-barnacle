@@ -2366,7 +2366,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           {exercises.map((exercise: any, exerciseIndex: number) => {
             const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
             const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
-            const isCompactSets = showPlateCalc && exercise.sets.length >= 4
+            const isCompactSets = exercise.sets.length >= 4
             const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
             const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
             const showProgressiveOverload =
