@@ -280,7 +280,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
-    const update = () => setIsLandscapeMobile(query.matches)
+    const update = () => {
+      hasInitialScrollRef.current = false
+      setIsLandscapeMobile(query.matches)
+    }
     update()
     query.addEventListener("change", update)
     window.addEventListener("orientationchange", update)
@@ -962,7 +965,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }, 400)
 
     return () => window.clearTimeout(timeout)
-  }, [currentExerciseIndex])
+  }, [currentExerciseIndex, isLandscapeMobile])
 
   useEffect(() => {
     if (!session?.startedAt) return
