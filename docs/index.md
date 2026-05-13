@@ -15,6 +15,10 @@
 ## Working with Codex
 - Codex standing instructions: /docs/codex-standing-instructions.md
 
+## Supabase
+- Migration checklist and Data API grants: /docs/supabase-migrations.md
+- Template: `supabase/MIGRATION_TEMPLATE.sql`
+
 ## Next Session Notes
 - Purpose: Explicit user authored notes for the next routine or exercise session.
 - UI: Routine note appears at the top of the session. Exercise note appears inside each exercise section.
