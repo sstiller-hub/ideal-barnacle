@@ -181,10 +181,15 @@ function asPayloadFromCompleted(
 ): { workout: any; sets: WorkoutSetDraft[]; exercises: Array<{ exercise_id: string; rating: ExerciseRating }> } {
   const resolvedWorkoutId = ensureWorkoutUuid(workout.id, map)
   const coerceToDatetime = (value: string): string => {
+    if (!value) return value
+    // Plain calendar date (YYYY-MM-DD) → midnight UTC.
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00.000Z`
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)) return value
+    // Normalize anything parseable (ISO with Z or offset, "YYYY-MM-DD HH:mm:ss",
+    // US m/d/Y, etc.) to a strict UTC instant the commit validator accepts.
     const parsed = new Date(value)
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
+    const reparsed = new Date(value.includes(" ") ? value.replace(" ", "T") : value)
+    if (!Number.isNaN(reparsed.getTime())) return reparsed.toISOString()
     return value
   }
   const startedAt = coerceToDatetime(workout.startedAt ?? workout.date)
@@ -247,26 +252,42 @@ function getServerUpdatedAt(server?: ServerMeta): number | null {
 }
 
 async function commitPayload(payload: { workout: any; sets: WorkoutSetDraft[] }, token: string) {
-  const response = await fetch("/api/workouts/commit", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    let message = `Commit failed (${response.status})`
-    try {
-      const error = JSON.parse(text)
-      message = error?.error || error?.message || message
-    } catch {
-      if (text) message = `${message}: ${text.slice(0, 160)}`
+  const maxAttempts = 6
+  for (let attempt = 1; ; attempt += 1) {
+    const response = await fetch("/api/workouts/commit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    // The commit endpoint is rate limited per user; bulk syncs hit it quickly.
+    // Respect Retry-After and back off instead of failing the workout.
+    if (response.status === 429 && attempt < maxAttempts) {
+      const retryAfter = Number(response.headers.get("Retry-After"))
+      const waitMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : Math.min(2000 * attempt, 15000)
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+      continue
     }
-    throw new Error(message)
+
+    if (!response.ok) {
+      const text = await response.text()
+      let message = `Commit failed (${response.status})`
+      try {
+        const error = JSON.parse(text)
+        message = error?.error || error?.message || message
+      } catch {
+        if (text) message = `${message}: ${text.slice(0, 160)}`
+      }
+      throw new Error(message)
+    }
+    return response.json().catch(() => ({}))
   }
-  return response.json().catch(() => ({}))
 }
 
 export async function runManualSync(options: ManualSyncOptions = {}): Promise<ManualSyncReport> {
