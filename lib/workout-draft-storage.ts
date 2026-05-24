@@ -15,6 +15,8 @@ export interface WorkoutSetDraft {
   updated_at_client: number
 }
 
+export type ExerciseRatingValue = "thumbs_up" | "thumbs_down" | null
+
 export interface ActiveWorkoutDraft {
   workout_id: string
   user_id: string
@@ -27,6 +29,7 @@ export interface ActiveWorkoutDraft {
   sync_state: SyncState
   last_sync_error?: string | null
   sets: WorkoutSetDraft[]
+  exercise_ratings?: Record<string, ExerciseRatingValue>
 }
 
 const DB_NAME = "akt-workout-drafts"

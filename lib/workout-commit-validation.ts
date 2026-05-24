@@ -31,6 +31,14 @@ export const workoutCommitSchema = z.object({
       })
     )
     .min(1),
+  exercises: z
+    .array(
+      z.object({
+        exercise_id: z.string().min(1),
+        rating: z.enum(["thumbs_up", "thumbs_down"]).nullable().optional(),
+      })
+    )
+    .optional(),
 })
 
 export type WorkoutCommitPayload = z.infer<typeof workoutCommitSchema>

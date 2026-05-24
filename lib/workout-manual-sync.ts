@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout, type ExerciseRating } from "@/lib/workout-storage"
 import {
   listAllWorkouts,
   markWorkoutError,
@@ -166,13 +166,19 @@ function asPayloadFromDraft(draft: ActiveWorkoutDraft) {
       schema_version: draft.schema_version,
     },
     sets: draft.sets,
+    exercises: draft.exercise_ratings
+      ? Object.entries(draft.exercise_ratings).map(([exercise_id, rating]) => ({
+          exercise_id,
+          rating,
+        }))
+      : undefined,
   }
 }
 
 function asPayloadFromCompleted(
   workout: CompletedWorkout,
   map: ManualIdMap
-): { workout: any; sets: WorkoutSetDraft[] } {
+): { workout: any; sets: WorkoutSetDraft[]; exercises: Array<{ exercise_id: string; rating: ExerciseRating }> } {
   const resolvedWorkoutId = ensureWorkoutUuid(workout.id, map)
   const coerceToDatetime = (value: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00.000Z`
@@ -186,8 +192,10 @@ function asPayloadFromCompleted(
   const updatedAtClient = Date.parse(completedAt) || Date.now()
 
   const sets: WorkoutSetDraft[] = []
+  const exercises: Array<{ exercise_id: string; rating: ExerciseRating }> = []
   workout.exercises.forEach((exercise) => {
     const exerciseId = exercise.id || exercise.name
+    exercises.push({ exercise_id: exerciseId, rating: exercise.rating ?? null })
     exercise.sets.forEach((set, index) => {
       const setKey = `${exerciseId}::${index}`
       const setId = ensureSetUuid(resolvedWorkoutId, setKey, map)
@@ -216,6 +224,7 @@ function asPayloadFromCompleted(
       schema_version: 1,
     },
     sets,
+    exercises,
   }
 }
 
