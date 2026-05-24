@@ -1591,10 +1591,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             routine_name: routine.name,
           })
         }
+        const exerciseRatings: Record<string, ExerciseRating> = {}
+        cleanedExercises.forEach((exercise: any) => {
+          const exId = exercise?.id || exercise?.name
+          if (exId) exerciseRatings[exId] = exercise.rating ?? null
+        })
         await updateWorkoutDraft(completedWorkoutId, {
           completed_at: completedAt,
           routine_id: routine.id,
           routine_name: routine.name,
+          exercise_ratings: exerciseRatings,
         })
         await markWorkoutPending(completedWorkoutId)
         const allSetDrafts: WorkoutSetDraft[] = []
