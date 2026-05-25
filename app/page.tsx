@@ -53,6 +53,7 @@ import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
+import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -251,6 +252,7 @@ export default function Home() {
   }, [weeklyVolumes, isInProgressSessionInCurrentWeek, currentWeekVolumeSoFar])
   const canCompareWeekOverWeek = !isInProgressSessionInCurrentWeek
   useEffect(() => {
+    runExerciseRenameMigration()
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
     setPrExcludedNames(getPrExcludedExercises())

@@ -60,7 +60,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
     createdAt: nowIso(),
     updatedAt: nowIso(),
     exercises: [
-      ex({ id: "upper1-incline-smith", name: "Incline Smith Machine Bench", type: "strength", targetSets: 4, targetReps: "6-9" }),
+      ex({ id: "upper1-incline-smith", name: "Incline Press Machine", type: "strength", targetSets: 4, targetReps: "6-9" }),
       ex({ id: "upper1-chest-press", name: "Machine Chest Press", type: "strength", targetSets: 3, targetReps: "8-10" }),
       ex({ id: "upper1-lat-pd", name: "Lat Pulldown", type: "strength", targetSets: 3, targetReps: "8-12" }),
       ex({
@@ -130,7 +130,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetReps: "12-15",
         targetWeight: 70,
       }),
-      ex({ id: "legs2-calf", name: "Standing / Machine Calf Raise", type: "strength", targetSets: 4, targetReps: "10-12" }),
+      ex({ id: "legs2-calf", name: "Machine Calf Raise", type: "strength", targetSets: 4, targetReps: "10-12" }),
       ex({ id: "legs2-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" }),
     ],
   },
@@ -182,7 +182,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 4,
         targetReps: "6-10",
       }),
-      ex({ id: "sa-incline-press", name: "Incline Machine Chest Press", type: "strength", targetSets: 3, targetReps: "8-10" }),
+      ex({ id: "sa-incline-press", name: "Wide Chest Press Machine", type: "strength", targetSets: 3, targetReps: "8-10" }),
       ex({
         id: "sa-rear-delt-single",
         name: "Rear Delt Fly (single-arm machine)",
