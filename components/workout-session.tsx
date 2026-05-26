@@ -207,6 +207,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isOrientationChangingRef = useRef(false)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const [, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -281,6 +282,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
     const update = () => {
+      if (scrollSettleTimeoutRef.current) {
+        clearTimeout(scrollSettleTimeoutRef.current)
+        scrollSettleTimeoutRef.current = null
+      }
+      isOrientationChangingRef.current = true
       hasInitialScrollRef.current = false
       setIsLandscapeMobile(query.matches)
     }
@@ -952,8 +958,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
     if (!hasInitialScrollRef.current) {
       hasInitialScrollRef.current = true
-      container.scrollTo({ left: scrollLeft, behavior: "instant" })
-      return
+      const rafId = requestAnimationFrame(() => {
+        const c = scrollContainerRef.current
+        if (!c) return
+        c.scrollTo({ left: currentExerciseIndex * c.offsetWidth, behavior: "instant" })
+        isOrientationChangingRef.current = false
+      })
+      return () => cancelAnimationFrame(rafId)
     }
 
     if (isScrollingProgrammatically.current) return
@@ -1452,6 +1463,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const container = scrollContainerRef.current
     if (!container) return
 
+    if (isOrientationChangingRef.current) return
+
     if (isScrollingProgrammatically.current) {
       isScrollingProgrammatically.current = false
     }
@@ -1945,7 +1958,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               return (
                 <button
                   key={ex.id}
-                  onClick={() => setUiExerciseIndex(index)}
+                  onClick={() => void setExerciseIndex(index)}
                   type="button"
                   className="transition-all duration-200"
                   style={{
