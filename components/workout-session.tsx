@@ -281,6 +281,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
+    let orientationResetTimeout: ReturnType<typeof setTimeout> | null = null
     const update = () => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
@@ -289,6 +290,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       isOrientationChangingRef.current = true
       hasInitialScrollRef.current = false
       setIsLandscapeMobile(query.matches)
+      // Safety reset: if the matchMedia value doesn't change (e.g.
+      // orientationchange fires without flipping landscape/portrait), the
+      // scroll effect's deps stay equal and its RAF — which normally clears
+      // this flag — never runs. Without this fallback, handleScroll stays
+      // blocked forever and swipes can't advance the carousel.
+      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
+      orientationResetTimeout = setTimeout(() => {
+        isOrientationChangingRef.current = false
+      }, 300)
     }
     update()
     query.addEventListener("change", update)
@@ -296,6 +306,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => {
       query.removeEventListener("change", update)
       window.removeEventListener("orientationchange", update)
+      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
     }
   }, [])
 
