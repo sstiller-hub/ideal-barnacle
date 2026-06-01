@@ -965,22 +965,41 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   useEffect(() => {
     if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
-    const scrollLeft = currentExerciseIndex * container.offsetWidth
 
     if (!hasInitialScrollRef.current) {
-      hasInitialScrollRef.current = true
-      const rafId = requestAnimationFrame(() => {
+      // Restore the carousel to the persisted exercise after a (re)mount or
+      // orientation change. Rotating back from landscape remounts this
+      // container with scrollLeft 0, and the new portrait layout width is not
+      // always ready on the first animation frame — reading offsetWidth too
+      // early resolves to 0 and scrolls to exercise 0. Retry across frames
+      // until the width is known, then scroll, and only re-enable handleScroll
+      // one frame later (via isOrientationChangingRef). That way the transient
+      // scrollLeft 0 the browser reports during the relayout — and the scroll
+      // event emitted by our own scrollTo — are never persisted as index 0.
+      let rafId = 0
+      let attempts = 0
+      const restore = () => {
         const c = scrollContainerRef.current
         if (!c) return
-        c.scrollTo({ left: currentExerciseIndex * c.offsetWidth, behavior: "instant" })
-        isOrientationChangingRef.current = false
-      })
+        const width = c.offsetWidth
+        if (width === 0 && attempts < 20) {
+          attempts += 1
+          rafId = requestAnimationFrame(restore)
+          return
+        }
+        c.scrollTo({ left: currentExerciseIndex * width, behavior: "instant" })
+        hasInitialScrollRef.current = true
+        rafId = requestAnimationFrame(() => {
+          isOrientationChangingRef.current = false
+        })
+      }
+      rafId = requestAnimationFrame(restore)
       return () => cancelAnimationFrame(rafId)
     }
 
     if (isScrollingProgrammatically.current) return
     isScrollingProgrammatically.current = true
-    container.scrollTo({ left: scrollLeft, behavior: "smooth" })
+    container.scrollTo({ left: currentExerciseIndex * container.offsetWidth, behavior: "smooth" })
 
     const timeout = window.setTimeout(() => {
       isScrollingProgrammatically.current = false
@@ -1483,7 +1502,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (scrollRafRef.current) return
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null
-      const pageWidth = container.offsetWidth || 1
+      const pageWidth = container.offsetWidth
+      // Mid-relayout (e.g. an orientation flip) the container can briefly
+      // report a 0 width and scrollLeft 0. Ignore those frames so a spurious
+      // exercise index 0 is never written to the session.
+      if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
       if (nextIndex !== uiExerciseIndex) {
         setUiExerciseIndex(nextIndex)
