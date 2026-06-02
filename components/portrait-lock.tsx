@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 
 const LANDSCAPE_MOBILE_QUERY = "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)"
 
-export default function PortraitLock({ children }: { children: React.ReactNode }) {
+export default function PortraitLock({ children }: { children: ReactNode }) {
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
   const pathname = usePathname()
   const isWorkoutSession = pathname?.startsWith("/workout/session") ?? false
@@ -21,15 +21,6 @@ export default function PortraitLock({ children }: { children: React.ReactNode }
     window.addEventListener("orientationchange", update)
     window.addEventListener("resize", update)
 
-    const orientationApi = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: "portrait") => Promise<void>
-    }
-    if (orientationApi.lock && !isWorkoutSession) {
-      orientationApi.lock("portrait").catch(() => {
-        // Many browsers (especially iOS Safari) block orientation lock.
-      })
-    }
-
     return () => {
       mediaQuery.removeEventListener("change", update)
       window.removeEventListener("orientationchange", update)
@@ -39,6 +30,9 @@ export default function PortraitLock({ children }: { children: React.ReactNode }
 
   if (!isLandscapeMobile || isWorkoutSession) return <>{children}</>
 
+  // Rotate the portrait-designed content -90° to fill the landscape viewport.
+  // In landscape: vw > vh. We size the inner box as (100vh × 100vw) — portrait
+  // dimensions — then center and rotate so it visually fills the landscape screen.
   return (
     <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden" }}>
       <div
