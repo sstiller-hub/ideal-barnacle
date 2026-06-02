@@ -9,6 +9,8 @@ type WorkoutExerciseInsert = {
   name: string
   sort_index: number
   updated_at: string
+  rating: "thumbs_up" | "thumbs_down" | null
+  rating_at: string | null
 }
 
 export async function POST(request: Request) {
@@ -42,9 +44,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const { workout, sets } = payload
+    const { workout, sets, exercises } = payload
     const performedAt = workout.completed_at ?? workout.started_at
     const now = new Date().toISOString()
+
+    const ratingByExerciseId = new Map<string, "thumbs_up" | "thumbs_down" | null>()
+    ;(exercises ?? []).forEach((exercise) => {
+      ratingByExerciseId.set(exercise.exercise_id, exercise.rating ?? null)
+    })
 
     const workoutRow = {
       id: workout.workout_id,
@@ -88,12 +95,15 @@ export async function POST(request: Request) {
     })
 
     Array.from(exerciseMap.entries()).forEach(([exerciseId, name], index) => {
+      const rating = ratingByExerciseId.get(exerciseId) ?? null
       exerciseRows.push({
         workout_id: workout.workout_id,
         exercise_id: exerciseId,
         name,
         sort_index: index,
         updated_at: now,
+        rating,
+        rating_at: rating ? now : null,
       })
     })
 

@@ -31,6 +31,7 @@ type WorkoutExercise = {
   target_reps?: number | string
   targetWeight?: number | string
   target_weight?: number | string
+  rating?: "thumbs_up" | "thumbs_down" | null
   sets?: WorkoutSet[]
 }
 
@@ -193,21 +194,26 @@ async function upsertWorkoutGraph(workout: WorkoutPayload, userId: string) {
     : []
   if (exercises.length === 0) return
 
-  const exerciseRows = exercises.map((ex, idx) => ({
-    workout_id: persistedWorkoutId,
-    exercise_id:
-      ex?.id ||
-      ex?.exerciseId ||
-      ex?.exercise_id ||
-      ex?.name ||
-      `exercise-${idx}`,
-    name: ex?.name || "Exercise",
-    target_sets: ex?.targetSets ?? ex?.target_sets ?? null,
-    target_reps: ex?.targetReps ?? ex?.target_reps ?? null,
-    target_weight: ex?.targetWeight ?? ex?.target_weight ?? null,
-    sort_index: idx,
-    updated_at: new Date().toISOString(),
-  }))
+  const exerciseRows = exercises.map((ex, idx) => {
+    const rating = ex?.rating === "thumbs_up" || ex?.rating === "thumbs_down" ? ex.rating : null
+    return {
+      workout_id: persistedWorkoutId,
+      exercise_id:
+        ex?.id ||
+        ex?.exerciseId ||
+        ex?.exercise_id ||
+        ex?.name ||
+        `exercise-${idx}`,
+      name: ex?.name || "Exercise",
+      target_sets: ex?.targetSets ?? ex?.target_sets ?? null,
+      target_reps: ex?.targetReps ?? ex?.target_reps ?? null,
+      target_weight: ex?.targetWeight ?? ex?.target_weight ?? null,
+      sort_index: idx,
+      updated_at: new Date().toISOString(),
+      rating,
+      rating_at: rating ? new Date().toISOString() : null,
+    }
+  })
 
   const { data: insertedExercises, error: exErr } = await supabase
     .from("workout_exercises")

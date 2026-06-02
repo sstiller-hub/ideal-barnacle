@@ -51,6 +51,7 @@ import {
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
+import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
 import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown } from "lucide-react"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
@@ -183,6 +184,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
+  const [restExtensionTrend, setRestExtensionTrend] = useState<RestExtensionTrend | null>(null)
   const [validationTrigger, setValidationTrigger] = useState(0)
   const [focusedInput, setFocusedInput] = useState<string | null>(null)
   const [uiNow, setUiNow] = useState(() => Date.now())
@@ -202,8 +204,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingProgrammatically = useRef(false)
+  const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isOrientationChangingRef = useRef(false)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const [, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -221,6 +225,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const sessionRef = useRef<WorkoutSession | null>(null)
   const exercisesRef = useRef<any[]>([])
   const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
+  const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
   const currentExerciseIndexRef = useRef(0)
   const historyRepsCacheRef = useRef<Map<string, number[]>>(new Map())
   const maxSetVolumeByExercise = useMemo(() => {
@@ -273,6 +278,37 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   useEffect(() => {
     exercisesRef.current = exercises
   }, [exercises])
+
+  useEffect(() => {
+    const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
+    let orientationResetTimeout: ReturnType<typeof setTimeout> | null = null
+    const update = () => {
+      if (scrollSettleTimeoutRef.current) {
+        clearTimeout(scrollSettleTimeoutRef.current)
+        scrollSettleTimeoutRef.current = null
+      }
+      isOrientationChangingRef.current = true
+      hasInitialScrollRef.current = false
+      setIsLandscapeMobile(query.matches)
+      // Safety reset: if the matchMedia value doesn't change (e.g.
+      // orientationchange fires without flipping landscape/portrait), the
+      // scroll effect's deps stay equal and its RAF — which normally clears
+      // this flag — never runs. Without this fallback, handleScroll stays
+      // blocked forever and swipes can't advance the carousel.
+      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
+      orientationResetTimeout = setTimeout(() => {
+        isOrientationChangingRef.current = false
+      }, 300)
+    }
+    update()
+    query.addEventListener("change", update)
+    window.addEventListener("orientationchange", update)
+    return () => {
+      query.removeEventListener("change", update)
+      window.removeEventListener("orientationchange", update)
+      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
+    }
+  }, [])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -840,6 +876,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   }, [isResting])
 
   useEffect(() => {
+    if (isResting) {
+      setRestExtensionTrend(getRestExtensionTrend())
+    } else {
+      setRestExtensionTrend(null)
+    }
+  }, [isResting])
+
+  useEffect(() => {
     if (!isResting) return
     if (restRemainingSeconds <= 0) {
       void setRestStateAndPersist(null)
@@ -919,18 +963,50 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   }, [currentExercise?.id, currentExercise?.sets?.length])
 
   useEffect(() => {
-    if (!scrollContainerRef.current || isScrollingProgrammatically.current) return
-    isScrollingProgrammatically.current = true
+    if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
-    const scrollLeft = currentExerciseIndex * container.offsetWidth
-    container.scrollTo({ left: scrollLeft, behavior: "smooth" })
+
+    if (!hasInitialScrollRef.current) {
+      // Restore the carousel to the persisted exercise after a (re)mount or
+      // orientation change. Rotating back from landscape remounts this
+      // container with scrollLeft 0, and the new portrait layout width is not
+      // always ready on the first animation frame — reading offsetWidth too
+      // early resolves to 0 and scrolls to exercise 0. Retry across frames
+      // until the width is known, then scroll, and only re-enable handleScroll
+      // one frame later (via isOrientationChangingRef). That way the transient
+      // scrollLeft 0 the browser reports during the relayout — and the scroll
+      // event emitted by our own scrollTo — are never persisted as index 0.
+      let rafId = 0
+      let attempts = 0
+      const restore = () => {
+        const c = scrollContainerRef.current
+        if (!c) return
+        const width = c.offsetWidth
+        if (width === 0 && attempts < 20) {
+          attempts += 1
+          rafId = requestAnimationFrame(restore)
+          return
+        }
+        c.scrollTo({ left: currentExerciseIndex * width, behavior: "instant" })
+        hasInitialScrollRef.current = true
+        rafId = requestAnimationFrame(() => {
+          isOrientationChangingRef.current = false
+        })
+      }
+      rafId = requestAnimationFrame(restore)
+      return () => cancelAnimationFrame(rafId)
+    }
+
+    if (isScrollingProgrammatically.current) return
+    isScrollingProgrammatically.current = true
+    container.scrollTo({ left: currentExerciseIndex * container.offsetWidth, behavior: "smooth" })
 
     const timeout = window.setTimeout(() => {
       isScrollingProgrammatically.current = false
     }, 400)
 
     return () => window.clearTimeout(timeout)
-  }, [currentExerciseIndex])
+  }, [currentExerciseIndex, isLandscapeMobile])
 
   useEffect(() => {
     if (!session?.startedAt) return
@@ -1370,6 +1446,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     await saveSession(updatedSession)
     signalAutoSaved()
 
+    const workoutNowFinishable = newExercises.every((ex: any) => canExerciseBeFinished(ex))
+    if (workoutNowFinishable) shouldStartRest = false
+
     if (shouldAutoRest && shouldStartRest) {
       const restSeconds =
         restSecondsToStart ??
@@ -1417,6 +1496,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const container = scrollContainerRef.current
     if (!container) return
 
+    if (isOrientationChangingRef.current) return
+
     if (isScrollingProgrammatically.current) {
       isScrollingProgrammatically.current = false
     }
@@ -1424,7 +1505,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (scrollRafRef.current) return
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null
-      const pageWidth = container.offsetWidth || 1
+      const pageWidth = container.offsetWidth
+      // Mid-relayout (e.g. an orientation flip) the container can briefly
+      // report a 0 width and scrollLeft 0. Ignore those frames so a spurious
+      // exercise index 0 is never written to the session.
+      if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
       if (nextIndex !== uiExerciseIndex) {
         setUiExerciseIndex(nextIndex)
@@ -1556,10 +1641,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             routine_name: routine.name,
           })
         }
+        const exerciseRatings: Record<string, ExerciseRating> = {}
+        cleanedExercises.forEach((exercise: any) => {
+          const exId = exercise?.id || exercise?.name
+          if (exId) exerciseRatings[exId] = exercise.rating ?? null
+        })
         await updateWorkoutDraft(completedWorkoutId, {
           completed_at: completedAt,
           routine_id: routine.id,
           routine_name: routine.name,
+          exercise_ratings: exerciseRatings,
         })
         await markWorkoutPending(completedWorkoutId)
         const allSetDrafts: WorkoutSetDraft[] = []
@@ -1778,6 +1869,333 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     )
   }
 
+  if (isLandscapeMobile) {
+    const lsExercise = exercises[uiExerciseIndex]
+    if (!lsExercise) return null
+    const lsCurrentSetIndex = lsExercise.sets.findIndex((s: any) => !s.completed)
+    const lsActiveSetIndex = lsCurrentSetIndex === -1 ? 0 : lsCurrentSetIndex
+    const lsCanEdit = uiExerciseIndex <= currentExerciseIndex
+
+    return (
+      <div
+        className="flex flex-col"
+        style={{
+          height: "100dvh",
+          background: "#0D0D0F",
+          paddingLeft: "env(safe-area-inset-left, 0px)",
+          paddingRight: "env(safe-area-inset-right, 0px)",
+        }}
+      >
+        {/* Rest timer overlay */}
+        <AnimatePresence>
+          {isResting && restState ? (
+            <motion.div
+              key="rest-dock-ls"
+              className="fixed z-[70] flex items-center justify-between gap-3 border"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8, transition: { duration: 0.2, ease: "easeOut" } }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              style={{
+                left: "calc(16px + env(safe-area-inset-left, 0px))",
+                right: "calc(16px + env(safe-area-inset-right, 0px))",
+                bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+                borderColor: restRemainingSeconds <= 10 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)",
+                background: "rgba(0,0,0,0.75)",
+                borderRadius: "14px",
+                padding: "6px 10px",
+              }}
+            >
+              <motion.div
+                className="flex items-end gap-2"
+                animate={{ opacity: restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1 }}
+                transition={restRemainingSeconds <= 10 ? { duration: 1, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+              >
+                <div className="flex flex-col items-start" style={{ paddingBottom: "3px" }}>
+                  <div className="text-white/35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
+                  {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
+                    <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "2px" }}>
+                      {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
+                    </div>
+                  )}
+                </div>
+                <div className="text-white leading-none" style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}>
+                  {formatSeconds(restRemainingSeconds)}
+                </div>
+              </motion.div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!isResting || !restState) return
+                    const next = restRemainingSeconds + 30
+                    void setRestStateAndPersist({ ...restState, remainingSeconds: next })
+                    scheduleRestNotification(next)
+                    recordRestExtension(session?.id ?? "unknown")
+                    setRestExtensionTrend(getRestExtensionTrend())
+                  }}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "2px", padding: "5px 8px" }}
+                  type="button"
+                >
+                  <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
+                </button>
+                <button
+                  onClick={() => void setRestStateAndPersist(null)}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "2px", padding: "5px 10px" }}
+                  type="button"
+                >
+                  <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>SKIP</span>
+                </button>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {/* Header */}
+        <div style={{ padding: "10px 16px 6px", flexShrink: 0 }}>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExit} type="button" style={{ flexShrink: 0 }}>
+              <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+            </button>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1
+                className="text-white/95"
+                style={{ fontSize: "20px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}
+                onClick={() => router.push(`/exercise/${encodeURIComponent(lsExercise.name)}?from=session`)}
+              >
+                {getExerciseLabel(lsExercise.name)}
+              </h1>
+              <div className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {formatSeconds(elapsedSeconds)}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
+              <div className="text-center">
+                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
+                <div className="text-white/70" style={{ fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{totalSetsCompleted}/{totalSets}</div>
+              </div>
+              <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.06)" }} />
+              <button
+                onClick={() => { if (!canFinishWorkout) return; void finishWorkout() }}
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  color: canFinishWorkout ? "#000" : "rgba(255,255,255,0.25)",
+                  background: canFinishWorkout ? "#fff" : "transparent",
+                  borderRadius: canFinishWorkout ? "4px" : "0",
+                  padding: canFinishWorkout ? "5px 10px" : "0",
+                  transition: "all 0.2s",
+                }}
+                type="button"
+                disabled={!canFinishWorkout}
+              >
+                FINISH
+              </button>
+            </div>
+          </div>
+
+          {/* Exercise navigation dots */}
+          <div className="flex items-center justify-center gap-1.5 mt-2">
+            {exercises.map((ex: any, index: number) => {
+              const isComplete = ex.sets.every((s: any) => s.completed && !isSetIncomplete(s))
+              const isCurrent = index === uiExerciseIndex
+              return (
+                <button
+                  key={ex.id}
+                  onClick={() => void setExerciseIndex(index)}
+                  type="button"
+                  className="transition-all duration-200"
+                  style={{
+                    width: isCurrent ? "20px" : "5px",
+                    height: "5px",
+                    background: isCurrent ? "rgba(255,255,255,0.5)" : isComplete ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
+                    borderRadius: "3px",
+                    border: "none",
+                  }}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)", margin: "0 16px", flexShrink: 0 }} />
+
+        {/* Sets list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 64px" }}>
+          {lsExercise.sets.map((set: any, setIndex: number) => {
+            const setKey = set.id ?? `${lsExercise.id}-${setIndex}`
+            const isCurrentSet = setIndex === lsActiveSetIndex
+            const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
+            const missingWeight = isMissingWeight(set.weight)
+            const missingReps = isMissingReps(set.reps)
+            const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
+            const lastSet = getMostRecentCompletedSetPerformance(lsExercise.name, setIndex, session?.id)
+            const comparison = getSetComparison(
+              set, lastSet,
+              maxSetVolumeByExercise.get(normalizeExerciseName(lsExercise.name)) ?? 0
+            )
+
+            return (
+              <div
+                key={setKey}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 0",
+                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  opacity: isCurrentSet ? 1 : set.completed ? 0.45 : 0.65,
+                }}
+              >
+                {/* Set number */}
+                <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", color: "rgba(255,255,255,0.3)", fontFamily: "'Archivo Narrow', sans-serif", minWidth: "28px", flexShrink: 0 }}>
+                  SET {setIndex + 1}
+                </div>
+
+                {/* Weight input */}
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="number"
+                    value={set.weight ?? ""}
+                    onChange={(e) => {
+                      if (!lsCanEdit) return
+                      const raw = e.target.value
+                      if (!raw.trim()) { void updateSetDataForExercise(uiExerciseIndex, setIndex, "weight", null); return }
+                      const parsed = parseNumber(raw)
+                      if (parsed === null || parsed < 0) return
+                      void updateSetDataForExercise(uiExerciseIndex, setIndex, "weight", parsed)
+                    }}
+                    onFocus={(e) => {
+                      if (set.id) handleSetFieldFocus(set.id, "weight")
+                      handleInputAutoSelect(e)
+                      setFocusedInput(`${setKey}-weight`)
+                    }}
+                    onBlur={() => {
+                      if (set.id) handleSetFieldBlur(set.id, "weight")
+                      setFocusedInput(null)
+                    }}
+                    placeholder="—"
+                    disabled={!lsCanEdit}
+                    className="w-full"
+                    style={{
+                      background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${showMissing && missingWeight ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.2)" : "transparent"}`,
+                      borderRadius: "2px", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
+                      color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
+                      fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
+                    }}
+                  />
+                  <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.06em", color: "rgba(255,255,255,0.25)", textAlign: "center", marginTop: "2px" }}>LBS</div>
+                </div>
+
+                {/* Reps input */}
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="number"
+                    value={set.reps ?? ""}
+                    onChange={(e) => {
+                      if (!lsCanEdit) return
+                      const raw = e.target.value
+                      if (!raw.trim()) { setRepCapErrors((prev) => ({ ...prev, [setKey]: false })); void updateSetDataForExercise(uiExerciseIndex, setIndex, "reps", null); return }
+                      const parsed = parseNumber(raw)
+                      if (parsed === null) return
+                      if (parsed > REP_MAX) { setRepCapErrors((prev) => ({ ...prev, [setKey]: true })); return }
+                      setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+                      void updateSetDataForExercise(uiExerciseIndex, setIndex, "reps", Math.max(REP_MIN, parsed))
+                    }}
+                    onFocus={(e) => {
+                      if (set.id) handleSetFieldFocus(set.id, "reps")
+                      handleInputAutoSelect(e)
+                      setFocusedInput(`${setKey}-reps`)
+                    }}
+                    onBlur={() => {
+                      if (set.id) handleSetFieldBlur(set.id, "reps")
+                      setFocusedInput(null)
+                    }}
+                    placeholder="—"
+                    disabled={!lsCanEdit}
+                    className="w-full"
+                    style={{
+                      background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${(repCapError || (showMissing && missingReps)) ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.2)" : "transparent"}`,
+                      borderRadius: "2px", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
+                      color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
+                      fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
+                    }}
+                  />
+                  <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.06em", color: "rgba(255,255,255,0.25)", textAlign: "center", marginTop: "2px" }}>REPS</div>
+                </div>
+
+                {/* Complete button */}
+                <button
+                  onClick={() => {
+                    if (!lsCanEdit) return
+                    if (!set.completed && (isSetIncomplete(set) || repCapError)) { setValidationTrigger(Date.now()); return }
+                    void completeSet(setIndex, { exerciseIndex: uiExerciseIndex, startRest: isCurrentSet && uiExerciseIndex === currentExerciseIndex })
+                  }}
+                  disabled={!lsCanEdit || (!set.completed && (isSetIncomplete(set) || repCapError))}
+                  className="flex items-center justify-center"
+                  style={{
+                    width: "32px", height: "32px",
+                    background: set.completed ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                    border: "none", borderRadius: "2px", flexShrink: 0,
+                    opacity: !lsCanEdit || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
+                  }}
+                  type="button"
+                  aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
+                >
+                  {set.completed ? (
+                    <Check size={14} strokeWidth={2} style={{ color: "rgba(255,255,255,0.8)" }} />
+                  ) : (
+                    <div style={{ width: "10px", height: "10px", borderRadius: "1px", border: "1px solid rgba(255,255,255,0.35)" }} />
+                  )}
+                </button>
+
+                {/* Last set comparison */}
+                {lastSet && (
+                  <div style={{ minWidth: "72px", flexShrink: 0 }}>
+                    <div style={{ fontSize: "8px", fontWeight: 400, color: "rgba(255,255,255,0.2)", fontVariantNumeric: "tabular-nums" }}>
+                      Last: {lastSet.weight}×{lastSet.reps}
+                    </div>
+                    {comparison?.status !== "no-history" && comparison?.message && (
+                      <div style={{
+                        fontSize: "8px",
+                        fontWeight: comparison?.status === "pr" ? 600 : 400,
+                        color: comparison?.status === "pr" ? "rgba(255,255,255,0.9)" : comparison?.status === "progressed" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.25)",
+                        letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
+                      }}>
+                        {comparison.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Validation error */}
+                {(repCapError || showMissing) && (
+                  <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+                    <AlertCircle size={8} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)" }} />
+                    <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)" }}>
+                      {repCapError ? `Max ${REP_MAX}` : missingWeight ? "Enter weight" : "Enter reps"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <style>{`
+          input[type="number"]::-webkit-inner-spin-button,
+          input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+          input[type="number"] { -moz-appearance: textfield; }
+        `}</style>
+      </div>
+    )
+  }
+
   return (
     <div
       className="flex flex-col relative overflow-hidden"
@@ -1825,17 +2243,23 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     : { duration: 0.2, ease: "linear" }
                 }
               >
-                <div
-                  className="text-white/35"
-                  style={{
-                    fontSize: "8px",
-                    fontWeight: 600,
-                    letterSpacing: "0.12em",
-                    lineHeight: 1,
-                    paddingBottom: "5px",
-                  }}
-                >
-                  REST
+                <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
+                  <div
+                    className="text-white/35"
+                    style={{
+                      fontSize: "8px",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      lineHeight: 1,
+                    }}
+                  >
+                    REST
+                  </div>
+                  {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
+                    <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "3px" }}>
+                      {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
+                    </div>
+                  )}
                 </div>
                 <div
                   className="text-white leading-none"
@@ -1861,6 +2285,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       remainingSeconds: next,
                     })
                     scheduleRestNotification(next)
+                    recordRestExtension(session?.id ?? "unknown")
+                    setRestExtensionTrend(getRestExtensionTrend())
                   }}
                   className="transition-colors duration-150 hover:bg-white/10"
                   style={{
@@ -1940,12 +2366,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 if (!canFinishWorkout) return
                 void finishWorkout()
               }}
-              className="transition-colors"
+              className="transition-all duration-200"
               style={{
                 fontSize: "9px",
-                fontWeight: 600,
+                fontWeight: 700,
                 letterSpacing: "0.08em",
-                color: canFinishWorkout ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.25)",
+                color: canFinishWorkout ? "#000" : "rgba(255, 255, 255, 0.25)",
+                background: canFinishWorkout ? "#fff" : "transparent",
+                borderRadius: canFinishWorkout ? "5px" : "0",
+                padding: canFinishWorkout ? "6px 12px" : "0",
               }}
               type="button"
               disabled={!canFinishWorkout}
@@ -2005,7 +2434,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           {exercises.map((exercise: any, exerciseIndex: number) => {
             const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
             const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
-            const isCompactSets = showPlateCalc && exercise.sets.length >= 4
+            const isCompactSets = exercise.sets.length >= 4
             const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
             const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
             const showProgressiveOverload =

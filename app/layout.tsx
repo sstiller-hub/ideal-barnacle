@@ -65,9 +65,9 @@ export default function RootLayout({
             <Suspense fallback={children}>
               <MobilePreviewWrapper>{children}</MobilePreviewWrapper>
             </Suspense>
+            <SonnerProvider />
+            <UpdateAvailableBanner />
           </PortraitLock>
-          <SonnerProvider />
-          <UpdateAvailableBanner />
         </ThemeProvider>
       </body>
     </html>

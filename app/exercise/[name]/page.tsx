@@ -182,6 +182,57 @@ export default function ExerciseHistoryPage() {
     [rawHistory, exerciseName, timeRange, aggregation, typeFilter]
   )
 
+  const ratingTrend = useMemo(() => {
+    const sessions = history
+      .map((workout) => {
+        const exercise = workout.exercises.find(
+          (e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName)
+        )
+        const topWeight = exercise
+          ? exercise.sets
+              .filter((s) => isSetEligibleForStats(s))
+              .reduce((max, s) => Math.max(max, s.weight ?? 0), 0)
+          : 0
+        return { date: workout.date, rating: exercise?.rating ?? null, topWeight }
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+    const rated = sessions.filter((s) => s.rating === "thumbs_up" || s.rating === "thumbs_down")
+    const good = rated.filter((s) => s.rating === "thumbs_up").length
+    const rough = rated.length - good
+    const pctGood = rated.length > 0 ? Math.round((good / rated.length) * 100) : 0
+
+    let direction: "better" | "rougher" | "steady" | null = null
+    let recentPct = 0
+    let olderPct = 0
+    if (rated.length >= 4) {
+      const recentCount = Math.min(5, Math.floor(rated.length / 2))
+      const recent = rated.slice(-recentCount)
+      const older = rated.slice(0, rated.length - recentCount)
+      if (older.length > 0) {
+        const pct = (group: typeof rated) =>
+          Math.round((group.filter((s) => s.rating === "thumbs_up").length / group.length) * 100)
+        recentPct = pct(recent)
+        olderPct = pct(older)
+        const delta = recentPct - olderPct
+        direction = delta >= 15 ? "better" : delta <= -15 ? "rougher" : "steady"
+      }
+    }
+
+    const avg = (values: number[]) =>
+      values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0
+    const goodWeights = rated.filter((s) => s.rating === "thumbs_up" && s.topWeight > 0).map((s) => s.topWeight)
+    const roughWeights = rated.filter((s) => s.rating === "thumbs_down" && s.topWeight > 0).map((s) => s.topWeight)
+    const goodAvgWeight = Math.round(avg(goodWeights))
+    const roughAvgWeight = Math.round(avg(roughWeights))
+    const weightInsight =
+      goodWeights.length >= 2 && roughWeights.length >= 2 && Math.abs(roughAvgWeight - goodAvgWeight) >= 5
+        ? { roughHeavier: roughAvgWeight > goodAvgWeight, goodAvgWeight, roughAvgWeight }
+        : null
+
+    return { sessions, ratedCount: rated.length, good, rough, pctGood, direction, recentPct, olderPct, weightInsight }
+  }, [history, exerciseName])
+
   const chartW = 400
   const chartH = 100
   const maxVolume = Math.max(...annotatedSeries.map((p) => p.volume), 0)
@@ -531,6 +582,90 @@ export default function ExerciseHistoryPage() {
                     {selectedPoint.sessionCount} session{selectedPoint.sessionCount !== 1 ? "s" : ""}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Felt ratings trend */}
+        {ratingTrend.ratedCount > 0 && (
+          <div
+            style={{
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "14px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "7px",
+                fontWeight: 500,
+                letterSpacing: "0.18em",
+                fontFamily: "'Archivo Narrow', sans-serif",
+                color: "rgba(255,255,255,0.25)",
+                marginBottom: "10px",
+              }}
+            >
+              FELT RATINGS
+            </div>
+
+            <div style={{ display: "flex", alignItems: "baseline", gap: "16px", marginBottom: "12px" }}>
+              <div>
+                <span style={{ fontSize: "22px", fontWeight: 600, color: "rgba(255,255,255,0.92)", letterSpacing: "-0.02em" }}>
+                  {ratingTrend.pctGood}%
+                </span>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginLeft: "6px" }}>felt good</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", fontSize: "11px" }}>
+                <span style={{ color: "rgba(52, 211, 153, 0.75)" }}>{ratingTrend.good} good</span>
+                <span style={{ color: "rgba(251, 191, 36, 0.75)" }}>{ratingTrend.rough} rough</span>
+              </div>
+            </div>
+
+            {/* Chronological timeline */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: ratingTrend.direction || ratingTrend.weightInsight ? "12px" : 0 }}>
+              {ratingTrend.sessions.slice(-40).map((s, i) => (
+                <div
+                  key={i}
+                  title={`${new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} — ${
+                    s.rating === "thumbs_up" ? "Good" : s.rating === "thumbs_down" ? "Rough" : "Unrated"
+                  }`}
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "2px",
+                    background:
+                      s.rating === "thumbs_up"
+                        ? "rgba(52, 211, 153, 0.7)"
+                        : s.rating === "thumbs_down"
+                        ? "rgba(251, 191, 36, 0.7)"
+                        : "rgba(255, 255, 255, 0.08)",
+                  }}
+                />
+              ))}
+            </div>
+
+            {ratingTrend.direction && (
+              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+                {ratingTrend.direction === "better" && (
+                  <span style={{ color: "rgba(52, 211, 153, 0.8)" }}>Trending better</span>
+                )}
+                {ratingTrend.direction === "rougher" && (
+                  <span style={{ color: "rgba(251, 191, 36, 0.8)" }}>Trending rougher</span>
+                )}
+                {ratingTrend.direction === "steady" && <span>Holding steady</span>}
+                {ratingTrend.direction === "steady"
+                  ? ` — around ${ratingTrend.recentPct}% good lately`
+                  : ` — ${ratingTrend.recentPct}% good recently vs ${ratingTrend.olderPct}% earlier`}
+              </div>
+            )}
+
+            {ratingTrend.weightInsight && (
+              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginTop: "4px" }}>
+                {ratingTrend.weightInsight.roughHeavier
+                  ? `Rough sessions averaged ${ratingTrend.weightInsight.roughAvgWeight} lbs vs ${ratingTrend.weightInsight.goodAvgWeight} lbs when it felt good`
+                  : `Good sessions averaged ${ratingTrend.weightInsight.goodAvgWeight} lbs vs ${ratingTrend.weightInsight.roughAvgWeight} lbs when it felt rough`}
               </div>
             )}
           </div>

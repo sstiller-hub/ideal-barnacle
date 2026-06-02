@@ -5,8 +5,8 @@ import { ChevronLeft, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from "react"
-import { getWorkoutHistory, deleteWorkout, type CompletedWorkout } from "@/lib/workout-storage"
+import { useState, useEffect, useMemo } from "react"
+import { getWorkoutHistory, deleteWorkout, normalizeExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 
 export default function HistoryPage() {
   const router = useRouter()
@@ -18,6 +18,29 @@ export default function HistoryPage() {
     setWorkouts(history)
     setLoading(false)
   }, [])
+
+  const ratingSummary = useMemo(() => {
+    const byExercise = new Map<string, { name: string; good: number; rough: number }>()
+    workouts.forEach((workout) => {
+      workout.exercises.forEach((exercise) => {
+        if (exercise.rating !== "thumbs_up" && exercise.rating !== "thumbs_down") return
+        const key = normalizeExerciseName(exercise.name)
+        const entry = byExercise.get(key) ?? { name: exercise.name, good: 0, rough: 0 }
+        if (exercise.rating === "thumbs_up") entry.good += 1
+        else entry.rough += 1
+        byExercise.set(key, entry)
+      })
+    })
+    const all = Array.from(byExercise.values()).map((entry) => {
+      const total = entry.good + entry.rough
+      return { ...entry, total, pctGood: Math.round((entry.good / total) * 100) }
+    })
+    const rough = all
+      .filter((entry) => entry.total >= 2 && entry.pctGood <= 50)
+      .sort((a, b) => a.pctGood - b.pctGood || b.rough - a.rough)
+      .slice(0, 5)
+    return { hasAny: all.length > 0, rough }
+  }, [workouts])
 
   const handleDelete = (workoutId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -103,6 +126,42 @@ export default function HistoryPage() {
           </Card>
         ) : (
           <div className="space-y-3">
+            {ratingSummary.hasAny && (
+              <Card className="p-4">
+                <h2 className="font-semibold text-foreground mb-1">Felt ratings</h2>
+                {ratingSummary.rough.length > 0 ? (
+                  <>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Exercises that tend to feel rough
+                    </p>
+                    <div className="space-y-3">
+                      {ratingSummary.rough.map((entry) => (
+                        <div key={entry.name}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-foreground">{entry.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {entry.pctGood}% good · {entry.rough} rough of {entry.total}
+                            </span>
+                          </div>
+                          <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              style={{ width: `${entry.pctGood}%`, background: "rgba(52, 211, 153, 0.7)" }}
+                            />
+                            <div
+                              style={{ width: `${100 - entry.pctGood}%`, background: "rgba(251, 191, 36, 0.7)" }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No exercises consistently feel rough — nice work.
+                  </p>
+                )}
+              </Card>
+            )}
             {workouts.map((workout) => (
               <Card key={workout.id} className="p-4 relative hover:bg-accent/50 transition-colors">
                 <button

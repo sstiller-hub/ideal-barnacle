@@ -9,8 +9,8 @@ const numericOrNull = z
 export const workoutCommitSchema = z.object({
   workout: z.object({
     workout_id: z.string().uuid(),
-    started_at: z.string().datetime(),
-    completed_at: z.string().datetime().nullable().optional(),
+    started_at: z.string().datetime({ offset: true }),
+    completed_at: z.string().datetime({ offset: true }).nullable().optional(),
     routine_id: z.string().optional().nullable(),
     routine_name: z.string().optional().nullable(),
     updated_at_client: z.number().int(),
@@ -31,6 +31,14 @@ export const workoutCommitSchema = z.object({
       })
     )
     .min(1),
+  exercises: z
+    .array(
+      z.object({
+        exercise_id: z.string().min(1),
+        rating: z.enum(["thumbs_up", "thumbs_down"]).nullable().optional(),
+      })
+    )
+    .optional(),
 })
 
 export type WorkoutCommitPayload = z.infer<typeof workoutCommitSchema>

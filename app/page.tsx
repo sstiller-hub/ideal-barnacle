@@ -53,6 +53,7 @@ import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
+import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
 
 // Helper function for relative date formatting
 function getRelativeDate(dateStr: string | null): string {
@@ -205,6 +206,22 @@ export default function Home() {
   const currentWeekVolume = weeklyVolumes[weeklyVolumes.length - 1] ?? 0
   const previousWeekVolume = weeklyVolumes[weeklyVolumes.length - 2] ?? 0
 
+  const weeklyFeltRatings = useMemo(() => {
+    const { start, end } = getWeekRange(new Date())
+    let good = 0
+    let rough = 0
+    for (const workout of workoutHistory) {
+      if (!workout.date) continue
+      const d = new Date(workout.date)
+      if (d < start || d >= end) continue
+      for (const ex of (workout.exercises ?? [])) {
+        if (ex.rating === "thumbs_up") good++
+        else if (ex.rating === "thumbs_down") rough++
+      }
+    }
+    return { good, rough }
+  }, [workoutHistory, getWeekRange])
+
   const inProgressSessionVolume = useMemo(() => {
     if (!session?.exercises) return 0
     return session.exercises.reduce((sum: number, exercise: any) => {
@@ -235,6 +252,7 @@ export default function Home() {
   }, [weeklyVolumes, isInProgressSessionInCurrentWeek, currentWeekVolumeSoFar])
   const canCompareWeekOverWeek = !isInProgressSessionInCurrentWeek
   useEffect(() => {
+    runExerciseRenameMigration()
     const currentSession = getCurrentInProgressSession()
     setSession(currentSession)
     setPrExcludedNames(getPrExcludedExercises())
@@ -1347,6 +1365,37 @@ export default function Home() {
                 </div>
               </div>
             </div>
+            {(weeklyFeltRatings.good > 0 || weeklyFeltRatings.rough > 0) && (
+              <div className="flex items-center gap-3 mt-3">
+                <div
+                  className="text-white/20"
+                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  FEEL
+                </div>
+                <div className="flex items-center gap-2">
+                  {weeklyFeltRatings.good > 0 && (
+                    <span
+                      className="text-white/60"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      {weeklyFeltRatings.good} GOOD
+                    </span>
+                  )}
+                  {weeklyFeltRatings.good > 0 && weeklyFeltRatings.rough > 0 && (
+                    <span className="text-white/15" style={{ fontSize: "7px" }}>·</span>
+                  )}
+                  {weeklyFeltRatings.rough > 0 && (
+                    <span
+                      className="text-white/40"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      {weeklyFeltRatings.rough} ROUGH
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
