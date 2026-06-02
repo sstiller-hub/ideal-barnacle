@@ -1446,6 +1446,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     await saveSession(updatedSession)
     signalAutoSaved()
 
+    const workoutNowFinishable = newExercises.every((ex: any) => canExerciseBeFinished(ex))
+    if (workoutNowFinishable) shouldStartRest = false
+
     if (shouldAutoRest && shouldStartRest) {
       const restSeconds =
         restSecondsToStart ??
@@ -1975,7 +1978,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.06)" }} />
               <button
                 onClick={() => { if (!canFinishWorkout) return; void finishWorkout() }}
-                style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em", color: canFinishWorkout ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.25)" }}
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  color: canFinishWorkout ? "#000" : "rgba(255,255,255,0.25)",
+                  background: canFinishWorkout ? "#fff" : "transparent",
+                  borderRadius: canFinishWorkout ? "4px" : "0",
+                  padding: canFinishWorkout ? "5px 10px" : "0",
+                  transition: "all 0.2s",
+                }}
                 type="button"
                 disabled={!canFinishWorkout}
               >
@@ -2354,12 +2366,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 if (!canFinishWorkout) return
                 void finishWorkout()
               }}
-              className="transition-colors"
+              className="transition-all duration-200"
               style={{
                 fontSize: "9px",
-                fontWeight: 600,
+                fontWeight: 700,
                 letterSpacing: "0.08em",
-                color: canFinishWorkout ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.25)",
+                color: canFinishWorkout ? "#000" : "rgba(255, 255, 255, 0.25)",
+                background: canFinishWorkout ? "#fff" : "transparent",
+                borderRadius: canFinishWorkout ? "5px" : "0",
+                padding: canFinishWorkout ? "6px 12px" : "0",
               }}
               type="button"
               disabled={!canFinishWorkout}
