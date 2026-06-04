@@ -384,13 +384,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const canExerciseBeFinished = (exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
     if (sets.length === 0) return true
-    const lastSetIndex = sets.length - 1
-    return sets.every((set: any, index: number) => {
-      if (set.completed) {
-        return !isSetIncomplete(set)
-      }
-      return index === lastSetIndex
-    })
+    return sets.every((set: any) => set.completed && !isSetIncomplete(set))
   }
 
   const getCachedHistoryReps = (exerciseName: string) => {
