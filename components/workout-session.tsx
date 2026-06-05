@@ -1667,15 +1667,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         })
         await upsertAllSets(completedWorkoutId, allSetDrafts)
         setSyncState("syncing")
-        const result = await attemptWorkoutSync({ workoutId: completedWorkoutId })
-        setSyncState(result.status)
-        if (result.status === "synced") {
-          setLastSyncedAt(result.syncedAt ?? new Date().toISOString())
-        }
+        void attemptWorkoutSync({ workoutId: completedWorkoutId }).then((result) => {
+          setSyncState(result.status)
+          if (result.status === "synced") {
+            setLastSyncedAt(result.syncedAt ?? new Date().toISOString())
+          }
+        })
       }
     } catch (error) {
       console.warn("Workout commit failed", error)
-      await markWorkoutError(completedWorkoutId, "Commit failed")
+      void markWorkoutError(completedWorkoutId, "Commit failed")
       setSyncState("error")
     }
 
@@ -1688,7 +1689,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         restTimer: undefined,
         exercises: cleanedExercises,
       }
-      await saveSession(completedSession)
+      void saveSession(completedSession)
     }
 
     deleteSetsForSession(session.id)
