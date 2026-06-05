@@ -96,10 +96,12 @@ function collapseMirroredSixSetPattern<T extends { reps: number | null; weight: 
 }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {
-  const d = new Date(date)
   if (aggregation === "month") {
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    const [year, month] = date.split("-").map(Number)
+    return new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
+  const [year, month, day] = date.split("-").map(Number)
+  const d = new Date(year, month - 1, day)
   if (aggregation === "week") {
     return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
   }

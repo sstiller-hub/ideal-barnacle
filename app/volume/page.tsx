@@ -96,13 +96,13 @@ function formatMaxVol(v: number): string {
 type VolumePoint = { date: string; volume: number }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {
-  const d = new Date(date)
   if (aggregation === "month") {
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    const [year, month] = date.split("-").map(Number)
+    return new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
+  const [year, month, day] = date.split("-").map(Number)
+  const d = new Date(year, month - 1, day)
   if (aggregation === "week") {
-    const end = new Date(d)
-    end.setDate(end.getDate() + 6)
     return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
   }
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
