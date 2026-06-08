@@ -342,7 +342,7 @@ export async function pullSupabaseToLocal() {
     const { data: ex, error: exErr } = await supabase
       .from("workout_exercises")
       .select(
-        "id, exercise_id, name, target_sets, target_reps, target_weight, sort_index"
+        "id, exercise_id, name, target_sets, target_reps, target_weight, sort_index, rating"
       )
       .eq("workout_id", w.id)
       .order("sort_index", { ascending: true })
@@ -390,6 +390,7 @@ export async function pullSupabaseToLocal() {
         targetSets: e.target_sets ?? undefined,
         targetReps: e.target_reps ?? undefined,
         targetWeight: e.target_weight ?? undefined,
+        rating: e.rating ?? null,
         sets: setsByExerciseId.get(e.id) || [],
         completed: true,
       })),
@@ -471,7 +472,7 @@ export async function pullWorkoutsForExerciseId(exerciseId: string): Promise<voi
   for (const w of workouts) {
     const { data: ex, error: exErr } = await supabase
       .from("workout_exercises")
-      .select("id, exercise_id, name, target_sets, target_reps, target_weight, sort_index")
+      .select("id, exercise_id, name, target_sets, target_reps, target_weight, sort_index, rating")
       .eq("workout_id", w.id)
       .order("sort_index", { ascending: true })
 
@@ -517,6 +518,7 @@ export async function pullWorkoutsForExerciseId(exerciseId: string): Promise<voi
         targetSets: e.target_sets ?? undefined,
         targetReps: e.target_reps ?? undefined,
         targetWeight: e.target_weight ?? undefined,
+        rating: e.rating ?? null,
         sets: setsByExerciseId.get(e.id) || [],
         completed: true,
       })),
