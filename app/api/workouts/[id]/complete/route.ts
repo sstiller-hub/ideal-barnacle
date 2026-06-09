@@ -7,6 +7,13 @@ import {
   isNewBest,
   type CompletedSetRecord,
 } from "@/lib/workout-analytics"
+import {
+  buildStallAlertContent,
+  detectProgressStall,
+  type DeloadRange,
+  type ExerciseSessionInput,
+} from "@/lib/progressive-overload"
+import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 type WorkoutExerciseRow = {
@@ -121,7 +128,7 @@ export async function POST(
 
   const { data: historyExercises, error: historyExerciseError } = await supabase
     .from("workout_exercises")
-    .select("id, exercise_id, name, workout_id, workouts!inner(user_id)")
+    .select("id, exercise_id, name, workout_id, workouts!inner(user_id, performed_at)")
     .in("exercise_id", uniqueExerciseIds)
     .eq("workouts.user_id", userId)
 
@@ -129,11 +136,12 @@ export async function POST(
     return NextResponse.json({ error: historyExerciseError.message }, { status: 500 })
   }
 
-  const historyExercisesList = (historyExercises || []) as Array<{
+  const historyExercisesList = (historyExercises || []) as unknown as Array<{
     id: string
     exercise_id: string
     name: string
     workout_id: string
+    workouts: { user_id: string; performed_at: string }
   }>
 
   const historyExerciseIds = historyExercisesList.map((ex) => ex.id)
@@ -147,9 +155,37 @@ export async function POST(
     return NextResponse.json({ error: historySetError.message }, { status: 500 })
   }
 
-  const historyExerciseById = new Map<string, { exercise_id: string; workout_id: string }>()
+  const historyExerciseById = new Map<
+    string,
+    { exercise_id: string; workout_id: string; performed_at: string }
+  >()
   historyExercisesList.forEach((ex) => {
-    historyExerciseById.set(ex.id, { exercise_id: ex.exercise_id, workout_id: ex.workout_id })
+    historyExerciseById.set(ex.id, {
+      exercise_id: ex.exercise_id,
+      workout_id: ex.workout_id,
+      performed_at: ex.workouts?.performed_at ?? "",
+    })
+  })
+
+  const sessionsByExercise = new Map<string, Map<string, ExerciseSessionInput>>()
+  ;(historySets || []).forEach((row: WorkoutSetRow) => {
+    const exerciseInfo = historyExerciseById.get(row.workout_exercise_id)
+    if (!exerciseInfo || !exerciseInfo.performed_at) return
+    let byWorkout = sessionsByExercise.get(exerciseInfo.exercise_id)
+    if (!byWorkout) {
+      byWorkout = new Map()
+      sessionsByExercise.set(exerciseInfo.exercise_id, byWorkout)
+    }
+    let session = byWorkout.get(exerciseInfo.workout_id)
+    if (!session) {
+      session = {
+        workoutId: exerciseInfo.workout_id,
+        performedAt: exerciseInfo.performed_at,
+        sets: [],
+      }
+      byWorkout.set(exerciseInfo.workout_id, session)
+    }
+    session.sets.push({ reps: row.reps, weight: row.weight, completed: row.completed })
   })
 
   const previousBestE1rm = new Map<string, { value: number; set: WorkoutSetRow }>()
@@ -263,8 +299,128 @@ export async function POST(
     return NextResponse.json({ error: workoutUpdateError.message }, { status: 500 })
   }
 
+  // Progressive-overload stall detection. Failures here must never break the
+  // analytics response — the alert is a nudge, not part of the commit path.
+  try {
+    await generateProgressStallAlerts({
+      supabase,
+      userId,
+      workoutId,
+      exercises,
+      sessionsByExercise,
+    })
+  } catch (error) {
+    console.error("Progressive overload detection failed:", error)
+  }
+
   return NextResponse.json({
     total_volume_lb: totalVolume,
     pr_count: prCount,
   })
+}
+
+const STALL_FLAGS = ["STALE", "REGRESSION"] as const
+const NUDGE_COOLDOWN_DAYS = 7
+// Cap nudges per completion so a backlog of stalls doesn't flood the banner;
+// the rest surface on later workouts once the cooldown clears the queue.
+const MAX_ALERTS_PER_WORKOUT = 3
+
+async function generateProgressStallAlerts(params: {
+  supabase: ReturnType<typeof getSupabaseAdmin>
+  userId: string
+  workoutId: string
+  exercises: WorkoutExerciseRow[]
+  sessionsByExercise: Map<string, Map<string, ExerciseSessionInput>>
+}) {
+  const { supabase, userId, workoutId, exercises, sessionsByExercise } = params
+
+  const { data: deloadRows, error: deloadError } = await supabase
+    .from("deload_weeks")
+    .select("started_at, ends_at")
+    .eq("user_id", userId)
+
+  if (deloadError) throw new Error(deloadError.message)
+
+  const now = Date.now()
+  const deloadRanges: DeloadRange[] = (deloadRows || []).map((row) => ({
+    start: row.started_at,
+    end: row.ends_at,
+  }))
+  const inActiveDeload = deloadRanges.some((range) => {
+    const start = Date.parse(range.start)
+    const end = Date.parse(range.end)
+    return !Number.isNaN(start) && !Number.isNaN(end) && now >= start && now <= end
+  })
+  // During a deload the user is intentionally not progressing — stay quiet.
+  if (inActiveDeload) return
+
+  const cooldownStart = new Date(now - NUDGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const { data: recentAlerts, error: recentError } = await supabase
+    .from("workout_alerts")
+    .select("exercise_name, context")
+    .eq("user_id", userId)
+    .in("flag", STALL_FLAGS as unknown as string[])
+    .gte("created_at", cooldownStart)
+
+  if (recentError) throw new Error(recentError.message)
+
+  const recentlyNudged = new Set<string>()
+  ;(recentAlerts || []).forEach((alert) => {
+    const contextExerciseId = (alert.context as Record<string, unknown> | null)?.exercise_id
+    if (typeof contextExerciseId === "string") recentlyNudged.add(contextExerciseId)
+    if (alert.exercise_name) recentlyNudged.add(alert.exercise_name)
+  })
+
+  const evaluated = new Set<string>()
+  const candidates: Array<{
+    stalledSessions: number
+    row: {
+      user_id: string
+      workout_id: string
+      exercise_name: string
+      flag: string
+      tier: number
+      message: string
+      action: string
+      context: Record<string, unknown>
+    }
+  }> = []
+
+  exercises.forEach((exercise) => {
+    if (evaluated.has(exercise.exercise_id)) return
+    evaluated.add(exercise.exercise_id)
+    if (isWarmupExercise(exercise.name)) return
+    if (recentlyNudged.has(exercise.exercise_id) || recentlyNudged.has(exercise.name)) return
+
+    const sessions = sessionsByExercise.get(exercise.exercise_id)
+    if (!sessions) return
+
+    const result = detectProgressStall(Array.from(sessions.values()), { deloadRanges })
+    if (!result) return
+
+    const content = buildStallAlertContent(exercise.exercise_id, exercise.name, result)
+    candidates.push({
+      stalledSessions: result.stalledSessions,
+      row: {
+        user_id: userId,
+        workout_id: workoutId,
+        exercise_name: exercise.name,
+        flag: content.flag,
+        tier: content.tier,
+        message: content.message,
+        action: content.action,
+        context: content.context,
+      },
+    })
+  })
+
+  if (candidates.length === 0) return
+
+  const alertRows = candidates
+    .sort((a, b) => a.row.tier - b.row.tier || b.stalledSessions - a.stalledSessions)
+    .slice(0, MAX_ALERTS_PER_WORKOUT)
+    .map((candidate) => candidate.row)
+
+  const { error: insertError } = await supabase.from("workout_alerts").insert(alertRows)
+  if (insertError) throw new Error(insertError.message)
 }
