@@ -122,181 +122,205 @@ export async function POST(
   const totalVolume = computeWorkoutVolume(currentSets)
   const currentExerciseVolumes = computeExerciseSessionVolumes(currentSets)
 
-  const uniqueExerciseIds = Array.from(
-    new Set(exercises.map((ex) => ex.exercise_id))
-  )
+  // Persist the headline volume FIRST, before the PR/history/stall work below.
+  // That work issues its own queries (notably large `.in(...)` history lookups
+  // that grow with the user's training history and can fail once they exceed
+  // request limits). If volume were only written at the end, any such failure
+  // would abort the route and leave total_volume_lb at its default of 0 — the
+  // exact "stats and volume show 0" bug: session counts and locally-computed
+  // numbers stay correct while every Supabase-backed volume reads 0.
+  const { error: volumeUpdateError } = await supabase
+    .from("workouts")
+    .update({ total_volume_lb: totalVolume })
+    .eq("id", workoutId)
 
-  const { data: historyExercises, error: historyExerciseError } = await supabase
-    .from("workout_exercises")
-    .select("id, exercise_id, name, workout_id, workouts!inner(user_id, performed_at)")
-    .in("exercise_id", uniqueExerciseIds)
-    .eq("workouts.user_id", userId)
-
-  if (historyExerciseError) {
-    return NextResponse.json({ error: historyExerciseError.message }, { status: 500 })
+  if (volumeUpdateError) {
+    return NextResponse.json({ error: volumeUpdateError.message }, { status: 500 })
   }
 
-  const historyExercisesList = (historyExercises || []) as unknown as Array<{
-    id: string
-    exercise_id: string
-    name: string
-    workout_id: string
-    workouts: { user_id: string; performed_at: string }
-  }>
-
-  const historyExerciseIds = historyExercisesList.map((ex) => ex.id)
-  const { data: historySets, error: historySetError } = await supabase
-    .from("workout_sets")
-    .select("workout_exercise_id, set_index, reps, weight, completed")
-    .in("workout_exercise_id", historyExerciseIds)
-    .eq("completed", true)
-
-  if (historySetError) {
-    return NextResponse.json({ error: historySetError.message }, { status: 500 })
-  }
-
-  const historyExerciseById = new Map<
-    string,
-    { exercise_id: string; workout_id: string; performed_at: string }
-  >()
-  historyExercisesList.forEach((ex) => {
-    historyExerciseById.set(ex.id, {
-      exercise_id: ex.exercise_id,
-      workout_id: ex.workout_id,
-      performed_at: ex.workouts?.performed_at ?? "",
-    })
-  })
-
+  // PR detection and progressive-overload analysis are best-effort enrichment.
+  // A failure here must never undo the volume already persisted above, so the
+  // whole block is isolated: on error we log and return the volume we have.
+  let prCount = 0
   const sessionsByExercise = new Map<string, Map<string, ExerciseSessionInput>>()
-  ;(historySets || []).forEach((row: WorkoutSetRow) => {
-    const exerciseInfo = historyExerciseById.get(row.workout_exercise_id)
-    if (!exerciseInfo || !exerciseInfo.performed_at) return
-    let byWorkout = sessionsByExercise.get(exerciseInfo.exercise_id)
-    if (!byWorkout) {
-      byWorkout = new Map()
-      sessionsByExercise.set(exerciseInfo.exercise_id, byWorkout)
+  try {
+    const uniqueExerciseIds = Array.from(
+      new Set(exercises.map((ex) => ex.exercise_id))
+    )
+
+    const { data: historyExercises, error: historyExerciseError } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id, name, workout_id, workouts!inner(user_id, performed_at)")
+      .in("exercise_id", uniqueExerciseIds)
+      .eq("workouts.user_id", userId)
+
+    if (historyExerciseError) {
+      throw new Error(historyExerciseError.message)
     }
-    let session = byWorkout.get(exerciseInfo.workout_id)
-    if (!session) {
-      session = {
-        workoutId: exerciseInfo.workout_id,
-        performedAt: exerciseInfo.performed_at,
-        sets: [],
+
+    const historyExercisesList = (historyExercises || []) as unknown as Array<{
+      id: string
+      exercise_id: string
+      name: string
+      workout_id: string
+      workouts: { user_id: string; performed_at: string }
+    }>
+
+    const historyExerciseIds = historyExercisesList.map((ex) => ex.id)
+    const { data: historySets, error: historySetError } = await supabase
+      .from("workout_sets")
+      .select("workout_exercise_id, set_index, reps, weight, completed")
+      .in("workout_exercise_id", historyExerciseIds)
+      .eq("completed", true)
+
+    if (historySetError) {
+      throw new Error(historySetError.message)
+    }
+
+    const historyExerciseById = new Map<
+      string,
+      { exercise_id: string; workout_id: string; performed_at: string }
+    >()
+    historyExercisesList.forEach((ex) => {
+      historyExerciseById.set(ex.id, {
+        exercise_id: ex.exercise_id,
+        workout_id: ex.workout_id,
+        performed_at: ex.workouts?.performed_at ?? "",
+      })
+    })
+
+    ;(historySets || []).forEach((row: WorkoutSetRow) => {
+      const exerciseInfo = historyExerciseById.get(row.workout_exercise_id)
+      if (!exerciseInfo || !exerciseInfo.performed_at) return
+      let byWorkout = sessionsByExercise.get(exerciseInfo.exercise_id)
+      if (!byWorkout) {
+        byWorkout = new Map()
+        sessionsByExercise.set(exerciseInfo.exercise_id, byWorkout)
       }
-      byWorkout.set(exerciseInfo.workout_id, session)
-    }
-    session.sets.push({ reps: row.reps, weight: row.weight, completed: row.completed })
-  })
+      let session = byWorkout.get(exerciseInfo.workout_id)
+      if (!session) {
+        session = {
+          workoutId: exerciseInfo.workout_id,
+          performedAt: exerciseInfo.performed_at,
+          sets: [],
+        }
+        byWorkout.set(exerciseInfo.workout_id, session)
+      }
+      session.sets.push({ reps: row.reps, weight: row.weight, completed: row.completed })
+    })
 
-  const previousBestE1rm = new Map<string, { value: number; set: WorkoutSetRow }>()
-  const previousBestVolume = new Map<string, number>()
-  const volumeByExerciseSession = new Map<string, number>()
+    const previousBestE1rm = new Map<string, { value: number; set: WorkoutSetRow }>()
+    const previousBestVolume = new Map<string, number>()
+    const volumeByExerciseSession = new Map<string, number>()
 
-  ;(historySets || []).forEach((row: WorkoutSetRow) => {
-    if (!row.completed) return
-    const exerciseInfo = historyExerciseById.get(row.workout_exercise_id)
-    if (!exerciseInfo) return
-    if (exerciseInfo.workout_id === workoutId) return
-    if (typeof row.reps !== "number" || typeof row.weight !== "number") return
-    if (row.reps <= 0 || row.weight <= 0) return
+    ;(historySets || []).forEach((row: WorkoutSetRow) => {
+      if (!row.completed) return
+      const exerciseInfo = historyExerciseById.get(row.workout_exercise_id)
+      if (!exerciseInfo) return
+      if (exerciseInfo.workout_id === workoutId) return
+      if (typeof row.reps !== "number" || typeof row.weight !== "number") return
+      if (row.reps <= 0 || row.weight <= 0) return
 
-    const e1rmValue = row.weight * (1 + row.reps / 30)
-    const currentBest = previousBestE1rm.get(exerciseInfo.exercise_id)
-    if (!currentBest || e1rmValue > currentBest.value) {
-      previousBestE1rm.set(exerciseInfo.exercise_id, { value: e1rmValue, set: row })
-    }
+      const e1rmValue = row.weight * (1 + row.reps / 30)
+      const currentBest = previousBestE1rm.get(exerciseInfo.exercise_id)
+      if (!currentBest || e1rmValue > currentBest.value) {
+        previousBestE1rm.set(exerciseInfo.exercise_id, { value: e1rmValue, set: row })
+      }
 
-    const volume = row.reps * row.weight
-    const sessionKey = `${exerciseInfo.exercise_id}::${exerciseInfo.workout_id}`
-    const sessionVolume = volumeByExerciseSession.get(sessionKey) ?? 0
-    volumeByExerciseSession.set(sessionKey, sessionVolume + volume)
-  })
+      const volume = row.reps * row.weight
+      const sessionKey = `${exerciseInfo.exercise_id}::${exerciseInfo.workout_id}`
+      const sessionVolume = volumeByExerciseSession.get(sessionKey) ?? 0
+      volumeByExerciseSession.set(sessionKey, sessionVolume + volume)
+    })
 
-  volumeByExerciseSession.forEach((volume, sessionKey) => {
-    const [exerciseId] = sessionKey.split("::")
-    const currentBest = previousBestVolume.get(exerciseId) ?? 0
-    if (volume > currentBest) {
-      previousBestVolume.set(exerciseId, volume)
-    }
-  })
+    volumeByExerciseSession.forEach((volume, sessionKey) => {
+      const [exerciseId] = sessionKey.split("::")
+      const currentBest = previousBestVolume.get(exerciseId) ?? 0
+      if (volume > currentBest) {
+        previousBestVolume.set(exerciseId, volume)
+      }
+    })
 
-  await supabase.from("workout_prs").delete().eq("workout_id", workoutId)
+    await supabase.from("workout_prs").delete().eq("workout_id", workoutId)
 
-  const prRows: Array<{
-    user_id: string
-    workout_id: string
-    exercise_id: string
-    exercise_name: string
-    pr_type: "e1rm" | "volume"
-    value: number
-    previous_value: number | null
-    context: Record<string, unknown>
-  }> = []
+    const prRows: Array<{
+      user_id: string
+      workout_id: string
+      exercise_id: string
+      exercise_name: string
+      pr_type: "e1rm" | "volume"
+      value: number
+      previous_value: number | null
+      context: Record<string, unknown>
+    }> = []
 
-  const currentExerciseGroups = new Map<string, CompletedSetRecord[]>()
-  currentSets.forEach((set) => {
-    if (!currentExerciseGroups.has(set.exerciseId)) {
-      currentExerciseGroups.set(set.exerciseId, [])
-    }
-    currentExerciseGroups.get(set.exerciseId)?.push(set)
-  })
+    const currentExerciseGroups = new Map<string, CompletedSetRecord[]>()
+    currentSets.forEach((set) => {
+      if (!currentExerciseGroups.has(set.exerciseId)) {
+        currentExerciseGroups.set(set.exerciseId, [])
+      }
+      currentExerciseGroups.get(set.exerciseId)?.push(set)
+    })
 
-  currentExerciseGroups.forEach((sets, exerciseId) => {
-    const exerciseName = sets[0]?.exerciseName || "Exercise"
-    const bestSet = computeBestE1rmSet(sets)
-    if (bestSet) {
-      const previous = previousBestE1rm.get(exerciseId)?.value ?? null
-      if (isNewBest(bestSet.value, previous)) {
+    currentExerciseGroups.forEach((sets, exerciseId) => {
+      const exerciseName = sets[0]?.exerciseName || "Exercise"
+      const bestSet = computeBestE1rmSet(sets)
+      if (bestSet) {
+        const previous = previousBestE1rm.get(exerciseId)?.value ?? null
+        if (isNewBest(bestSet.value, previous)) {
+          prRows.push({
+            user_id: userId,
+            workout_id: workoutId,
+            exercise_id: exerciseId,
+            exercise_name: exerciseName,
+            pr_type: "e1rm",
+            value: bestSet.value,
+            previous_value: previous,
+            context: {
+              weight: bestSet.set.weight,
+              reps: bestSet.set.reps,
+              setIndex: bestSet.set.setIndex ?? null,
+            },
+          })
+        }
+      }
+
+      const currentVolume = currentExerciseVolumes.get(exerciseId) ?? 0
+      const previousVolume = previousBestVolume.get(exerciseId) ?? null
+      if (currentVolume > 0 && isNewBest(currentVolume, previousVolume)) {
         prRows.push({
           user_id: userId,
           workout_id: workoutId,
           exercise_id: exerciseId,
           exercise_name: exerciseName,
-          pr_type: "e1rm",
-          value: bestSet.value,
-          previous_value: previous,
+          pr_type: "volume",
+          value: currentVolume,
+          previous_value: previousVolume,
           context: {
-            weight: bestSet.set.weight,
-            reps: bestSet.set.reps,
-            setIndex: bestSet.set.setIndex ?? null,
+            exercise_session_volume_lb: currentVolume,
           },
         })
       }
+    })
+
+    if (prRows.length > 0) {
+      const { error: prError } = await supabase.from("workout_prs").insert(prRows)
+      if (prError) {
+        throw new Error(prError.message)
+      }
     }
 
-    const currentVolume = currentExerciseVolumes.get(exerciseId) ?? 0
-    const previousVolume = previousBestVolume.get(exerciseId) ?? null
-    if (currentVolume > 0 && isNewBest(currentVolume, previousVolume)) {
-      prRows.push({
-        user_id: userId,
-        workout_id: workoutId,
-        exercise_id: exerciseId,
-        exercise_name: exerciseName,
-        pr_type: "volume",
-        value: currentVolume,
-        previous_value: previousVolume,
-        context: {
-          exercise_session_volume_lb: currentVolume,
-        },
-      })
+    prCount = prRows.length
+    const { error: prCountUpdateError } = await supabase
+      .from("workouts")
+      .update({ pr_count: prCount })
+      .eq("id", workoutId)
+
+    if (prCountUpdateError) {
+      throw new Error(prCountUpdateError.message)
     }
-  })
-
-  if (prRows.length > 0) {
-    const { error: prError } = await supabase.from("workout_prs").insert(prRows)
-    if (prError) {
-      return NextResponse.json({ error: prError.message }, { status: 500 })
-    }
-  }
-
-  const prCount = prRows.length
-  const { error: workoutUpdateError } = await supabase
-    .from("workouts")
-    .update({ total_volume_lb: totalVolume, pr_count: prCount })
-    .eq("id", workoutId)
-
-  if (workoutUpdateError) {
-    return NextResponse.json({ error: workoutUpdateError.message }, { status: 500 })
+  } catch (error) {
+    console.error("PR detection failed:", error)
   }
 
   // Progressive-overload stall detection. Failures here must never break the

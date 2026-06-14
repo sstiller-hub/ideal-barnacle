@@ -112,6 +112,13 @@ type WorkoutPrEvent = {
 
 type DayState = "scheduled" | "rest" | "completed" | "activeSession"
 
+// Workouts whose stored total_volume_lb is 0/null may simply have failed the
+// analytics pass at commit time (e.g. a large history query aborted before the
+// volume write). Their sets are still in the DB, so we re-run analytics once to
+// repair the stored value. This set prevents re-hitting the endpoint for the
+// same workout on every focus/refresh of the home screen.
+const repairAttemptedWorkoutIds = new Set<string>()
+
 export default function Home() {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -395,7 +402,29 @@ export default function Home() {
     }
   }, [selectedDate, userId])
 
-  const loadHomeAnalytics = useCallback(async (targetUserId: string) => {
+  const repairWorkoutAnalytics = useCallback(async (workoutIds: string[]): Promise<boolean> => {
+    if (!supabase || workoutIds.length === 0) return false
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) return false
+
+    const results = await Promise.all(
+      workoutIds.map(async (workoutId) => {
+        try {
+          const response = await fetch(`/api/workouts/${workoutId}/complete`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          return response.ok
+        } catch {
+          return false
+        }
+      })
+    )
+    return results.some(Boolean)
+  }, [])
+
+  const loadHomeAnalytics = useCallback(async (targetUserId: string, allowRepair = true) => {
     if (!supabase) return
     const now = new Date()
     const { start, end } = getWeekRange(now)
@@ -468,7 +497,32 @@ export default function Home() {
     if (prsError) return
 
     setLastWorkoutPrs((prsData || []) as WorkoutPrEvent[])
-  }, [getWeekRange])
+
+    // Self-heal workouts whose analytics never wrote a volume. We only retry
+    // each workout once per session to avoid hammering the endpoint for those
+    // that are legitimately zero (e.g. no completed sets).
+    if (allowRepair) {
+      const zeroVolumeIds = [
+        ...(currentWeek ?? []),
+        ...(previousWeek ?? []),
+        { id: lastWorkout.id, total_volume_lb: lastWorkout.total_volume_lb },
+      ]
+        .filter((row) => row?.id && !row.total_volume_lb)
+        .map((row) => row.id as string)
+
+      const idsToRepair = Array.from(new Set(zeroVolumeIds)).filter(
+        (id) => !repairAttemptedWorkoutIds.has(id)
+      )
+
+      if (idsToRepair.length > 0) {
+        idsToRepair.forEach((id) => repairAttemptedWorkoutIds.add(id))
+        const repaired = await repairWorkoutAnalytics(idsToRepair)
+        if (repaired) {
+          await loadHomeAnalytics(targetUserId, false)
+        }
+      }
+    }
+  }, [getWeekRange, repairWorkoutAnalytics])
 
   useEffect(() => {
     if (!userId) {
