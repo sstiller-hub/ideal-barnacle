@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin"
 import { validateWorkoutCommitPayload } from "@/lib/workout-commit-validation"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { computeWorkoutVolume, type CompletedSetRecord } from "@/lib/workout-analytics"
+import { runWorkoutAnalytics } from "@/lib/workout-analytics-server"
 
 type WorkoutExerciseInsert = {
   workout_id: string
@@ -166,6 +167,20 @@ export async function POST(request: Request) {
       const { error: setsError } = await supabase.from("workout_sets").insert(setRows)
       if (setsError) {
         return NextResponse.json({ error: setsError.message }, { status: 500 })
+      }
+    }
+
+    // Run analytics (PRs, stall alerts, volume refinement) in this same request
+    // for completed workouts. This is the reliable place to do it: the commit
+    // request always runs to completion server-side, whereas the separate
+    // client-initiated /complete call is routinely never dispatched on mobile
+    // (the app is backgrounded right after finishing), which is why no workout
+    // ever had PRs. Best-effort: analytics failures must not fail the commit.
+    if (workout.completed_at) {
+      try {
+        await runWorkoutAnalytics(supabase, { userId, workoutId: workout.workout_id })
+      } catch (error) {
+        console.error("Workout analytics failed during commit:", error)
       }
     }
 
