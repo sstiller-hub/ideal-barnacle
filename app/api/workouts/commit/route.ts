@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
 import { validateWorkoutCommitPayload } from "@/lib/workout-commit-validation"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { computeWorkoutVolume, type CompletedSetRecord } from "@/lib/workout-analytics"
 
 type WorkoutExerciseInsert = {
   workout_id: string
@@ -48,6 +49,23 @@ export async function POST(request: Request) {
     const performedAt = workout.completed_at ?? workout.started_at
     const now = new Date().toISOString()
 
+    // Compute and persist the workout volume here, in the same request that
+    // writes the sets. The /complete analytics endpoint also computes this, but
+    // it runs as a separate fire-and-forget call that can silently fail or never
+    // run — leaving total_volume_lb at its default of 0. Writing it atomically
+    // with the commit guarantees the headline stat is always correct.
+    const totalVolume = computeWorkoutVolume(
+      sets.map<CompletedSetRecord>((set) => ({
+        reps: set.reps,
+        weight: set.weight,
+        completed: set.completed,
+        setIndex: set.set_index,
+        exerciseId: set.exercise_id,
+        exerciseName: set.exercise_name,
+        workoutId: workout.workout_id,
+      }))
+    )
+
     const ratingByExerciseId = new Map<string, "thumbs_up" | "thumbs_down" | null>()
     ;(exercises ?? []).forEach((exercise) => {
       ratingByExerciseId.set(exercise.exercise_id, exercise.rating ?? null)
@@ -61,6 +79,7 @@ export async function POST(request: Request) {
       started_at: workout.started_at,
       completed_at: workout.completed_at ?? null,
       status: workout.completed_at ? "completed" : "draft",
+      total_volume_lb: totalVolume,
       updated_at: now,
     }
 
