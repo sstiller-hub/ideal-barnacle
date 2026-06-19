@@ -47,7 +47,6 @@ import {
   ArrowUp,
   Settings,
   ChevronRight,
-  ChevronRight as ChevronRightSmall,
 } from "lucide-react"
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
@@ -164,8 +163,6 @@ export default function Home() {
   }
 
   const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
-  const formatShortDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" })
   const formatVolume = (value: number) => Math.round(value).toLocaleString()
 
   const getWeekRange = useCallback((date: Date) => {
@@ -212,22 +209,6 @@ export default function Home() {
 
   const currentWeekVolume = weeklyVolumes[weeklyVolumes.length - 1] ?? 0
   const previousWeekVolume = weeklyVolumes[weeklyVolumes.length - 2] ?? 0
-
-  const weeklyFeltRatings = useMemo(() => {
-    const { start, end } = getWeekRange(new Date())
-    let good = 0
-    let rough = 0
-    for (const workout of workoutHistory) {
-      if (!workout.date) continue
-      const d = new Date(workout.date)
-      if (d < start || d >= end) continue
-      for (const ex of (workout.exercises ?? [])) {
-        if (ex.rating === "thumbs_up") good++
-        else if (ex.rating === "thumbs_down") rough++
-      }
-    }
-    return { good, rough }
-  }, [workoutHistory, getWeekRange])
 
   const inProgressSessionVolume = useMemo(() => {
     if (!session?.exercises) return 0
@@ -978,6 +959,92 @@ export default function Home() {
     return { totalSets, remainingSets }
   }, [session?.exercises])
 
+  // --- Progressive-overload context for the home screen ---
+
+  // Most recent top set (by e1RM) for each exercise, excluding the selected
+  // day's own workout. Powers the "what to beat" hint next to today's plan.
+  const lastPerformanceByExercise = useMemo(() => {
+    const map = new Map<string, { weight: number; reps: number; date: string }>()
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    const sorted = [...workoutHistory].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    for (const workout of sorted) {
+      const workoutDate = new Date(workout.date)
+      workoutDate.setHours(0, 0, 0, 0)
+      if (workoutDate.getTime() === selected.getTime()) continue
+      for (const exercise of workout.exercises ?? []) {
+        const key = normalizeExerciseName(exercise.name)
+        if (map.has(key)) continue
+        let best: { weight: number; reps: number; e1rm: number } | null = null
+        for (const set of exercise.sets ?? []) {
+          if (!set?.completed || !((set.weight ?? 0) > 0) || !((set.reps ?? 0) > 0)) continue
+          const e1rm = (set.weight as number) * (1 + (set.reps as number) / 30)
+          if (!best || e1rm > best.e1rm) {
+            best = { weight: set.weight as number, reps: set.reps as number, e1rm }
+          }
+        }
+        if (best) map.set(key, { weight: best.weight, reps: best.reps, date: workout.date })
+      }
+    }
+    return map
+  }, [workoutHistory, selectedDate, normalizeExerciseName])
+
+  // The last time this same workout was trained (matched by routine name, else
+  // by Upper/Lower type). Gives the day full context: what you hit, what to beat.
+  const lastSameWorkout = useMemo(() => {
+    if (actualState !== "scheduled" && actualState !== "activeSession") return null
+    const routineName =
+      (actualState === "activeSession" ? session?.routineName : scheduledRoutine?.name) ?? null
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    const notSelectedDay = (workout: CompletedWorkout) => {
+      const workoutDate = new Date(workout.date)
+      workoutDate.setHours(0, 0, 0, 0)
+      return workoutDate.getTime() !== selected.getTime()
+    }
+    const sorted = [...workoutHistory].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    const match =
+      (routineName ? sorted.find((w) => notSelectedDay(w) && w.name === routineName) : undefined) ??
+      sorted.find((w) => notSelectedDay(w) && deriveWorkoutType(w.name) === selectedTitle)
+    if (!match) return null
+
+    const topLifts = (match.exercises ?? [])
+      .map((exercise: any) => {
+        let best: { weight: number; reps: number } | null = null
+        for (const set of exercise.sets ?? []) {
+          if (!set?.completed || !((set.weight ?? 0) > 0) || !((set.reps ?? 0) > 0)) continue
+          if (!best || set.weight > best.weight) best = { weight: set.weight, reps: set.reps }
+        }
+        return best ? { name: exercise.name, weight: best.weight, reps: best.reps } : null
+      })
+      .filter((lift): lift is { name: string; weight: number; reps: number } => Boolean(lift))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 3)
+
+    return {
+      id: match.id,
+      date: match.date,
+      totalVolume: match.stats?.totalVolume ?? 0,
+      topLifts,
+    }
+  }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
+
+  // Overall progression signal: how many tracked lifts are trending up vs down.
+  const progression = useMemo(() => {
+    let up = 0
+    let down = 0
+    for (const pr of todayPRs) {
+      if (pr.trendPct === null) continue
+      if (pr.trendPct > 0) up += 1
+      else if (pr.trendPct < 0) down += 1
+    }
+    return { up, down, tracked: up + down }
+  }, [todayPRs])
+
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -1363,183 +1430,59 @@ export default function Home() {
           </div>
         )}
 
-        {weeklySummary && (
-          <div className="px-5 mb-2">
-            <div
-              className="text-white/25 tracking-widest mb-3"
-              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+        {lastSameWorkout && (
+          <div className="px-5 mb-5">
+            <button
+              className="w-full text-left transition-all duration-200"
+              onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
+              style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.07)",
+                borderRadius: "4px",
+                padding: "12px 14px",
+              }}
+              type="button"
             >
-              THIS WEEK
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <div
-                  className="text-white/20 mb-1"
-                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              <div className="flex items-center justify-between mb-2.5">
+                <span
+                  className="text-white/30 tracking-widest"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
                 >
-                  VOLUME
-                </div>
-                <div
-                  className="text-white/90"
-                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+                  LAST {selectedTitle.toUpperCase()} · TO BEAT
+                </span>
+                <span className="text-white/25" style={{ fontSize: "9px", fontWeight: 400 }}>
+                  {getRelativeDate(lastSameWorkout.date)}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5 mb-3">
+                <span
+                  className="text-white/85"
+                  style={{ fontSize: "18px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
                 >
-                  {formatVolume(weeklySummary.volumeLb)}
-                </div>
-                <div className="text-white/15" style={{ fontSize: "7px", fontWeight: 400 }}>
-                  lb
-                </div>
+                  {formatVolume(lastSameWorkout.totalVolume)}
+                </span>
+                <span className="text-white/20" style={{ fontSize: "8px", fontWeight: 400 }}>
+                  lb total
+                </span>
               </div>
-              <div>
-                <div
-                  className="text-white/20 mb-1"
-                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                >
-                  SESSIONS
-                </div>
-                <div
-                  className="text-white/90"
-                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                >
-                  {weeklySummary.sessions}
-                </div>
-              </div>
-              <div>
-                <div
-                  className="text-white/20 mb-1"
-                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                >
-                  WEEK/WEEK
-                </div>
-                <div
-                  className="text-white/90"
-                  style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                >
-                  {weeklySummary.wowPercent >= 0 ? "+" : "-"}
-                  {Math.abs(weeklySummary.wowPercent).toFixed(1)}%
-                </div>
-              </div>
-            </div>
-            {(weeklyFeltRatings.good > 0 || weeklyFeltRatings.rough > 0) && (
-              <div className="flex items-center gap-3 mt-3">
-                <div
-                  className="text-white/20"
-                  style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                >
-                  FEEL
-                </div>
-                <div className="flex items-center gap-2">
-                  {weeklyFeltRatings.good > 0 && (
-                    <span
-                      className="text-white/60"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                    >
-                      {weeklyFeltRatings.good} GOOD
-                    </span>
-                  )}
-                  {weeklyFeltRatings.good > 0 && weeklyFeltRatings.rough > 0 && (
-                    <span className="text-white/15" style={{ fontSize: "7px" }}>·</span>
-                  )}
-                  {weeklyFeltRatings.rough > 0 && (
-                    <span
-                      className="text-white/40"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", fontFamily: "'Archivo Narrow', sans-serif" }}
-                    >
-                      {weeklyFeltRatings.rough} ROUGH
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {lastWorkoutSummary && (
-          <div className="px-5 mb-2">
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className="text-white/25 tracking-widest"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-              >
-                LAST WORKOUT
-              </div>
-              <div className="text-white/25" style={{ fontSize: "9px", fontWeight: 400 }}>
-                {formatShortDate(lastWorkoutSummary.performedAt)}
-              </div>
-            </div>
-            <div className="text-white/90" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em" }}>
-              {lastWorkoutSummary.name}
-            </div>
-            <div className="flex items-center gap-3 mt-3">
-              <div
-                className="text-white/20"
-                style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
-              >
-                VOLUME
-              </div>
-              <div
-                className="text-white/90"
-                style={{ fontSize: "12px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
-              >
-                {formatVolume(lastWorkoutSummary.totalVolumeLb)} lb
-              </div>
-              {lastWorkoutSummary.prCount > 0 && (
-                <div
-                  style={{
-                    background: "rgba(255, 255, 255, 0.04)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "999px",
-                    padding: "2px 8px",
-                  }}
-                >
-                  <span className="text-white/60" style={{ fontSize: "9px", fontWeight: 500 }}>
-                    {lastWorkoutSummary.prCount} PRs
-                  </span>
+              {lastSameWorkout.topLifts.length > 0 && (
+                <div className="space-y-1.5">
+                  {lastSameWorkout.topLifts.map((lift) => (
+                    <div key={lift.name} className="flex items-center justify-between">
+                      <span className="text-white/55" style={{ fontSize: "10px", fontWeight: 400 }}>
+                        {getExerciseLabel(lift.name)}
+                      </span>
+                      <span
+                        className="text-white/70"
+                        style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {lift.weight} × {lift.reps}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {lastWorkoutSummary && lastWorkoutPrs.length > 0 && (
-          <div className="px-5 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className="text-white/25 tracking-widest"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-              >
-                PRS FROM LAST WORKOUT
-              </div>
-              <button
-                className="flex items-center gap-1 text-white/30 hover:text-white/50 transition-colors duration-200"
-                onClick={() => router.push(`/history/${lastWorkoutSummary.id}`)}
-              >
-                <span style={{ fontSize: "10px", fontWeight: 400 }}>View all PRs</span>
-                <ChevronRightSmall size={11} strokeWidth={1.5} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {lastWorkoutPrs.map((pr) => {
-                const label =
-                  pr.pr_type === "e1rm" ? "e1RM" : pr.pr_type === "volume" ? "Volume" : "Weight"
-                const delta =
-                  pr.previous_value !== null ? pr.value - pr.previous_value : null
-                const displayValue =
-                  pr.pr_type === "volume" ? formatVolume(pr.value) : Math.round(pr.value).toLocaleString()
-                return (
-                  <div key={pr.id} className="flex items-center justify-between">
-                    <div className="text-white/70" style={{ fontSize: "11px", fontWeight: 400 }}>
-                      {pr.exercise_name} • {label} {displayValue} lb
-                    </div>
-                    {delta !== null && (
-                      <div className="text-white/25" style={{ fontSize: "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
-                        {delta >= 0 ? "+" : "-"}
-                        {Math.abs(Math.round(delta))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            </button>
           </div>
         )}
 
@@ -1680,7 +1623,7 @@ export default function Home() {
                 <div
                   key={exercise.id ?? `${exercise.name}-${index}`}
                   className="flex items-center gap-3"
-                  style={{ opacity: 0.35, gap: isCompactExerciseList ? "6px" : undefined }}
+                  style={{ opacity: 0.7, gap: isCompactExerciseList ? "6px" : undefined }}
                 >
                   <div
                     className="text-white/40"
@@ -1703,15 +1646,32 @@ export default function Home() {
                   >
                     {getExerciseLabel(exercise.name)}
                   </div>
-                  <div
-                    className="text-white/30"
-                    style={{
-                      fontSize: isCompactExerciseList ? "8px" : "9px",
-                      fontWeight: 400,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
+                  <div className="flex flex-col items-end" style={{ gap: "1px" }}>
+                    <div
+                      className="text-white/40"
+                      style={{
+                        fontSize: isCompactExerciseList ? "8px" : "9px",
+                        fontWeight: 400,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
+                    </div>
+                    {(() => {
+                      const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
+                      return last ? (
+                        <div
+                          className="text-white/30"
+                          style={{
+                            fontSize: isCompactExerciseList ? "7px" : "8px",
+                            fontWeight: 400,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          last {last.weight}×{last.reps}
+                        </div>
+                      ) : null
+                    })()}
                   </div>
                 </div>
               ))}
@@ -1802,11 +1762,28 @@ export default function Home() {
         onTouchMoveCapture={(event) => event.stopPropagation()}
         onTouchEndCapture={(event) => event.stopPropagation()}
       >
-        <div
-          className="text-white/25 tracking-widest mb-2"
-          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
-        >
-          TRAINING VOLUME
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="text-white/25 tracking-widest"
+            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+          >
+            PROGRESS
+          </div>
+          {progression.tracked > 0 && (
+            <div className="flex items-center gap-1">
+              {progression.up >= progression.down ? (
+                <ArrowUp size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+              ) : (
+                <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+              )}
+              <span
+                className="text-white/40"
+                style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                {progression.up} of {progression.tracked} lifts up
+              </span>
+            </div>
+          )}
         </div>
         <button
           className="w-full text-left transition-all duration-200"
@@ -1843,43 +1820,23 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <div
-              className="flex gap-3 overflow-x-auto"
-              data-scroll-x="pr-cards-row-1"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-            >
-              {prRows.firstRow.map((pr) => (
-                <PRCard
-                  key={`r1-${pr.name}`}
-                  exercise={pr.name}
-                  reps={pr.reps}
-                  weight={pr.weight}
-                  details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
-                  chartData={pr.chartData || []}
-                  trendPct={pr.trendPct}
-                  onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
-                />
-              ))}
-            </div>
-            <div
-              className="flex gap-3 overflow-x-auto"
-              data-scroll-x="pr-cards-row-2"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-            >
-              {prRows.secondRow.map((pr) => (
-                <PRCard
-                  key={`r2-${pr.name}`}
-                  exercise={pr.name}
-                  reps={pr.reps}
-                  weight={pr.weight}
-                  details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
-                  chartData={pr.chartData || []}
-                  trendPct={pr.trendPct}
-                  onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
-                />
-              ))}
-            </div>
+          <div
+            className="flex gap-3 overflow-x-auto"
+            data-scroll-x="pr-cards-row-1"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+          >
+            {[...prRows.firstRow, ...prRows.secondRow].map((pr) => (
+              <PRCard
+                key={`pr-${pr.name}`}
+                exercise={pr.name}
+                reps={pr.reps}
+                weight={pr.weight}
+                details={pr.achievedAt ? getRelativeDate(pr.achievedAt) : ""}
+                chartData={pr.chartData || []}
+                trendPct={pr.trendPct}
+                onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
+              />
+            ))}
           </div>
         </div>
       )}
