@@ -32,6 +32,48 @@ test("progressing exercise is not flagged", () => {
   assert.equal(detectProgressStall(sessions), null)
 })
 
+test("adding weight while dropping reps is progress, not a decline", () => {
+  // The user's style: climb in load, shed reps. e1RM would wobble down here,
+  // but every session adds weight, so nothing should be flagged.
+  const sessions = [
+    session(0, [[12, 100]]),
+    session(3, [[10, 110]]),
+    session(6, [[8, 120]]),
+    session(9, [[6, 130]]),
+    session(12, [[5, 140]]),
+  ]
+  assert.equal(detectProgressStall(sessions), null)
+})
+
+test("double progression: building reps at a fixed weight is progress", () => {
+  // Same weight, +1 rep each session until the top of the range.
+  const sessions = [
+    session(0, [[6, 120]]),
+    session(3, [[7, 120]]),
+    session(6, [[8, 120]]),
+    session(9, [[9, 120]]),
+    session(12, [[10, 120]]),
+  ]
+  assert.equal(detectProgressStall(sessions), null)
+})
+
+test("stuck at one weight without adding reps is flagged as STALE", () => {
+  // Added load once, then stopped adding reps at the new weight — the only
+  // case the user considers a real stall.
+  const sessions = [
+    session(0, [[8, 110]]),
+    session(3, [[8, 120]]),
+    session(6, [[8, 120]]),
+    session(9, [[8, 120]]),
+    session(12, [[8, 120]]),
+    session(15, [[8, 120]]),
+  ]
+  const result = detectProgressStall(sessions)
+  assert.ok(result)
+  assert.equal(result.flag, "STALE")
+  assert.equal(result.stalledSessions, 4)
+})
+
 test("four flat sessions after a baseline produce a STALE tier 2 result", () => {
   const sessions = [
     session(0, [[8, 120]]),
@@ -44,7 +86,7 @@ test("four flat sessions after a baseline produce a STALE tier 2 result", () => 
   assert.ok(result)
   assert.equal(result.flag, "STALE")
   assert.equal(result.tier, 2)
-  assert.equal(result.metric, "e1rm")
+  assert.equal(result.metric, "load")
   assert.equal(result.stalledSessions, 4)
 })
 
@@ -72,8 +114,9 @@ test("fewer than threshold+1 sessions is not enough history to judge", () => {
   assert.equal(detectProgressStall(sessions), null)
 })
 
-test("a tiny e1RM wiggle below tolerance does not count as progress", () => {
-  // 8x120 = 152 e1RM; 8x120.5 ≈ 152.6 — under the 0.5% tolerance margin
+test("a tiny weight wiggle below tolerance does not count as progress", () => {
+  // 120.5 lb is within the 0.5% tolerance of 120, so it reads as the same
+  // working weight and the matching reps add no progress.
   const sessions = [
     session(0, [[8, 120]]),
     session(3, [[8, 120.5]]),
@@ -196,6 +239,6 @@ test("buildStallAlertContent produces a message, action, and context payload", (
   assert.match(content.message, /4 sessions/)
   assert.ok(content.action.length > 0)
   assert.equal(content.context.exercise_id, "upper1-lat-pd")
-  assert.equal(content.context.source, "progressive_overload_v1")
+  assert.equal(content.context.source, "progressive_overload_v2")
   assert.equal(content.context.stalled_sessions, 4)
 })

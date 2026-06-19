@@ -1,5 +1,3 @@
-import { calculateE1rm } from "@/lib/workout-analytics"
-
 export type StallSetInput = {
   reps: number | null
   weight: number | null
@@ -32,16 +30,18 @@ export type StallDetectionOptions = {
   now?: Date
 }
 
-export type StallMetric = "e1rm" | "reps"
+export type StallMetric = "load" | "reps"
 
 export type StallResult = {
   flag: "STALE" | "REGRESSION"
   tier: 1 | 2
   metric: StallMetric
   stalledSessions: number
-  bestValue: number
+  bestWeight: number
+  bestReps: number
   bestAt: string
-  latestValue: number
+  latestWeight: number
+  latestReps: number
   latestAt: string
   sessionsAnalyzed: number
 }
@@ -60,24 +60,22 @@ function isWithinRange(timestamp: number, range: DeloadRange): boolean {
   return timestamp >= start && timestamp <= end
 }
 
-function bestWeightedE1rm(sets: StallSetInput[]): number | null {
-  let best: number | null = null
-  sets.forEach((set) => {
-    if (!set.completed) return
-    if (typeof set.reps !== "number" || typeof set.weight !== "number") return
-    if (set.reps <= 0 || set.weight <= 0) return
-    const value = calculateE1rm(set.weight, set.reps)
-    if (best === null || value > best) best = value
-  })
-  return best
-}
+type TopSet = { weight: number; reps: number }
 
-function bestReps(sets: StallSetInput[]): number | null {
-  let best: number | null = null
+/**
+ * The heaviest completed working set of a session, with the best reps achieved
+ * at that weight. This is the unit of double progression: you add reps at a
+ * weight until the top of your range, then add load and the reps reset down.
+ */
+function topWorkingSet(sets: StallSetInput[]): TopSet | null {
+  let best: TopSet | null = null
   sets.forEach((set) => {
     if (!set.completed) return
     if (typeof set.reps !== "number" || set.reps <= 0) return
-    if (best === null || set.reps > best) best = set.reps
+    if (typeof set.weight !== "number" || set.weight < 0) return
+    if (best === null || set.weight > best.weight || (set.weight === best.weight && set.reps > best.reps)) {
+      best = { weight: set.weight, reps: set.reps }
+    }
   })
   return best
 }
@@ -85,17 +83,22 @@ function bestReps(sets: StallSetInput[]): number | null {
 type SessionPoint = {
   performedAt: string
   timestamp: number
-  value: number
+  weight: number
+  reps: number
 }
 
 /**
  * Detect a progressive-overload stall for a single exercise.
  *
- * A session counts as progress when its best estimated 1RM (Epley) beats the
- * running best of the analyzed window by `improvementTolerance`. When every
- * completed set in the history is unweighted (bodyweight work), best reps per
- * session is used instead. Returns null when the exercise is progressing or
- * there is not enough history to judge.
+ * Progress is judged by double progression on the top working set: a session
+ * counts as progress when its top weight beats the running best (by
+ * `improvementTolerance`), OR it adds reps at that same weight. Adding load
+ * while reps drop is therefore always progress — it never reads as a decline.
+ * When every completed set in the history is unweighted (bodyweight work), best
+ * reps per session is used instead. A REGRESSION (the working weight actually
+ * dropping) is distinguished from a plain STALE (stuck at the same weight
+ * without adding reps). Returns null when the exercise is progressing or there
+ * is not enough history to judge.
  */
 export function detectProgressStall(
   sessions: ExerciseSessionInput[],
@@ -129,25 +132,43 @@ export function detectProgressStall(
   const windowStart = referenceTime - config.baselineWindowDays * 24 * 60 * 60 * 1000
   const windowed = ordered.filter(({ timestamp }) => timestamp >= windowStart)
 
-  const hasWeightedHistory = windowed.some(({ session }) => bestWeightedE1rm(session.sets) !== null)
-  const metric: StallMetric = hasWeightedHistory ? "e1rm" : "reps"
+  const topSets = windowed.map(({ session, timestamp }) => ({
+    timestamp,
+    performedAt: session.performedAt,
+    top: topWorkingSet(session.sets),
+  }))
+
+  const hasWeightedHistory = topSets.some(({ top }) => top !== null && top.weight > 0)
+  const metric: StallMetric = hasWeightedHistory ? "load" : "reps"
 
   const points: SessionPoint[] = []
-  windowed.forEach(({ session, timestamp }) => {
-    const value = metric === "e1rm" ? bestWeightedE1rm(session.sets) : bestReps(session.sets)
-    if (value === null) return
-    points.push({ performedAt: session.performedAt, timestamp, value })
+  topSets.forEach(({ performedAt, timestamp, top }) => {
+    if (top === null) return
+    points.push({ performedAt, timestamp, weight: top.weight, reps: top.reps })
   })
 
   if (points.length < config.stallSessionThreshold + 1) return null
 
-  let bestValue = points[0].value
+  let bestWeight = points[0].weight
+  let bestReps = points[0].reps
   let bestAt = points[0].performedAt
   let lastImprovementIndex = 0
   points.forEach((point, index) => {
     if (index === 0) return
-    if (point.value > bestValue * (1 + config.improvementTolerance)) {
-      bestValue = point.value
+    const addedLoad = metric === "load" && point.weight > bestWeight * (1 + config.improvementTolerance)
+    // Same working weight (within tolerance) for load lifts; always true for bodyweight.
+    const sameWeight = metric === "reps" || point.weight >= bestWeight * (1 - config.improvementTolerance)
+    const addedReps = sameWeight && point.reps > bestReps
+
+    if (addedLoad) {
+      // New top weight is progress regardless of reps — the user's whole point.
+      bestWeight = point.weight
+      bestReps = point.reps
+      bestAt = point.performedAt
+      lastImprovementIndex = index
+    } else if (addedReps) {
+      // Added a rep at the established weight.
+      bestReps = point.reps
       bestAt = point.performedAt
       lastImprovementIndex = index
     }
@@ -157,24 +178,30 @@ export function detectProgressStall(
   if (stalledSessions < config.stallSessionThreshold) return null
 
   const latest = points[points.length - 1]
-  const isRegression = latest.value < bestValue * (1 - config.regressionThreshold)
+  // A regression is the working weight genuinely sliding back, not reps dropping
+  // because load went up.
+  const regressionValue = metric === "load" ? latest.weight : latest.reps
+  const regressionBest = metric === "load" ? bestWeight : bestReps
+  const isRegression = regressionValue < regressionBest * (1 - config.regressionThreshold)
 
   return {
     flag: isRegression ? "REGRESSION" : "STALE",
     tier: isRegression ? 1 : 2,
     metric,
     stalledSessions,
-    bestValue,
+    bestWeight,
+    bestReps,
     bestAt,
-    latestValue: latest.value,
+    latestWeight: latest.weight,
+    latestReps: latest.reps,
     latestAt: latest.performedAt,
     sessionsAnalyzed: points.length,
   }
 }
 
-function formatMetricValue(value: number, metric: StallMetric): string {
-  if (metric === "reps") return `${Math.round(value)} reps`
-  return `~${Math.round(value)} lb e1RM`
+function formatTopSet(weight: number, reps: number, metric: StallMetric): string {
+  if (metric === "reps") return `${Math.round(reps)} reps`
+  return `${Math.round(weight)} lb × ${Math.round(reps)}`
 }
 
 function formatDate(iso: string): string {
@@ -196,15 +223,15 @@ export function buildStallAlertContent(
   exerciseName: string,
   result: StallResult
 ): StallAlertContent {
-  const best = formatMetricValue(result.bestValue, result.metric)
-  const latest = formatMetricValue(result.latestValue, result.metric)
+  const best = formatTopSet(result.bestWeight, result.bestReps, result.metric)
+  const latest = formatTopSet(result.latestWeight, result.latestReps, result.metric)
 
   if (result.flag === "REGRESSION") {
     return {
       flag: result.flag,
       tier: result.tier,
-      message: `${exerciseName} is trending down: latest ${latest} vs best ${best} on ${formatDate(result.bestAt)}.`,
-      action: "Check recovery and form; repeat the last weight until reps come back before adding load.",
+      message: `${exerciseName} working weight is down: latest ${latest} vs your best ${best} on ${formatDate(result.bestAt)}.`,
+      action: "Drop back to your best working weight and rebuild reps before adding load.",
       context: buildContext(exerciseId, result),
     }
   }
@@ -212,22 +239,24 @@ export function buildStallAlertContent(
   return {
     flag: result.flag,
     tier: result.tier,
-    message: `No progression on ${exerciseName} in your last ${result.stalledSessions} sessions (best ${best} on ${formatDate(result.bestAt)}).`,
-    action: "Try a small weight bump or +1 rep target next session — or plan a deload if fatigue is high.",
+    message: `No progression on ${exerciseName} in your last ${result.stalledSessions} sessions — still ${best} since ${formatDate(result.bestAt)}.`,
+    action: "Add a rep at this weight, or bump the load and drop reps — either one counts.",
     context: buildContext(exerciseId, result),
   }
 }
 
 function buildContext(exerciseId: string, result: StallResult): Record<string, unknown> {
   return {
-    source: "progressive_overload_v1",
+    source: "progressive_overload_v2",
     exercise_id: exerciseId,
     metric: result.metric,
     stalled_sessions: result.stalledSessions,
     sessions_analyzed: result.sessionsAnalyzed,
-    best_value: Number(result.bestValue.toFixed(2)),
+    best_weight: Number(result.bestWeight.toFixed(2)),
+    best_reps: result.bestReps,
     best_at: result.bestAt,
-    latest_value: Number(result.latestValue.toFixed(2)),
+    latest_weight: Number(result.latestWeight.toFixed(2)),
+    latest_reps: result.latestReps,
     latest_at: result.latestAt,
   }
 }
