@@ -1045,6 +1045,58 @@ export default function Home() {
     return { up, down, tracked: up + down }
   }, [todayPRs])
 
+  // For a completed day: compare it against the previous time the same workout
+  // was trained (by routine name, else Upper/Lower type) so the finished day
+  // answers "did I beat last time" — volume delta and lifts beaten.
+  const completedComparison = useMemo(() => {
+    if (actualState !== "completed" || !workoutForDate) return null
+    const current = workoutForDate
+    const currentDay = new Date(current.date)
+    currentDay.setHours(0, 0, 0, 0)
+    const earlier = [...workoutHistory]
+      .filter((w) => w.id !== current.id)
+      .filter((w) => {
+        const d = new Date(w.date)
+        d.setHours(0, 0, 0, 0)
+        return d.getTime() < currentDay.getTime()
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const prev =
+      earlier.find((w) => w.name === current.name) ??
+      earlier.find((w) => deriveWorkoutType(w.name) === deriveWorkoutType(current.name))
+    if (!prev) return null
+
+    const bestE1rm = (workout: CompletedWorkout, name: string) => {
+      const key = normalizeExerciseName(name)
+      let best = 0
+      for (const exercise of workout.exercises ?? []) {
+        if (normalizeExerciseName(exercise.name) !== key) continue
+        for (const set of exercise.sets ?? []) {
+          if (!set?.completed || !((set.weight ?? 0) > 0) || !((set.reps ?? 0) > 0)) continue
+          best = Math.max(best, (set.weight as number) * (1 + (set.reps as number) / 30))
+        }
+      }
+      return best
+    }
+
+    let beaten = 0
+    let compared = 0
+    for (const exercise of current.exercises ?? []) {
+      const todayBest = bestE1rm(current, exercise.name)
+      const prevBest = bestE1rm(prev, exercise.name)
+      if (todayBest > 0 && prevBest > 0) {
+        compared += 1
+        if (todayBest > prevBest + 1e-6) beaten += 1
+      }
+    }
+
+    const currentVolume = current.stats?.totalVolume ?? 0
+    const prevVolume = prev.stats?.totalVolume ?? 0
+    const delta = currentVolume - prevVolume
+    const percent = prevVolume > 0 ? (delta / prevVolume) * 100 : 0
+    return { prevId: prev.id, prevDate: prev.date, delta, percent, beaten, compared }
+  }, [actualState, workoutForDate, workoutHistory, normalizeExerciseName])
+
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -1537,6 +1589,76 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {completedComparison && (
+                <button
+                  className="w-full text-left transition-all duration-200"
+                  onClick={() => router.push(`/history/${completedComparison.prevId}`)}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: "1px",
+                    padding: isCompactExerciseList ? "9px 10px" : "11px 12px",
+                    marginBottom: isCompactExerciseList ? "12px" : "16px",
+                  }}
+                  type="button"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className="text-white/25 tracking-widest"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      VS LAST {deriveWorkoutType(workoutForDate.name).toUpperCase()}
+                    </span>
+                    <span className="text-white/20" style={{ fontSize: "8px", fontWeight: 400 }}>
+                      {getRelativeDate(completedComparison.prevDate)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      {completedComparison.delta >= 0 ? (
+                        <ArrowUp size={10} strokeWidth={2} style={{ color: completedComparison.delta > 0 ? "#FF5733" : "rgba(255,255,255,0.3)" }} />
+                      ) : (
+                        <ArrowDown size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)" }} />
+                      )}
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: completedComparison.delta > 0 ? "#FF5733" : "rgba(255,255,255,0.5)",
+                          fontVariantNumeric: "tabular-nums",
+                          fontFamily: "'Archivo Narrow', sans-serif",
+                        }}
+                      >
+                        {completedComparison.delta >= 0 ? "+" : "-"}
+                        {Math.abs(Math.round(completedComparison.delta / 100) / 10)}k
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 500,
+                          color: completedComparison.delta > 0 ? "rgba(255,87,51,0.6)" : "rgba(255,255,255,0.25)",
+                          fontVariantNumeric: "tabular-nums",
+                          fontFamily: "'Archivo Narrow', sans-serif",
+                        }}
+                      >
+                        ({Math.abs(completedComparison.percent).toFixed(0)}%)
+                      </span>
+                    </div>
+                    {completedComparison.compared > 0 && (
+                      <>
+                        <span className="text-white/15" style={{ fontSize: "8px" }}>·</span>
+                        <span
+                          className="text-white/45"
+                          style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+                        >
+                          {completedComparison.beaten} of {completedComparison.compared} lifts beaten
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </button>
+              )}
 
               <button
                 className="w-full transition-all duration-200"
