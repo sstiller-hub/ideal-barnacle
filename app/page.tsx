@@ -1152,6 +1152,54 @@ export default function Home() {
     }
   }, [actualState, selectedDate, workoutHistory, getWeekRange, todayPRs])
 
+  // On a rest day the middle of the screen — normally the exercise list — is
+  // empty, so surface the next scheduled training day's plan there. We walk
+  // forward from the rest day until we hit a day that resolves to a workout,
+  // honoring manual overrides before falling back to the Growth V2 plan.
+  const nextWorkout = useMemo(() => {
+    if (actualState !== "rest") return null
+
+    const pool = routinePool.length > 0 ? routinePool : GROWTH_V2_ROUTINES
+    const routineById = new Map(pool.map((routine) => [routine.id, routine]))
+    const growthById = new Map(GROWTH_V2_ROUTINES.map((routine) => [routine.id, routine]))
+    const resolveEntry = (entry: ScheduledWorkout | null | undefined) => {
+      if (!entry) return null
+      return (
+        routineById.get(entry.routineId) ||
+        growthById.get(entry.routineId) ||
+        pool.find((routine) => routine.name === entry.routineName) ||
+        GROWTH_V2_ROUTINES.find((routine) => routine.name === entry.routineName) ||
+        null
+      )
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    for (let offset = 1; offset <= 7; offset += 1) {
+      const date = new Date(selectedDate)
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() + offset)
+
+      const manual = getScheduledWorkoutForDate(date)
+      const resolved = manual !== undefined ? manual : GROWTH_V2_WEEKLY[date.getDay()] ?? null
+      if (resolved === null) continue
+
+      const routine = resolveEntry(resolved)
+      if (!routine) continue
+
+      const dayDiff = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      const label =
+        dayDiff === 1
+          ? "TOMORROW"
+          : date.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()
+
+      return { routine, label }
+    }
+
+    return null
+  }, [actualState, selectedDate, routinePool])
+
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -1885,6 +1933,76 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {actualState === "rest" && nextWorkout && (() => {
+          const exercises = nextWorkout.routine.exercises ?? []
+          const compact = exercises.length >= 9
+          return (
+            <div className="px-5 mb-2">
+              <div className="flex items-center gap-2 mb-3">
+                <div
+                  className="text-white/25 tracking-widest"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                >
+                  UP NEXT · {nextWorkout.label}
+                </div>
+                <div className="flex-1 h-px" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
+                <div
+                  className="text-white/40"
+                  style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "0.01em" }}
+                >
+                  {deriveWorkoutType(nextWorkout.routine.name)}
+                </div>
+              </div>
+              <div className="space-y-2.5" style={{ gap: compact ? "6px" : undefined }}>
+                {exercises.map((exercise: any, index: number) => (
+                  <div
+                    key={exercise.id ?? `${exercise.name}-${index}`}
+                    className="flex items-center gap-3"
+                    style={{ opacity: 0.55, gap: compact ? "6px" : undefined }}
+                  >
+                    <div
+                      className="text-white/40"
+                      style={{
+                        fontSize: compact ? "8px" : "9px",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                        minWidth: "12px",
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div
+                      className="text-white/90 flex-1"
+                      style={{ fontSize: compact ? "10px" : "11px", fontWeight: 400, letterSpacing: "0.005em" }}
+                    >
+                      {getExerciseLabel(exercise.name)}
+                    </div>
+                    <div className="flex flex-col items-end" style={{ gap: "1px" }}>
+                      <div
+                        className="text-white/40"
+                        style={{ fontSize: compact ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
+                      </div>
+                      {(() => {
+                        const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
+                        return last ? (
+                          <div
+                            className="text-white/30"
+                            style={{ fontSize: compact ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
+                          >
+                            last {last.weight}×{last.reps}
+                          </div>
+                        ) : null
+                      })()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
           <div className="px-5 mb-2">
