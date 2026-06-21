@@ -54,7 +54,14 @@ test("schedule editor saves and Home reflects rest day", async ({ page }) => {
 
   await page.goto("/")
   await page.evaluate(() => window.dispatchEvent(new Event("schedule:updated")))
-  await expect(page.getByText(/Rest day/i).first()).toBeVisible()
+  // Sunday/Wednesday rest days surface the weekly recap panel instead of the
+  // plain "Rest day" line, so accept either depending on the current weekday.
+  const today = new Date().getDay()
+  if (today === 0 || today === 3) {
+    await expect(page.getByText(/WEEK (IN REVIEW|SO FAR)/i).first()).toBeVisible()
+  } else {
+    await expect(page.getByText(/Rest day/i).first()).toBeVisible()
+  }
 })
 
 test("scheduled workout shows on Home when set", async ({ page }) => {
