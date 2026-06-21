@@ -1097,6 +1097,61 @@ export default function Home() {
     return { prevId: prev.id, prevDate: prev.date, delta, percent, beaten, compared }
   }, [actualState, workoutForDate, workoutHistory, normalizeExerciseName])
 
+  // Contextual rest-day summary. The Growth V2 plan rests on Sunday (end of the
+  // Mon–Sun week) and Wednesday (mid-week), so those two rest days get a recap:
+  // Sunday = "week in review" (the week is behind you), Wednesday = "week so
+  // far" (a mid-week check-in). All numbers come from local history, so this
+  // works without auth.
+  const weeklyReview = useMemo(() => {
+    if (actualState !== "rest") return null
+    const day = selectedDate.getDay()
+    const variant: "review" | "midweek" | null =
+      day === 0 ? "review" : day === 3 ? "midweek" : null
+    if (!variant) return null
+
+    const { start, end } = getWeekRange(selectedDate)
+    const previousStart = new Date(start)
+    previousStart.setDate(previousStart.getDate() - 7)
+
+    const statsForRange = (rangeStart: Date, rangeEnd: Date) => {
+      let volume = 0
+      let sessions = 0
+      for (const workout of workoutHistory) {
+        if (!workout.date) continue
+        const workoutDate = new Date(workout.date)
+        if (workoutDate < rangeStart || workoutDate >= rangeEnd) continue
+        sessions += 1
+        for (const exercise of workout.exercises ?? []) {
+          for (const set of exercise.sets ?? []) {
+            if (isSetEligibleForStats(set)) {
+              volume += (set.weight ?? 0) * (set.reps ?? 0)
+            }
+          }
+        }
+      }
+      return { volume, sessions }
+    }
+
+    const current = statsForRange(start, end)
+    const previous = statsForRange(previousStart, start)
+    const { percent: wowPercent } = computeWeekOverWeek(current.volume, previous.volume)
+
+    const prCount = todayPRs.reduce((count, pr) => {
+      if (!pr.achievedAt) return count
+      const achieved = new Date(pr.achievedAt)
+      return achieved >= start && achieved < end ? count + 1 : count
+    }, 0)
+
+    return {
+      variant,
+      sessions: current.sessions,
+      volume: current.volume,
+      previousVolume: previous.volume,
+      wowPercent,
+      prCount,
+    }
+  }, [actualState, selectedDate, workoutHistory, getWeekRange, todayPRs])
+
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -1730,10 +1785,103 @@ export default function Home() {
           </div>
         )}
 
-        {actualState === "rest" && (
+        {actualState === "rest" && !weeklyReview && (
           <div className="px-5 mb-6">
             <div className="text-white/20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
               Rest day — no workout scheduled
+            </div>
+          </div>
+        )}
+
+        {actualState === "rest" && weeklyReview && (
+          <div className="px-5 mb-6">
+            <div
+              style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+                padding: "18px",
+              }}
+            >
+              <div
+                className="text-white/25 tracking-widest mb-1"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              >
+                {weeklyReview.variant === "review" ? "WEEK IN REVIEW" : "WEEK SO FAR"}
+              </div>
+              <div
+                className="text-white/70 mb-4"
+                style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.01em" }}
+              >
+                {weeklyReview.variant === "review"
+                  ? "How the week went"
+                  : "How the week is going so far"}
+              </div>
+
+              <div className="flex items-stretch">
+                <div className="flex-1">
+                  <div
+                    className="text-white/25 tracking-widest mb-1"
+                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  >
+                    SESSIONS
+                  </div>
+                  <div
+                    className="text-white/95"
+                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                  >
+                    {weeklyReview.sessions}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div
+                    className="text-white/25 tracking-widest mb-1"
+                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  >
+                    {weeklyReview.variant === "review" ? "VOLUME" : "VOLUME SO FAR"}
+                  </div>
+                  <div
+                    className="text-white/95"
+                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                  >
+                    {formatVolume(weeklyReview.volume)}
+                    <span className="text-white/30" style={{ fontSize: "11px", marginLeft: "3px" }}>lb</span>
+                  </div>
+                </div>
+                {weeklyReview.variant === "review" && (
+                  <div className="flex-1">
+                    <div
+                      className="text-white/25 tracking-widest mb-1"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    >
+                      PRS
+                    </div>
+                    <div
+                      className="text-white/95"
+                      style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                    >
+                      {weeklyReview.prCount}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {weeklyReview.previousVolume > 0 && (
+                <div className="flex items-center gap-1.5 mt-4">
+                  {weeklyReview.wowPercent >= 0 ? (
+                    <ArrowUp size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+                  ) : (
+                    <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
+                  )}
+                  <span
+                    className="text-white/40"
+                    style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  >
+                    {Math.abs(Math.round(weeklyReview.wowPercent))}%{" "}
+                    {weeklyReview.variant === "review" ? "vs last week" : "vs last week's pace"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
