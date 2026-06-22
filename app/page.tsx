@@ -1061,9 +1061,13 @@ export default function Home() {
         return d.getTime() < currentDay.getTime()
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    const prev =
-      earlier.find((w) => w.name === current.name) ??
-      earlier.find((w) => deriveWorkoutType(w.name) === deriveWorkoutType(current.name))
+    // Only compare against the most recent prior session of the SAME routine
+    // (matched by name). We intentionally do NOT fall back to the Upper/Lower
+    // type: two different Lower routines (e.g. "Legs 1 – Quad Dominant" vs
+    // "Legs 2 – Glutes + Hamstrings") have largely different exercise lists, so
+    // a cross-routine volume delta would be apples-to-oranges. If there's no
+    // prior session of this exact routine, the comparison is hidden.
+    const prev = earlier.find((w) => w.name === current.name)
     if (!prev) return null
 
     const bestE1rm = (workout: CompletedWorkout, name: string) => {
