@@ -2199,7 +2199,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         background: "#0D0D0F",
       }}
     >
-      <div className="relative z-10" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
+      <div className="relative z-10 flex-1 flex flex-col min-h-0" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
         <AnimatePresence>
           {isResting && restState ? (
             <motion.div
@@ -2418,12 +2418,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-1 flex overflow-x-auto overflow-y-hidden"
+          className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden"
           style={{
             scrollSnapType: "x mandatory",
             scrollBehavior: "smooth",
             WebkitOverflowScrolling: "touch",
-            height: "calc(100dvh - 160px)",
           }}
         >
           {exercises.map((exercise: any, exerciseIndex: number) => {
@@ -2453,7 +2452,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   transition: "opacity 0.2s ease",
                 }}
               >
-                <div className="mb-4">
+                <div style={{ marginBottom: isCompactSets ? "8px" : "16px" }}>
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div
                       className="text-white/30 tracking-widest"
@@ -2571,7 +2570,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   </div>
                 </div>
 
-                <div className="flex flex-col" style={{ gap: isCompactSets ? "16px" : "28px" }}>
+                <div className="flex flex-col" style={{ gap: isCompactSets ? "10px" : "28px" }}>
                   {exercise.sets.map((set: any, setIndex: number) => {
                     const setKey = set.id ?? `${exercise.id}-${setIndex}`
                     const isActiveExercise = exerciseIndex === currentExerciseIndex
@@ -2609,7 +2608,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             fontWeight: 500,
                             letterSpacing: "0.12em",
                             fontFamily: "'Archivo Narrow', sans-serif",
-                            marginBottom: isCompressedCompletedSet ? "4px" : "12px",
+                            marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px",
                           }}
                         >
                           SET {setIndex + 1}
@@ -2617,7 +2616,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
                         <div
                           className="flex items-center gap-3"
-                          style={{ marginBottom: isCompressedCompletedSet ? "4px" : "12px" }}
+                          style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "8px" : "12px" }}
                         >
                           <div className="flex-1 relative">
                             <input
@@ -2664,12 +2663,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                   ? "5px"
                                   : isCompactCompleted
                                     ? (isCompactSets ? "8px" : "12px")
-                                    : isCompactSets ? "12px" : "18px",
+                                    : isCompactSets ? "9px" : "18px",
                                 fontSize: isCompressedCompletedSet
                                   ? "16px"
                                   : isCompactCompleted
                                     ? (isCompactSets ? "18px" : "22px")
-                                    : isCompactSets ? "22px" : "28px",
+                                    : isCompactSets ? "20px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2681,7 +2680,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             <div
                               className="text-white/25 text-center transition-colors duration-150"
                               style={{
-                                marginTop: isCompressedCompletedSet ? "2px" : "6px",
+                                marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
@@ -2744,12 +2743,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                   ? "5px"
                                   : isCompactCompleted
                                     ? (isCompactSets ? "8px" : "12px")
-                                    : isCompactSets ? "12px" : "18px",
+                                    : isCompactSets ? "9px" : "18px",
                                 fontSize: isCompressedCompletedSet
                                   ? "16px"
                                   : isCompactCompleted
                                     ? (isCompactSets ? "18px" : "22px")
-                                    : isCompactSets ? "22px" : "28px",
+                                    : isCompactSets ? "20px" : "28px",
                                 fontWeight: 600,
                                 letterSpacing: "-0.02em",
                                 color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
@@ -2761,7 +2760,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             <div
                               className="text-white/25 text-center transition-colors duration-150"
                               style={{
-                                marginTop: isCompressedCompletedSet ? "2px" : "6px",
+                                marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
                                 fontWeight: 500,
                                 letterSpacing: "0.06em",
@@ -2839,7 +2838,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           typeof set.reps === "number" && (
                           <div
                             className="flex items-center gap-2"
-                            style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "8px" : "12px" }}
+                            style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px" }}
                           >
                             <div
                               className="text-white/20"
@@ -2875,8 +2874,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         )}
 
                         {showPlateCalc && isPlateSetActive && (
-                          <div className="mb-3">
-                            <div className="flex items-center gap-2 mb-3">
+                          <div className={isCompactSets ? "mb-1" : "mb-3"}>
+                            <div className={`flex items-center gap-2 ${isCompactSets ? "mb-2" : "mb-3"}`}>
                               <button
                                 className="transition-colors duration-150"
                                 style={{
@@ -2938,7 +2937,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                               />
                             </div>
 
-                            <div className="flex items-center gap-1.5 mb-3">
+                            <div className={`flex items-center gap-1.5 ${isCompactSets ? "mb-2" : "mb-3"}`}>
                               {plates.map((plate, plateIndex) => (
                                 <div key={plateIndex} className="flex items-center gap-1">
                                   {Array.from({ length: plate.count }).map((_, countIndex) => {
