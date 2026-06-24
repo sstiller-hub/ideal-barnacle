@@ -1117,6 +1117,17 @@ export default function Home() {
     const previousStart = new Date(start)
     previousStart.setDate(previousStart.getDate() - 7)
 
+    // Compare like-for-like: cap both weeks at the same point in the week so a
+    // partial week-to-date total is measured against last week's volume through
+    // the same day ("vs last week's pace") rather than against last week's full
+    // total. On the Sunday review the cutoff is the end of the week, so this
+    // naturally becomes a full-week vs full-week comparison.
+    const asOf = new Date(selectedDate)
+    asOf.setHours(23, 59, 59, 999)
+    const currentEnd = asOf < end ? asOf : end
+    const previousEnd = new Date(asOf)
+    previousEnd.setDate(previousEnd.getDate() - 7)
+
     const statsForRange = (rangeStart: Date, rangeEnd: Date) => {
       let volume = 0
       let sessions = 0
@@ -1136,8 +1147,8 @@ export default function Home() {
       return { volume, sessions }
     }
 
-    const current = statsForRange(start, end)
-    const previous = statsForRange(previousStart, start)
+    const current = statsForRange(start, currentEnd)
+    const previous = statsForRange(previousStart, previousEnd)
     const { percent: wowPercent } = computeWeekOverWeek(current.volume, previous.volume)
 
     const prCount = todayPRs.reduce((count, pr) => {
