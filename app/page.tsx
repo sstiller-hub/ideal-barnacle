@@ -38,7 +38,7 @@ import {
   type ScheduleOverrideResult,
 } from "@/lib/supabase-schedule-overrides"
 import { deriveWorkoutType } from "@/lib/workout-type"
-import { computeWeekOverWeek } from "@/lib/workout-analytics"
+import { computeWeekOverWeek, computeWeeklyPace } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
 import { getPrExcludedExercises } from "@/lib/pr-exclusions"
@@ -1114,31 +1114,26 @@ export default function Home() {
     if (!variant) return null
 
     const { start, end } = getWeekRange(selectedDate)
-    const previousStart = new Date(start)
-    previousStart.setDate(previousStart.getDate() - 7)
 
-    const statsForRange = (rangeStart: Date, rangeEnd: Date) => {
+    // Reduce each workout to a single dated volume, then let computeWeeklyPace
+    // handle the like-for-like windowing: both weeks are capped at the same
+    // point in the week so a partial week-to-date total is measured against
+    // last week through the same day ("vs last week's pace") instead of against
+    // last week's full total. On the Sunday review the cutoff lands at the end
+    // of the week, so it naturally becomes a full-week comparison.
+    const datedVolumes = workoutHistory.map((workout) => {
       let volume = 0
-      let sessions = 0
-      for (const workout of workoutHistory) {
-        if (!workout.date) continue
-        const workoutDate = new Date(workout.date)
-        if (workoutDate < rangeStart || workoutDate >= rangeEnd) continue
-        sessions += 1
-        for (const exercise of workout.exercises ?? []) {
-          for (const set of exercise.sets ?? []) {
-            if (isSetEligibleForStats(set)) {
-              volume += (set.weight ?? 0) * (set.reps ?? 0)
-            }
+      for (const exercise of workout.exercises ?? []) {
+        for (const set of exercise.sets ?? []) {
+          if (isSetEligibleForStats(set)) {
+            volume += (set.weight ?? 0) * (set.reps ?? 0)
           }
         }
       }
-      return { volume, sessions }
-    }
+      return { date: workout.date, volume }
+    })
 
-    const current = statsForRange(start, end)
-    const previous = statsForRange(previousStart, start)
-    const { percent: wowPercent } = computeWeekOverWeek(current.volume, previous.volume)
+    const pace = computeWeeklyPace(datedVolumes, selectedDate)
 
     const prCount = todayPRs.reduce((count, pr) => {
       if (!pr.achievedAt) return count
@@ -1148,10 +1143,10 @@ export default function Home() {
 
     return {
       variant,
-      sessions: current.sessions,
-      volume: current.volume,
-      previousVolume: previous.volume,
-      wowPercent,
+      sessions: pace.currentSessions,
+      volume: pace.currentVolume,
+      previousVolume: pace.previousVolume,
+      wowPercent: pace.percent,
       prCount,
     }
   }, [actualState, selectedDate, workoutHistory, getWeekRange, todayPRs])

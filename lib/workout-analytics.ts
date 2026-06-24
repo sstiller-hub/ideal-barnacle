@@ -77,3 +77,81 @@ export function isNewBest(currentValue: number, previousValue: number | null): b
   if (previousValue === null || Number.isNaN(previousValue)) return true
   return currentValue > previousValue
 }
+
+export type DatedWorkoutVolume = {
+  date: string | Date | null | undefined
+  volume: number
+}
+
+export type WeeklyPace = {
+  currentVolume: number
+  currentSessions: number
+  previousVolume: number
+  previousSessions: number
+  delta: number
+  percent: number
+}
+
+/** Local-midnight Monday that begins the week containing `date`. */
+export function getWeekStart(date: Date): Date {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  const day = start.getDay()
+  const diffToMonday = (day + 6) % 7
+  start.setDate(start.getDate() - diffToMonday)
+  return start
+}
+
+/**
+ * Compares this week's training volume against last week's at the *same point
+ * in the week* — "vs last week's pace". Both weeks are capped at the end of the
+ * reference day, so a partial week-to-date total (e.g. 2 of N sessions done) is
+ * measured against last week through the same day rather than against last
+ * week's full total. When `reference` is the final day of the week the cutoff
+ * lands at the end of the week, so it naturally becomes a full-week comparison.
+ *
+ * Each workout is counted in a range that is start-inclusive and end-exclusive.
+ */
+export function computeWeeklyPace(
+  workouts: DatedWorkoutVolume[],
+  reference: Date
+): WeeklyPace {
+  const start = getWeekStart(reference)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+
+  const asOf = new Date(reference)
+  asOf.setHours(23, 59, 59, 999)
+  const currentEnd = asOf < end ? asOf : end
+
+  const previousStart = new Date(start)
+  previousStart.setDate(previousStart.getDate() - 7)
+  const previousEnd = new Date(asOf)
+  previousEnd.setDate(previousEnd.getDate() - 7)
+
+  const statsForRange = (rangeStart: Date, rangeEnd: Date) => {
+    let volume = 0
+    let sessions = 0
+    for (const workout of workouts) {
+      if (!workout.date) continue
+      const when = new Date(workout.date)
+      if (when < rangeStart || when >= rangeEnd) continue
+      sessions += 1
+      volume += workout.volume
+    }
+    return { volume, sessions }
+  }
+
+  const current = statsForRange(start, currentEnd)
+  const previous = statsForRange(previousStart, previousEnd)
+  const { delta, percent } = computeWeekOverWeek(current.volume, previous.volume)
+
+  return {
+    currentVolume: current.volume,
+    currentSessions: current.sessions,
+    previousVolume: previous.volume,
+    previousSessions: previous.sessions,
+    delta,
+    percent,
+  }
+}
