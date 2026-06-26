@@ -5,7 +5,7 @@ import type React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
-import type { WorkoutRoutine } from "@/lib/routine-storage"
+import { type WorkoutRoutine, getRoutineById, saveRoutine } from "@/lib/routine-storage"
 import {
   getExerciseHistory,
   getLatestPerformance,
@@ -52,7 +52,8 @@ import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
 import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
-import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown } from "lucide-react"
+import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown, ListOrdered } from "lucide-react"
+import { ReorderExercisesSheet } from "@/components/reorder-exercises-sheet"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
@@ -225,6 +226,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const sessionRef = useRef<WorkoutSession | null>(null)
   const exercisesRef = useRef<any[]>([])
   const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
+  const [isReorderOpen, setIsReorderOpen] = useState(false)
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
   const currentExerciseIndexRef = useRef(0)
   const historyRepsCacheRef = useRef<Map<string, number[]>>(new Map())
@@ -1486,6 +1488,87 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     setValidationTrigger(0)
   }
 
+  const canSaveToRoutine = useMemo(
+    () => Boolean(session?.routineId && getRoutineById(session.routineId)),
+    [session?.routineId],
+  )
+
+  // Apply a new exercise order coming from the reorder sheet.
+  // Reordering moves whole exercise objects (with their logged sets) so no set
+  // data is lost. The active exercise is tracked by id so it stays active.
+  const applyReorder = async (orderedIds: string[], saveToRoutine: boolean) => {
+    if (!session) return
+
+    const byId = new Map<string, any>(exercises.map((exercise: any) => [exercise.id, exercise]))
+    // Rebuild from the requested order, dropping unknown ids and appending any
+    // exercise the sheet somehow omitted so nothing is ever lost.
+    const seen = new Set<string>()
+    const newExercises: any[] = []
+    for (const id of orderedIds) {
+      if (seen.has(id)) continue
+      const exercise = byId.get(id)
+      if (!exercise) continue
+      seen.add(id)
+      newExercises.push(exercise)
+    }
+    for (const exercise of exercises) {
+      if (!seen.has(exercise.id)) newExercises.push(exercise)
+    }
+
+    if (newExercises.length !== exercises.length) {
+      setIsReorderOpen(false)
+      return
+    }
+
+    // Keep the active exercise active after the move.
+    const activeId = exercises[currentExerciseIndex]?.id
+    const remappedIndex = activeId ? newExercises.findIndex((e: any) => e.id === activeId) : -1
+    const nextIndex = remappedIndex >= 0 ? remappedIndex : 0
+
+    const orderChanged = newExercises.some((exercise: any, idx: number) => exercise.id !== exercises[idx]?.id)
+
+    if (orderChanged) {
+      setExercises(newExercises)
+      const updatedSession: WorkoutSession = {
+        ...session,
+        exercises: newExercises,
+        currentExerciseIndex: nextIndex,
+      }
+      setSession(updatedSession)
+      await saveSession(updatedSession)
+      // If the active exercise's index changed, the currentExerciseIndex effect
+      // re-runs and smooth-scrolls the carousel to it (managing the programmatic
+      // scroll guard itself). If the index is unchanged, the carousel is already
+      // positioned correctly and the reordered pages just re-key in place.
+      setValidationTrigger(0)
+    }
+
+    if (saveToRoutine && session.routineId) {
+      const routine = getRoutineById(session.routineId)
+      if (routine) {
+        const normalize = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ")
+        const remaining = [...routine.exercises]
+        const reordered: typeof routine.exercises = []
+        for (const exercise of newExercises) {
+          let matchIdx = remaining.findIndex((r) => r.id === exercise.id)
+          if (matchIdx === -1) {
+            matchIdx = remaining.findIndex((r) => normalize(r.name) === normalize(exercise.name))
+          }
+          if (matchIdx >= 0) {
+            reordered.push(remaining[matchIdx])
+            remaining.splice(matchIdx, 1)
+          }
+        }
+        // Keep any routine exercises that weren't part of this session at the end.
+        reordered.push(...remaining)
+        saveRoutine({ ...routine, exercises: reordered })
+        toast.success("Order saved to routine")
+      }
+    }
+
+    setIsReorderOpen(false)
+  }
+
   const handleScroll = () => {
     const container = scrollContainerRef.current
     if (!container) return
@@ -1992,7 +2075,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           </div>
 
           {/* Exercise navigation dots */}
-          <div className="flex items-center justify-center gap-1.5 mt-2">
+          <div className="relative flex items-center justify-center gap-1.5 mt-2">
             {exercises.map((ex: any, index: number) => {
               const isComplete = ex.sets.every((s: any) => s.completed && !isSetIncomplete(s))
               const isCurrent = index === uiExerciseIndex
@@ -2012,6 +2095,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 />
               )
             })}
+            {exercises.length > 1 ? (
+              <button
+                type="button"
+                aria-label="Reorder exercises"
+                onClick={() => setIsReorderOpen(true)}
+                className="absolute"
+                style={{ right: 0, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", padding: "4px" }}
+              >
+                <ListOrdered size={14} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -2187,6 +2281,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           input[type="number"] { -moz-appearance: textfield; }
         `}</style>
+
+        <ReorderExercisesSheet
+          open={isReorderOpen}
+          onOpenChange={setIsReorderOpen}
+          exercises={exercises}
+          currentExerciseId={exercises[currentExerciseIndex]?.id}
+          canSaveToRoutine={canSaveToRoutine}
+          onApply={applyReorder}
+        />
       </div>
     )
   }
@@ -2378,7 +2481,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             </button>
           </div>
 
-          <div className="flex items-center justify-center gap-1.5 mb-4">
+          <div className="relative flex items-center justify-center gap-1.5 mb-4">
             {exercises.map((exercise, index) => {
               const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
               const isCurrent = index === uiExerciseIndex
@@ -2401,6 +2504,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 />
               )
             })}
+            {exercises.length > 1 ? (
+              <button
+                type="button"
+                aria-label="Reorder exercises"
+                onClick={() => setIsReorderOpen(true)}
+                className="absolute"
+                style={{ right: 0, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", padding: "4px" }}
+              >
+                <ListOrdered size={15} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+              </button>
+            ) : null}
           </div>
 
           <div style={{ display: "flex", justifyContent: "center" }}>
@@ -3160,6 +3274,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           -moz-appearance: textfield;
         }
       `}</style>
+
+      <ReorderExercisesSheet
+        open={isReorderOpen}
+        onOpenChange={setIsReorderOpen}
+        exercises={exercises}
+        currentExerciseId={exercises[currentExerciseIndex]?.id}
+        canSaveToRoutine={canSaveToRoutine}
+        onApply={applyReorder}
+      />
     </div>
   )
 }
