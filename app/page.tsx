@@ -38,6 +38,7 @@ import {
   type ScheduleOverrideResult,
 } from "@/lib/supabase-schedule-overrides"
 import { deriveWorkoutType } from "@/lib/workout-type"
+import { topSetWithContext } from "@/lib/top-set"
 import { computeWeekOverWeek, computeWeeklyPace } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
@@ -964,7 +965,10 @@ export default function Home() {
   // Most recent top set (by e1RM) for each exercise, excluding the selected
   // day's own workout. Powers the "what to beat" hint next to today's plan.
   const lastPerformanceByExercise = useMemo(() => {
-    const map = new Map<string, { weight: number; reps: number; date: string }>()
+    const map = new Map<
+      string,
+      { weight: number; reps: number; date: string; ordinal: number; total: number; standsOut: boolean }
+    >()
     const selected = new Date(selectedDate)
     selected.setHours(0, 0, 0, 0)
     const sorted = [...workoutHistory].sort(
@@ -977,15 +981,17 @@ export default function Home() {
       for (const exercise of workout.exercises ?? []) {
         const key = normalizeExerciseName(exercise.name)
         if (map.has(key)) continue
-        let best: { weight: number; reps: number; e1rm: number } | null = null
-        for (const set of exercise.sets ?? []) {
-          if (!set?.completed || !((set.weight ?? 0) > 0) || !((set.reps ?? 0) > 0)) continue
-          const e1rm = (set.weight as number) * (1 + (set.reps as number) / 30)
-          if (!best || e1rm > best.e1rm) {
-            best = { weight: set.weight as number, reps: set.reps as number, e1rm }
-          }
+        const top = topSetWithContext(exercise.sets)
+        if (top) {
+          map.set(key, {
+            weight: top.weight,
+            reps: top.reps,
+            date: workout.date,
+            ordinal: top.ordinal,
+            total: top.total,
+            standsOut: top.standsOut,
+          })
         }
-        if (best) map.set(key, { weight: best.weight, reps: best.reps, date: workout.date })
       }
     }
     return map
@@ -1014,15 +1020,33 @@ export default function Home() {
 
     const topLifts = (match.exercises ?? [])
       .map((exercise: any) => {
-        let best: { weight: number; reps: number } | null = null
-        for (const set of exercise.sets ?? []) {
-          if (!set?.completed || !((set.weight ?? 0) > 0) || !((set.reps ?? 0) > 0)) continue
-          if (!best || set.weight > best.weight) best = { weight: set.weight, reps: set.reps }
-        }
-        return best ? { name: exercise.name, weight: best.weight, reps: best.reps } : null
+        const top = topSetWithContext(exercise.sets)
+        return top
+          ? {
+              name: exercise.name,
+              weight: top.weight,
+              reps: top.reps,
+              ordinal: top.ordinal,
+              total: top.total,
+              standsOut: top.standsOut,
+              product: top.weight * top.reps,
+            }
+          : null
       })
-      .filter((lift): lift is { name: string; weight: number; reps: number } => Boolean(lift))
-      .sort((a, b) => b.weight - a.weight)
+      .filter(
+        (
+          lift
+        ): lift is {
+          name: string
+          weight: number
+          reps: number
+          ordinal: number
+          total: number
+          standsOut: boolean
+          product: number
+        } => Boolean(lift)
+      )
+      .sort((a, b) => b.product - a.product)
       .slice(0, 3)
 
     return {
@@ -1631,6 +1655,7 @@ export default function Home() {
                         style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
                       >
                         {lift.weight} × {lift.reps}
+                        {lift.standsOut ? ` · set ${lift.ordinal}` : ""}
                       </span>
                     </div>
                   ))}
@@ -1992,6 +2017,7 @@ export default function Home() {
                             style={{ fontSize: compact ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
                           >
                             last {last.weight}×{last.reps}
+                            {last.standsOut ? ` · set ${last.ordinal}` : ""}
                           </div>
                         ) : null
                       })()}
@@ -2056,6 +2082,7 @@ export default function Home() {
                           }}
                         >
                           last {last.weight}×{last.reps}
+                          {last.standsOut ? ` · set ${last.ordinal}` : ""}
                         </div>
                       ) : null
                     })()}
