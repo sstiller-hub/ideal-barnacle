@@ -1266,7 +1266,7 @@ export default function Home() {
     <>
       <button
         onClick={() => router.push("/settings")}
-        className="fixed z-[60] text-white/25 hover:text-white/50 transition-colors duration-200"
+        className="fixed z-[60] text-ink-25 hover:text-ink-50 transition-colors duration-base"
         style={{
           top: "calc(env(safe-area-inset-top, 0px) + 10px)",
           right: "calc(18px + env(safe-area-inset-right, 0px))",
@@ -1298,18 +1298,18 @@ export default function Home() {
                 <button
                   key={state}
                   onClick={() => setUiStateOverride(uiStateOverride === state ? null : state)}
-                  className="flex-shrink-0 transition-all duration-200"
+                  className="flex-shrink-0 transition-all duration-base"
                   style={{
                     background: uiStateOverride === state ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
                     border: uiStateOverride === state ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(255, 255, 255, 0.06)",
-                    borderRadius: "1px",
+                    borderRadius: "var(--radius-flat)",
                     padding: "6px 10px",
                   }}
                   type="button"
                 >
                   <span
-                    className={uiStateOverride === state ? "text-white/70" : "text-white/30"}
-                    style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className={uiStateOverride === state ? "text-ink-70" : "text-ink-30"}
+                    style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     {state.toUpperCase()}
                   </span>
@@ -1340,12 +1340,12 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-1">
               <button
                 onClick={handleDevModeActivation}
-                className="text-white/25 tracking-widest select-none"
+                className="text-ink-25 tracking-widest select-none"
                 style={{
                   fontSize: "7px",
                   fontWeight: 500,
                   letterSpacing: "0.18em",
-                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontFamily: "var(--font-label)",
                   background: "transparent",
                   border: "none",
                   padding: 0,
@@ -1367,15 +1367,15 @@ export default function Home() {
                     }}
                   />
                   <span
-                    className="text-white/40"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-40"
+                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     IN PROGRESS
                   </span>
                   {activeSessionProgress && (
                     <span
-                      className="text-white/30"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className="text-ink-30"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                     >
                       • {activeSessionProgress.remainingSets} SETS REMAINING
                     </span>
@@ -1386,18 +1386,18 @@ export default function Home() {
             <button
               onClick={() => !isPastDay && setShowWorkoutPicker(!showWorkoutPicker)}
               disabled={isPastDay}
-              className="text-left transition-opacity duration-200 hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
+              className="text-left transition-opacity duration-base hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
               style={{ paddingRight: "44px" }}
             >
               <h1
                 className="text-white"
                 style={{
-                  fontSize: "48px",
+                  fontSize: "var(--text-marquee)",
                   fontWeight: 400,
                   letterSpacing: "-0.01em",
                   lineHeight: "0.92",
                   marginTop: "10px",
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "var(--font-display)",
                 }}
               >
                 {selectedTitle}
@@ -1406,7 +1406,7 @@ export default function Home() {
                 <ChevronRight
                   size={20}
                   strokeWidth={1.5}
-                  className="text-white/30 mt-2 transition-transform duration-200"
+                  className="text-ink-30 mt-2 transition-transform duration-base"
                   style={{
                     transform: showWorkoutPicker ? "rotate(90deg)" : "rotate(0deg)",
                   }}
@@ -1419,15 +1419,15 @@ export default function Home() {
             <div className="flex items-center gap-1.5">
               <div>
                 <div
-                  className="text-white/25 tracking-widest mb-1"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  className="text-ink-25 tracking-widest mb-1"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
                 >
                   {isToday() ? "TODAY" : isTomorrow() ? "TOMORROW" : isYesterday() ? "YESTERDAY" : isPastDay ? "PAST" : "UPCOMING"}
                 </div>
-                <div className="text-white/95" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em", textAlign: "left" }}>
+                <div className="text-ink-95" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em", textAlign: "left" }}>
                   {selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
                 </div>
-                <div className="text-white/30 mt-0.5" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.01em" }}>
+                <div className="text-ink-30 mt-0.5" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.01em" }}>
                   {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </div>
               </div>
@@ -1444,16 +1444,16 @@ export default function Home() {
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
                 WebkitOverflowScrolling: "touch",
-                animation: "slideInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                animation: "slideInDown var(--duration-slow) var(--ease-theatre) forwards",
               }}
             >
               <button
                 onClick={() => handleSelectWorkoutType(null)}
-                className="flex-shrink-0 transition-all duration-200"
+                className="flex-shrink-0 transition-all duration-base"
                 style={{
                   background: effectiveRestDay ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.02)",
                   border: effectiveRestDay ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.06)",
-                  borderRadius: "1px",
+                  borderRadius: "var(--radius-flat)",
                   padding: "12px 18px",
                   minWidth: "100px",
                 }}
@@ -1472,8 +1472,8 @@ export default function Home() {
                 type="button"
               >
                 <div
-                  className={effectiveRestDay ? "text-white/90" : "text-white/50"}
-                  style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  className={effectiveRestDay ? "text-ink-90" : "text-ink-50"}
+                  style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
                 >
                   Rest
                 </div>
@@ -1484,14 +1484,14 @@ export default function Home() {
                   <button
                     key={routine.id}
                     onClick={() => handleSelectWorkoutType(routine.id)}
-                    className="flex-shrink-0 transition-all duration-200"
+                    className="flex-shrink-0 transition-all duration-base"
                     style={{
                       background: isSelected ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.02)",
                       border: isSelected ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.06)",
-                      borderRadius: "1px",
+                      borderRadius: "var(--radius-flat)",
                       padding: "12px 18px",
                       minWidth: "100px",
-                      animation: `slideInItem 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.03}s backwards`,
+                      animation: `slideInItem var(--duration-entry) var(--ease-theatre) ${index * 0.03}s backwards`,
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
@@ -1508,8 +1508,8 @@ export default function Home() {
                     type="button"
                   >
                     <div
-                      className={isSelected ? "text-white/90" : "text-white/50"}
-                      style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className={isSelected ? "text-ink-90" : "text-ink-50"}
+                      style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
                     >
                       {routine.name}
                     </div>
@@ -1551,35 +1551,35 @@ export default function Home() {
         {lastSameWorkout && (
           <div className="px-5 mb-5">
             <button
-              className="w-full text-left transition-all duration-200"
+              className="w-full text-left transition-all duration-base"
               onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 border: "1px solid rgba(255, 255, 255, 0.07)",
-                borderRadius: "4px",
+                borderRadius: "var(--radius-xs)",
                 padding: "12px 14px",
               }}
               type="button"
             >
               <div className="flex items-center justify-between mb-2.5">
                 <span
-                  className="text-white/30 tracking-widest"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  className="text-ink-30 tracking-widest"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
                 >
                   LAST {selectedTitle.toUpperCase()} · TO BEAT
                 </span>
-                <span className="text-white/25" style={{ fontSize: "9px", fontWeight: 400 }}>
+                <span className="text-ink-25" style={{ fontSize: "9px", fontWeight: 400 }}>
                   {getRelativeDate(lastSameWorkout.date)}
                 </span>
               </div>
               <div className="flex items-baseline gap-1.5 mb-3">
                 <span
-                  className="text-white/85"
+                  className="text-ink-85"
                   style={{ fontSize: "18px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
                 >
                   {formatVolume(lastSameWorkout.totalVolume)}
                 </span>
-                <span className="text-white/20" style={{ fontSize: "8px", fontWeight: 400 }}>
+                <span className="text-ink-20" style={{ fontSize: "8px", fontWeight: 400 }}>
                   lb total
                 </span>
               </div>
@@ -1587,11 +1587,11 @@ export default function Home() {
                 <div className="space-y-1.5">
                   {lastSameWorkout.topLifts.map((lift) => (
                     <div key={lift.name} className="flex items-center justify-between">
-                      <span className="text-white/55" style={{ fontSize: "10px", fontWeight: 400 }}>
+                      <span className="text-ink-50" style={{ fontSize: "10px", fontWeight: 400 }}>
                         {getExerciseLabel(lift.name)}
                       </span>
                       <span
-                        className="text-white/70"
+                        className="text-ink-70"
                         style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
                       >
                         {lift.weight} × {lift.reps}
@@ -1612,13 +1612,13 @@ export default function Home() {
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "1px",
+                borderRadius: "var(--radius-flat)",
                 padding: isCompactExerciseList ? "12px" : "16px",
               }}
             >
               <div
-                className="text-white/25 tracking-widest mb-4"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-25 tracking-widest mb-4"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
               >
                 {isPastDay ? "COMPLETED" : "COMPLETED TODAY"}
               </div>
@@ -1626,13 +1626,13 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4" style={{ marginBottom: isCompactExerciseList ? "12px" : "24px" }}>
                 <div>
                   <div
-                    className="text-white/20 mb-1"
-                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-20 mb-1"
+                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     EXERCISES
                   </div>
                   <div
-                    className="text-white/90"
+                    className="text-ink-90"
                     style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
                   >
                     {workoutForDate.exercises?.length ?? 0}
@@ -1640,18 +1640,18 @@ export default function Home() {
                 </div>
                 <div>
                   <div
-                    className="text-white/20 mb-1"
-                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-20 mb-1"
+                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     VOLUME
                   </div>
                   <div
-                    className="text-white/90"
+                    className="text-ink-90"
                     style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
                   >
                     {Math.round(workoutForDate.stats.totalVolume / 100) / 10}k
                   </div>
-                  <div className="text-white/15" style={{ fontSize: "7px", fontWeight: 400 }}>
+                  <div className="text-ink-15" style={{ fontSize: "7px", fontWeight: 400 }}>
                     lbs
                   </div>
                 </div>
@@ -1659,12 +1659,12 @@ export default function Home() {
 
               {completedComparison && (
                 <button
-                  className="w-full text-left transition-all duration-200"
+                  className="w-full text-left transition-all duration-base"
                   onClick={() => router.push(`/history/${completedComparison.prevId}`)}
                   style={{
                     background: "rgba(255, 255, 255, 0.02)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
-                    borderRadius: "1px",
+                    borderRadius: "var(--radius-flat)",
                     padding: isCompactExerciseList ? "9px 10px" : "11px 12px",
                     marginBottom: isCompactExerciseList ? "12px" : "16px",
                   }}
@@ -1672,12 +1672,12 @@ export default function Home() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span
-                      className="text-white/25 tracking-widest"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className="text-ink-25 tracking-widest"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "var(--font-label)" }}
                     >
                       VS LAST {deriveWorkoutType(workoutForDate.name).toUpperCase()}
                     </span>
-                    <span className="text-white/20" style={{ fontSize: "8px", fontWeight: 400 }}>
+                    <span className="text-ink-20" style={{ fontSize: "8px", fontWeight: 400 }}>
                       {getRelativeDate(completedComparison.prevDate)}
                     </span>
                   </div>
@@ -1694,7 +1694,7 @@ export default function Home() {
                           fontWeight: 600,
                           color: completedComparison.delta > 0 ? "#FF5733" : "rgba(255,255,255,0.5)",
                           fontVariantNumeric: "tabular-nums",
-                          fontFamily: "'Archivo Narrow', sans-serif",
+                          fontFamily: "var(--font-label)",
                         }}
                       >
                         {completedComparison.delta >= 0 ? "+" : "-"}
@@ -1706,7 +1706,7 @@ export default function Home() {
                           fontWeight: 500,
                           color: completedComparison.delta > 0 ? "rgba(255,87,51,0.6)" : "rgba(255,255,255,0.25)",
                           fontVariantNumeric: "tabular-nums",
-                          fontFamily: "'Archivo Narrow', sans-serif",
+                          fontFamily: "var(--font-label)",
                         }}
                       >
                         ({Math.abs(completedComparison.percent).toFixed(0)}%)
@@ -1714,10 +1714,10 @@ export default function Home() {
                     </div>
                     {completedComparison.compared > 0 && (
                       <>
-                        <span className="text-white/15" style={{ fontSize: "8px" }}>·</span>
+                        <span className="text-ink-15" style={{ fontSize: "8px" }}>·</span>
                         <span
-                          className="text-white/45"
-                          style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+                          className="text-ink-40"
+                          style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
                         >
                           {completedComparison.beaten} of {completedComparison.compared} lifts beaten
                         </span>
@@ -1728,11 +1728,11 @@ export default function Home() {
               )}
 
               <button
-                className="w-full transition-all duration-200"
+                className="w-full transition-all duration-base"
                 style={{
                   background: "rgba(255, 255, 255, 0.03)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "1px",
+                  borderRadius: "var(--radius-flat)",
                   padding: isCompactExerciseList ? "9px" : "11px",
                 }}
                 onClick={() => router.push(`/history/${workoutForDate.id}`)}
@@ -1745,7 +1745,7 @@ export default function Home() {
                   e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)"
                 }}
               >
-                <span className="text-white/60" style={{ fontSize: "11px", fontWeight: 400 }}>
+                <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
                   View Details
                 </span>
               </button>
@@ -1760,7 +1760,7 @@ export default function Home() {
                     style={{ opacity: 0.6, gap: isCompactExerciseList ? "6px" : undefined }}
                   >
                     <div
-                      className="text-white/40"
+                      className="text-ink-40"
                       style={{
                         fontSize: isCompactExerciseList ? "8px" : "9px",
                         fontWeight: 500,
@@ -1771,7 +1771,7 @@ export default function Home() {
                       {index + 1}
                     </div>
                     <div
-                      className="text-white/90 flex-1"
+                      className="text-ink-90 flex-1"
                       style={{
                         fontSize: isCompactExerciseList ? "10px" : "11px",
                         fontWeight: 400,
@@ -1781,7 +1781,7 @@ export default function Home() {
                       {getExerciseLabel(exercise.name)}
                     </div>
                     <div
-                      className="text-white/30"
+                      className="text-ink-30"
                       style={{
                         fontSize: isCompactExerciseList ? "8px" : "9px",
                         fontWeight: 400,
@@ -1799,7 +1799,7 @@ export default function Home() {
 
         {actualState === "rest" && !weeklyReview && (
           <div className="px-5 mb-6">
-            <div className="text-white/20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
+            <div className="text-ink-20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
               Rest day — no workout scheduled
             </div>
           </div>
@@ -1811,18 +1811,18 @@ export default function Home() {
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
+                borderRadius: "var(--radius-xs)",
                 padding: "18px",
               }}
             >
               <div
-                className="text-white/25 tracking-widest mb-1"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-25 tracking-widest mb-1"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
               >
                 {weeklyReview.variant === "review" ? "WEEK IN REVIEW" : "WEEK SO FAR"}
               </div>
               <div
-                className="text-white/70 mb-4"
+                className="text-ink-70 mb-4"
                 style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.01em" }}
               >
                 {weeklyReview.variant === "review"
@@ -1833,44 +1833,44 @@ export default function Home() {
               <div className="flex items-stretch">
                 <div className="flex-1">
                   <div
-                    className="text-white/25 tracking-widest mb-1"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-25 tracking-widest mb-1"
+                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
                   >
                     SESSIONS
                   </div>
                   <div
-                    className="text-white/95"
-                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                    className="text-ink-95"
+                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
                   >
                     {weeklyReview.sessions}
                   </div>
                 </div>
                 <div className="flex-1">
                   <div
-                    className="text-white/25 tracking-widest mb-1"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-25 tracking-widest mb-1"
+                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
                   >
                     {weeklyReview.variant === "review" ? "VOLUME" : "VOLUME SO FAR"}
                   </div>
                   <div
-                    className="text-white/95"
-                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                    className="text-ink-95"
+                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
                   >
                     {formatVolume(weeklyReview.volume)}
-                    <span className="text-white/30" style={{ fontSize: "11px", marginLeft: "3px" }}>lb</span>
+                    <span className="text-ink-30" style={{ fontSize: "11px", marginLeft: "3px" }}>lb</span>
                   </div>
                 </div>
                 {weeklyReview.variant === "review" && (
                   <div className="flex-1">
                     <div
-                      className="text-white/25 tracking-widest mb-1"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className="text-ink-25 tracking-widest mb-1"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
                     >
                       PRS
                     </div>
                     <div
-                      className="text-white/95"
-                      style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}
+                      className="text-ink-95"
+                      style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
                     >
                       {weeklyReview.prCount}
                     </div>
@@ -1886,8 +1886,8 @@ export default function Home() {
                     <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
                   )}
                   <span
-                    className="text-white/40"
-                    style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+                    className="text-ink-40"
+                    style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
                   >
                     {Math.abs(Math.round(weeklyReview.wowPercent))}%{" "}
                     {weeklyReview.variant === "review" ? "vs last week" : "vs last week's pace"}
@@ -1905,14 +1905,14 @@ export default function Home() {
             <div className="px-5 mb-2">
               <div className="flex items-center gap-2 mb-3">
                 <div
-                  className="text-white/25 tracking-widest"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                  className="text-ink-25 tracking-widest"
+                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
                 >
                   UP NEXT · {nextWorkout.label}
                 </div>
                 <div className="flex-1 h-px" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
                 <div
-                  className="text-white/40"
+                  className="text-ink-40"
                   style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "0.01em" }}
                 >
                   {deriveWorkoutType(nextWorkout.routine.name)}
@@ -1926,7 +1926,7 @@ export default function Home() {
                     style={{ opacity: 0.55, gap: compact ? "6px" : undefined }}
                   >
                     <div
-                      className="text-white/40"
+                      className="text-ink-40"
                       style={{
                         fontSize: compact ? "8px" : "9px",
                         fontWeight: 500,
@@ -1937,14 +1937,14 @@ export default function Home() {
                       {index + 1}
                     </div>
                     <div
-                      className="text-white/90 flex-1"
+                      className="text-ink-90 flex-1"
                       style={{ fontSize: compact ? "10px" : "11px", fontWeight: 400, letterSpacing: "0.005em" }}
                     >
                       {getExerciseLabel(exercise.name)}
                     </div>
                     <div className="flex flex-col items-end" style={{ gap: "1px" }}>
                       <div
-                        className="text-white/40"
+                        className="text-ink-40"
                         style={{ fontSize: compact ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
                       >
                         {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
@@ -1953,7 +1953,7 @@ export default function Home() {
                         const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
                         return last ? (
                           <div
-                            className="text-white/30"
+                            className="text-ink-30"
                             style={{ fontSize: compact ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
                           >
                             last {last.weight}×{last.reps}
@@ -1979,7 +1979,7 @@ export default function Home() {
                   style={{ opacity: 0.7, gap: isCompactExerciseList ? "6px" : undefined }}
                 >
                   <div
-                    className="text-white/40"
+                    className="text-ink-40"
                     style={{
                       fontSize: isCompactExerciseList ? "8px" : "9px",
                       fontWeight: 500,
@@ -1990,7 +1990,7 @@ export default function Home() {
                     {index + 1}
                   </div>
                   <div
-                    className="text-white/90 flex-1"
+                    className="text-ink-90 flex-1"
                     style={{
                       fontSize: isCompactExerciseList ? "10px" : "11px",
                       fontWeight: 400,
@@ -2001,7 +2001,7 @@ export default function Home() {
                   </div>
                   <div className="flex flex-col items-end" style={{ gap: "1px" }}>
                     <div
-                      className="text-white/40"
+                      className="text-ink-40"
                       style={{
                         fontSize: isCompactExerciseList ? "8px" : "9px",
                         fontWeight: 400,
@@ -2014,7 +2014,7 @@ export default function Home() {
                       const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
                       return last ? (
                         <div
-                          className="text-white/30"
+                          className="text-ink-30"
                           style={{
                             fontSize: isCompactExerciseList ? "7px" : "8px",
                             fontWeight: 400,
@@ -2032,11 +2032,11 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full transition-all duration-200"
+              className="w-full transition-all duration-base"
               style={{
                 background: actualState === "activeSession" ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.03)",
                 border: actualState === "activeSession" ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "1px",
+                borderRadius: "var(--radius-flat)",
                 padding: "14px",
               }}
               onMouseEnter={(e) => {
@@ -2069,7 +2069,7 @@ export default function Home() {
                     }}
                   />
                 )}
-                <span className="text-white/90" style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em" }}>
+                <span className="text-ink-90" style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em" }}>
                   {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
                 </span>
                 {actualState === "activeSession" && null}
@@ -2078,11 +2078,11 @@ export default function Home() {
 
             {actualState === "activeSession" && (
               <button
-                className="w-full mt-3 transition-all duration-200"
+                className="w-full mt-3 transition-all duration-base"
                 style={{
                   background: "transparent",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "1px",
+                  borderRadius: "var(--radius-flat)",
                   padding: "12px",
                 }}
                 onMouseEnter={(e) => {
@@ -2095,7 +2095,7 @@ export default function Home() {
                 }}
                 onClick={handleDiscardActiveWorkout}
               >
-                <span className="text-white/40" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.02em" }}>
+                <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.02em" }}>
                   Discard Active Workout
                 </span>
               </button>
@@ -2118,8 +2118,8 @@ export default function Home() {
       >
         <div className="flex items-center justify-between mb-2">
           <div
-            className="text-white/25 tracking-widest"
-            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+            className="text-ink-25 tracking-widest"
+            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
           >
             PROGRESS
           </div>
@@ -2131,8 +2131,8 @@ export default function Home() {
                 <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
               )}
               <span
-                className="text-white/40"
-                style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-40"
+                style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
               >
                 {progression.up} of {progression.tracked} lifts up
               </span>
@@ -2140,7 +2140,7 @@ export default function Home() {
           )}
         </div>
         <button
-          className="w-full text-left transition-all duration-200"
+          className="w-full text-left transition-all duration-base"
           onClick={() => router.push("/volume")}
           style={{ background: "transparent", padding: 0 }}
           type="button"
@@ -2167,8 +2167,8 @@ export default function Home() {
         >
           <div className="px-5 flex items-center justify-between mb-4">
             <h2
-              className="text-white/25 tracking-widest"
-              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+              className="text-ink-25 tracking-widest"
+              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
             >
               PERSONAL RECORDS
             </h2>
@@ -2213,7 +2213,7 @@ export default function Home() {
               Active Workout Detected
             </AlertDialogTitle>
             <AlertDialogDescription
-              className="text-white/40"
+              className="text-ink-40"
               style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
             >
               You have an active workout in progress ({session?.routineName || "Workout"}). Would you like to resume it
@@ -2231,7 +2231,7 @@ export default function Home() {
                 padding: "12px",
               }}
             >
-              <span className="text-white/90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.02em" }}>
+              <span className="text-ink-90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.02em" }}>
                 Resume Existing
               </span>
             </AlertDialogAction>
@@ -2245,7 +2245,7 @@ export default function Home() {
                 padding: "12px",
               }}
             >
-              <span className="text-white/60" style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.02em" }}>
+              <span className="text-ink-50" style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.02em" }}>
                 Discard & Start New
               </span>
             </AlertDialogAction>
@@ -2259,7 +2259,7 @@ export default function Home() {
                 padding: "10px",
               }}
             >
-              <span className="text-white/40" style={{ fontSize: "11px", fontWeight: 400 }}>
+              <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
                 Cancel
               </span>
             </AlertDialogCancel>
@@ -2341,7 +2341,7 @@ function PRCard({
       type="button"
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="text-white/35 pr-2" style={{ fontSize: "9px", fontWeight: 400, lineHeight: "1.3", letterSpacing: "0.005em" }}>
+        <div className="text-ink-35 pr-2" style={{ fontSize: "9px", fontWeight: 400, lineHeight: "1.3", letterSpacing: "0.005em" }}>
           {exercise}
         </div>
 
@@ -2369,22 +2369,22 @@ function PRCard({
       <div className="mb-5">
         <div className="flex items-baseline gap-2">
           <div
-            className="text-white/95"
+            className="text-ink-95 font-display"
             style={{ fontSize: "34px", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: "1", fontVariantNumeric: "tabular-nums" }}
           >
             {reps}
           </div>
-          <div className="text-white/15" style={{ fontSize: "11px", fontWeight: 400, marginBottom: "3px" }}>
+          <div className="text-ink-15" style={{ fontSize: "11px", fontWeight: 400, marginBottom: "3px" }}>
             ×
           </div>
           <div
-            className="text-white/95"
+            className="text-ink-95 font-display"
             style={{ fontSize: "34px", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: "1", fontVariantNumeric: "tabular-nums" }}
           >
             {weight}
           </div>
         </div>
-        <div className="text-white/20 mt-1" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.02em" }}>
+        <div className="text-ink-20 mt-1" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.02em" }}>
           lbs
         </div>
       </div>
@@ -2426,7 +2426,7 @@ function PRCard({
         </ResponsiveContainer>
       </div>
 
-      <div className="text-white/18" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.01em" }}>
+      <div className="text-ink-20" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.01em" }}>
         {details}
       </div>
     </button>
@@ -2464,7 +2464,7 @@ function TrainingVolumeCard({
       <div className="mb-4">
         <div className="flex items-baseline gap-2">
           <div
-            className="text-white/95"
+            className="text-ink-95 font-display"
             style={{
               fontSize: "34px",
               fontWeight: 500,
@@ -2475,7 +2475,7 @@ function TrainingVolumeCard({
           >
             {formatVolumeK(displayVolume)}
           </div>
-          <div className="text-white/20" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
+          <div className="text-ink-20" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
             lbs
           </div>
         </div>
@@ -2483,8 +2483,8 @@ function TrainingVolumeCard({
 
       <div className="flex items-center gap-2 mb-2">
         <div
-          className="text-white/40"
-          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "'Archivo Narrow', sans-serif" }}
+          className="text-ink-40"
+          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "var(--font-label)" }}
         >
           {showWeekCompare ? "WEEK/WEEK" : "THIS WEEK SO FAR"}
         </div>
@@ -2501,7 +2501,7 @@ function TrainingVolumeCard({
                 fontWeight: 600,
                 color: valueColor,
                 fontVariantNumeric: "tabular-nums",
-                fontFamily: "'Archivo Narrow', sans-serif",
+                fontFamily: "var(--font-label)",
               }}
             >
               {formatVolumeK(Math.abs(delta))}
@@ -2512,7 +2512,7 @@ function TrainingVolumeCard({
                 fontWeight: 500,
                 color: percentColor,
                 fontVariantNumeric: "tabular-nums",
-                fontFamily: "'Archivo Narrow', sans-serif",
+                fontFamily: "var(--font-label)",
               }}
             >
               ({Math.abs(percent).toFixed(1)}%)
@@ -2520,8 +2520,8 @@ function TrainingVolumeCard({
           </div>
         ) : (
           <div
-            className="text-white/25"
-            style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "'Archivo Narrow', sans-serif" }}
+            className="text-ink-25"
+            style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
           >
             Prev 7d {formatVolumeK(previousWeekVolume)} lbs
           </div>

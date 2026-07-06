@@ -31,7 +31,7 @@ function pillStyle(active: boolean): React.CSSProperties {
     color: active ? "rgba(255, 255, 255, 0.70)" : "rgba(255, 255, 255, 0.30)",
     fontSize: "10px",
     fontWeight: 500,
-    fontFamily: "'Archivo Narrow', sans-serif",
+    fontFamily: "var(--font-label)",
     letterSpacing: "0.06em",
     textAlign: "center" as const,
     transition: "background 0.15s, color 0.15s",

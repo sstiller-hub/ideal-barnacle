@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { useState, useEffect, useMemo } from "react"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -327,9 +328,9 @@ export default function WorkoutDetailPage() {
                 </span>
               )}
               {performanceSummary.excludedSets > 0 && (
-                <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-1 rounded-full">
+                <Badge tone="warn" className="normal-case tracking-normal text-xs py-1">
                   ⚠️ {performanceSummary.excludedSets} sets excluded
-                </span>
+                </Badge>
               )}
             </div>
           </Card>
@@ -355,15 +356,9 @@ export default function WorkoutDetailPage() {
                         {exercise.name}
                       </button>
                       {exercise.rating && (
-                        <span
-                          className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                            exercise.rating === "thumbs_up"
-                              ? "bg-emerald-500/10 text-emerald-700"
-                              : "bg-amber-500/10 text-amber-700"
-                          }`}
-                        >
+                        <Badge tone={exercise.rating === "thumbs_up" ? "good" : "warn"}>
                           {exercise.rating === "thumbs_up" ? "Felt good" : "Felt rough"}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -413,7 +408,7 @@ export default function WorkoutDetailPage() {
                                   {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} lbs` : "—"}
                                 </span>
                                 {weightDeltaLabel && (
-                                  <span className="text-[10px] text-white/40" style={{ fontWeight: 400 }}>
+                                  <span className="text-[10px] text-ink-40" style={{ fontWeight: 400 }}>
                                     {weightDeltaLabel}
                                   </span>
                                 )}
@@ -425,7 +420,7 @@ export default function WorkoutDetailPage() {
                                   {set.completed && set.reps !== null && set.reps !== undefined ? set.reps : "—"}
                                 </span>
                                 {repsDeltaLabel && (
-                                  <span className="text-[10px] text-white/40" style={{ fontWeight: 400 }}>
+                                  <span className="text-[10px] text-ink-40" style={{ fontWeight: 400 }}>
                                     {repsDeltaLabel}
                                   </span>
                                 )}

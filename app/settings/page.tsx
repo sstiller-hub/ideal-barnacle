@@ -334,7 +334,7 @@ export default function SettingsPage() {
         <div className="relative flex items-center justify-between mb-8 flex-shrink-0">
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
             style={{
               background: "transparent",
               border: "none",
@@ -350,7 +350,7 @@ export default function SettingsPage() {
             </span>
           </button>
           <h1
-            className="text-white/95 absolute left-1/2 transform -translate-x-1/2"
+            className="text-ink-95 absolute left-1/2 transform -translate-x-1/2"
             style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.01em" }}
           >
             Settings
@@ -498,7 +498,7 @@ export default function SettingsPage() {
                 )}
 
                 {manualSyncReport && (
-                  <div className="rounded-md border border-white/10 p-3 text-xs text-muted-foreground space-y-2">
+                  <div className="rounded-md border border-ink-08 p-3 text-xs text-muted-foreground space-y-2">
                     <div>
                       Summary: {manualSyncReport.synced} synced, {manualSyncReport.skipped} skipped,{" "}
                       {manualSyncReport.conflicts} conflicts, {manualSyncReport.errors} errors.
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                       <summary className="cursor-pointer">Details</summary>
                       <div className="mt-2 space-y-2">
                         {manualSyncReport.results.map((result) => (
-                          <div key={result.workout_id} className="border-t border-white/5 pt-2">
+                          <div key={result.workout_id} className="border-t border-ink-04 pt-2">
                             <div>
                               {result.workout_id} • {result.status}
                             </div>
@@ -734,21 +734,21 @@ export default function SettingsPage() {
                       <span className="font-semibold">{importResult.rowsParsed}</span>
                     </div>
 
-                    <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg text-sm">
+                    <div className="flex items-center justify-between p-2 bg-good-tint rounded-lg text-sm">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <CheckCircle2 className="w-4 h-4 text-good-ink" />
                         <span>Sessions Created</span>
                       </div>
-                      <span className="font-semibold text-green-600">{importResult.sessionsCreated}</span>
+                      <span className="font-semibold text-good-ink">{importResult.sessionsCreated}</span>
                     </div>
 
                     {importResult.duplicatesSkipped > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg text-sm">
+                      <div className="flex items-center justify-between p-2 bg-warn-tint rounded-lg text-sm">
                         <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-yellow-600" />
+                          <AlertCircle className="w-4 h-4 text-warn-ink" />
                           <span>Duplicates Skipped</span>
                         </div>
-                        <span className="font-semibold text-yellow-600">{importResult.duplicatesSkipped}</span>
+                        <span className="font-semibold text-warn-ink">{importResult.duplicatesSkipped}</span>
                       </div>
                     )}
 
@@ -828,7 +828,7 @@ export default function SettingsPage() {
                   style={{
                     background: "rgba(255, 255, 255, 0.03)",
                     border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "4px",
+                    borderRadius: "var(--radius-xs)",
                     padding: "12px 14px",
                   }}
                 >
@@ -837,7 +837,7 @@ export default function SettingsPage() {
                       fontSize: "12px",
                       color: "rgba(255, 255, 255, 0.55)",
                       marginBottom: "8px",
-                      fontFamily: "'Archivo Narrow', sans-serif",
+                      fontFamily: "var(--font-label)",
                     }}
                   >
                     Deload active — ends{" "}
@@ -855,7 +855,7 @@ export default function SettingsPage() {
                       cursor: "pointer",
                       fontSize: "11px",
                       color: "rgba(255, 255, 255, 0.28)",
-                      fontFamily: "'Archivo Narrow', sans-serif",
+                      fontFamily: "var(--font-label)",
                       letterSpacing: "0.06em",
                       textDecoration: "underline",
                     }}
@@ -984,7 +984,7 @@ function SettingsSection({
     >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 transition-colors duration-200 hover:bg-white/[0.01]"
+        className="w-full flex items-center justify-between p-4 transition-colors duration-base hover:bg-white/[0.01]"
         style={{
           background: "transparent",
           border: "none",
@@ -993,17 +993,17 @@ function SettingsSection({
         type="button"
       >
         <span
-          className="text-white/50"
+          className="text-ink-50"
           style={{
             fontSize: "11px",
             fontWeight: 500,
             letterSpacing: "0.08em",
-            fontFamily: "'Archivo Narrow', sans-serif",
+            fontFamily: "var(--font-label)",
           }}
         >
           {title}
         </span>
-        <div className="text-white/30">
+        <div className="text-ink-30">
           {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
         </div>
       </button>
@@ -1025,7 +1025,7 @@ function SettingsSection({
 function SettingItem({ label }: { label: string }) {
   return (
     <button
-      className="w-full text-left py-2.5 px-0 transition-colors duration-200 hover:text-white/70"
+      className="w-full text-left py-2.5 px-0 transition-colors duration-base hover:text-ink-70"
       style={{
         background: "transparent",
         border: "none",
@@ -1034,7 +1034,7 @@ function SettingItem({ label }: { label: string }) {
       type="button"
     >
       <span
-        className="text-white/50"
+        className="text-ink-50"
         style={{
           fontSize: "12px",
           fontWeight: 400,

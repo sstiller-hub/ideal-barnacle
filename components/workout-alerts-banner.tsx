@@ -20,9 +20,9 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
           <div
             key={alert.id}
             style={{
-              background: isUrgent ? "rgba(239, 68, 68, 0.07)" : "rgba(245, 158, 11, 0.07)",
-              border: `1px solid ${isUrgent ? "rgba(239, 68, 68, 0.22)" : "rgba(245, 158, 11, 0.22)"}`,
-              borderRadius: "4px",
+              background: isUrgent ? "rgba(239, 68, 68, 0.07)" : "var(--warn-tint)",
+              border: `1px solid ${isUrgent ? "rgba(239, 68, 68, 0.22)" : "var(--warn-ink)"}`,
+              borderRadius: "var(--radius-xs)",
               padding: "10px 12px",
             }}
           >
@@ -31,31 +31,31 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <span style={{ fontSize: "10px", lineHeight: 1 }}>{tier.emoji}</span>
                   <span
+                    className="font-label"
                     style={{
                       fontSize: "8px",
                       fontWeight: 700,
                       letterSpacing: "0.14em",
-                      color: tier.color,
-                      fontFamily: "'Archivo Narrow', sans-serif",
+                      color: isUrgent ? tier.color : "var(--warn-ink)",
                       textTransform: "uppercase" as const,
                     }}
                   >
                     {tier.label}
                   </span>
                   <span
+                    className="font-label"
                     style={{
                       fontSize: "8px",
                       fontWeight: 400,
                       letterSpacing: "0.05em",
-                      color: "rgba(255, 255, 255, 0.28)",
-                      fontFamily: "'Archivo Narrow', sans-serif",
+                      color: "var(--ink-25)",
                     }}
                   >
                     · {alert.exercise_name}
                   </span>
                 </div>
                 <div
-                  className="text-white/75 mb-1"
+                  className="text-ink-70 mb-1"
                   style={{ fontSize: "12px", fontWeight: 400, lineHeight: "1.4" }}
                 >
                   {alert.message}
@@ -64,7 +64,7 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                   style={{
                     fontSize: "11px",
                     fontWeight: 400,
-                    color: "rgba(255, 255, 255, 0.38)",
+                    color: "var(--ink-35)",
                     fontStyle: "italic" as const,
                     lineHeight: "1.3",
                   }}
@@ -79,7 +79,7 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                   border: "none",
                   padding: "0 2px",
                   cursor: "pointer",
-                  color: "rgba(255, 255, 255, 0.22)",
+                  color: "var(--ink-20)",
                   fontSize: "16px",
                   lineHeight: 1,
                   flexShrink: 0,
@@ -97,14 +97,14 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
       {alerts.length > 1 && (
         <button
           onClick={() => onDismiss()}
+          className="font-label"
           style={{
             background: "transparent",
             border: "none",
             padding: "2px 0",
             cursor: "pointer",
-            color: "rgba(255, 255, 255, 0.22)",
+            color: "var(--ink-20)",
             fontSize: "9px",
-            fontFamily: "'Archivo Narrow', sans-serif",
             letterSpacing: "0.10em",
             textTransform: "uppercase" as const,
           }}

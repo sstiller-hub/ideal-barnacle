@@ -59,21 +59,21 @@ function ReorderRow({
       }}
     >
       <div
-        className="text-white/25"
+        className="text-ink-25"
         style={{ fontSize: "10px", fontWeight: 600, width: "16px", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
       >
         {index + 1}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
-          className="text-white/90"
-          style={{ fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "'Bebas Neue', sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+          className="text-ink-90"
+          style={{ fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "var(--font-display)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
         >
           {exercise.name}
         </div>
         <div
-          className="text-white/30"
-          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "'Archivo Narrow', sans-serif" }}
+          className="text-ink-30"
+          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}
         >
           {setCount} SET{setCount !== 1 ? "S" : ""}
           {isCurrent ? " • CURRENT" : done ? " • DONE" : ""}
@@ -158,14 +158,14 @@ export function ReorderExercisesSheet({
             {/* Title */}
             <div style={{ padding: "12px 20px 8px" }}>
               <h2
-                className="text-white/95"
-                style={{ fontSize: "22px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif" }}
+                className="text-ink-95"
+                style={{ fontSize: "22px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "var(--font-display)" }}
               >
                 Reorder Exercises
               </h2>
               <div
-                className="text-white/30"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "4px", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-30"
+                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "4px", fontFamily: "var(--font-label)" }}
               >
                 DRAG THE HANDLE TO CHANGE THE ORDER
               </div>
@@ -194,10 +194,10 @@ export function ReorderExercisesSheet({
                 style={{ margin: "4px 20px 12px", padding: "10px 0", background: "transparent", border: "none", width: "calc(100% - 40px)" }}
               >
                 <div style={{ textAlign: "left" }}>
-                  <div className="text-white/80" style={{ fontSize: "12px", fontWeight: 500 }}>
+                  <div className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
                     Save order to my routine
                   </div>
-                  <div className="text-white/30" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
+                  <div className="text-ink-30" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
                     Use this order for future workouts
                   </div>
                 </div>

@@ -277,15 +277,15 @@ export default function ExerciseHistoryPage() {
             </Button>
             <div>
               <div
-                className="text-white/25 tracking-widest"
-                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-25 tracking-widest"
+                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
               >
                 EXERCISE HISTORY
               </div>
-              <h1 className="text-white/95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
+              <h1 className="text-ink-95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
                 {exerciseName}
               </h1>
-              <p className="text-white/35" style={{ fontSize: "11px" }}>
+              <p className="text-ink-35" style={{ fontSize: "11px" }}>
                 {history.length} workouts logged
               </p>
             </div>
@@ -311,7 +311,7 @@ export default function ExerciseHistoryPage() {
             style={{
               background: "rgba(255, 255, 255, 0.02)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "16px",
+              borderRadius: "var(--radius-2xl)",
               padding: "14px",
             }}
           >
@@ -320,14 +320,14 @@ export default function ExerciseHistoryPage() {
                 fontSize: "7px",
                 fontWeight: 500,
                 letterSpacing: "0.18em",
-                fontFamily: "'Archivo Narrow', sans-serif",
+                fontFamily: "var(--font-label)",
                 color: "rgba(255,255,255,0.25)",
                 marginBottom: "6px",
               }}
             >
               WORKOUT VOLUME
             </div>
-            <div className="text-white/70" style={{ fontSize: "12px", marginBottom: "10px" }}>
+            <div className="text-ink-70" style={{ fontSize: "12px", marginBottom: "10px" }}>
               Total volume per {aggregation === "session" ? "workout" : aggregation}
             </div>
 
@@ -336,7 +336,7 @@ export default function ExerciseHistoryPage() {
                 <div style={{
                   position: "absolute", top: 0, left: 0, zIndex: 1,
                   fontSize: "8px", color: "rgba(255,255,255,0.20)",
-                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontFamily: "var(--font-label)",
                   lineHeight: 1, pointerEvents: "none",
                 }}>
                   {formatMaxVol(maxVolume)}
@@ -433,11 +433,11 @@ export default function ExerciseHistoryPage() {
             <div style={{ display: "flex", gap: "12px", marginTop: "6px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1.5px", background: "rgba(255,255,255,0.6)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "'Archivo Narrow', sans-serif" }}>Volume</span>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>Volume</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1px", borderTop: "1px dashed rgba(255,255,255,0.25)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "'Archivo Narrow', sans-serif" }}>Rolling avg</span>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>Rolling avg</span>
               </div>
             </div>
           </div>
@@ -485,7 +485,7 @@ export default function ExerciseHistoryPage() {
                   fontSize: "10px",
                   color: selectedPoint.annotation.kind === "peak" ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.40)",
                   marginBottom: "10px",
-                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontFamily: "var(--font-label)",
                   letterSpacing: "0.05em",
                 }}
               >
@@ -513,7 +513,7 @@ export default function ExerciseHistoryPage() {
                       fontWeight: 500,
                       letterSpacing: "0.18em",
                       color: "rgba(255,255,255,0.25)",
-                      fontFamily: "'Archivo Narrow', sans-serif",
+                      fontFamily: "var(--font-label)",
                       marginBottom: "6px",
                     }}
                   >
@@ -547,7 +547,7 @@ export default function ExerciseHistoryPage() {
                     fontWeight: 500,
                     letterSpacing: "0.18em",
                     color: "rgba(255,255,255,0.25)",
-                    fontFamily: "'Archivo Narrow', sans-serif",
+                    fontFamily: "var(--font-label)",
                     marginBottom: "6px",
                   }}
                 >
@@ -595,7 +595,7 @@ export default function ExerciseHistoryPage() {
             style={{
               background: "rgba(255, 255, 255, 0.02)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "16px",
+              borderRadius: "var(--radius-2xl)",
               padding: "14px",
             }}
           >
@@ -604,7 +604,7 @@ export default function ExerciseHistoryPage() {
                 fontSize: "7px",
                 fontWeight: 500,
                 letterSpacing: "0.18em",
-                fontFamily: "'Archivo Narrow', sans-serif",
+                fontFamily: "var(--font-label)",
                 color: "rgba(255,255,255,0.25)",
                 marginBottom: "10px",
               }}
@@ -689,13 +689,13 @@ export default function ExerciseHistoryPage() {
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "16px",
+                borderRadius: "var(--radius-2xl)",
               }}
             >
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="text-white/90" style={{ fontSize: "13px", fontWeight: 500 }}>
+                    <div className="text-ink-90" style={{ fontSize: "13px", fontWeight: 500 }}>
                       {formattedDate}
                     </div>
                     {exercise.rating && (
@@ -708,22 +708,22 @@ export default function ExerciseHistoryPage() {
                           borderRadius: "6px",
                           background: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.1)" : "rgba(251, 191, 36, 0.1)",
                           color: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.7)" : "rgba(251, 191, 36, 0.7)",
-                          fontFamily: "'Archivo Narrow', sans-serif",
+                          fontFamily: "var(--font-label)",
                         }}
                       >
                         {exercise.rating === "thumbs_up" ? "GOOD" : "ROUGH"}
                       </span>
                     )}
                   </div>
-                  <div className="text-white/35" style={{ fontSize: "10px" }}>
+                  <div className="text-ink-35" style={{ fontSize: "10px" }}>
                     {workout.name}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-white/70" style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
+                  <div className="text-ink-70" style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
                     VOLUME
                   </div>
-                  <div className="text-white/90" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  <div className="text-ink-90" style={{ fontSize: "12px", fontWeight: 600 }}>
                     {Math.round(volume).toLocaleString()} lbs
                   </div>
                 </div>
@@ -733,10 +733,10 @@ export default function ExerciseHistoryPage() {
                   .filter((s) => s.completed)
                   .map((set, idx) => (
                     <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-white/35" style={{ fontSize: "11px" }}>
+                      <span className="text-ink-35" style={{ fontSize: "11px" }}>
                         Set {idx + 1}
                       </span>
-                      <span className="text-white/85" style={{ fontSize: "12px", fontWeight: 500 }}>
+                      <span className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
                         {set.weight} lbs × {set.reps} reps
                       </span>
                     </div>
@@ -748,7 +748,7 @@ export default function ExerciseHistoryPage() {
 
         {history.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-white/40">No history for this exercise yet</p>
+            <p className="text-ink-40">No history for this exercise yet</p>
           </div>
         )}
       </div>
