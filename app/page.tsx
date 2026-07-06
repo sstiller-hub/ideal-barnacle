@@ -52,6 +52,7 @@ import {
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
+import AktProgramMessageLine from "@/components/akt-program-message-line"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
 
@@ -1523,89 +1524,28 @@ export default function Home() {
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
         <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
 
-        {isDeload && deloadEndsAt && (
-          <div className="px-5 mb-3">
-            <div
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
-                padding: "10px 12px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 500,
-                  letterSpacing: "0.10em",
-                  color: "rgba(255, 255, 255, 0.35)",
-                  fontFamily: "'Archivo Narrow', sans-serif",
-                  textTransform: "uppercase",
-                }}
-              >
-                Deload Week Active
-              </span>
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 400,
-                  color: "rgba(255, 255, 255, 0.20)",
-                  fontFamily: "'Archivo Narrow', sans-serif",
-                  marginLeft: "8px",
-                }}
-              >
-                ends{" "}
-                {deloadEndsAt.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {showDeloadCompleteBanner && (
-          <div className="px-5 mb-3">
-            <div
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
-                padding: "10px 12px",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 400,
-                    color: "rgba(255, 255, 255, 0.50)",
-                    lineHeight: "1.4",
-                  }}
-                >
-                  Deload complete — back to full training
-                </span>
-                <button
-                  onClick={dismissDeloadCompleteBanner}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: "0 2px",
-                    cursor: "pointer",
-                    color: "rgba(255, 255, 255, 0.22)",
-                    fontSize: "16px",
-                    lineHeight: 1,
-                    flexShrink: 0,
-                  }}
-                  aria-label="Dismiss"
-                  type="button"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Program-message slot — one line hosts every program state (active
+            deload, deload complete, and future states) via AktProgramMessageLine.
+            The slot reserves its space in all states so nothing reflows. */}
+        {isDeload && deloadEndsAt ? (
+          <AktProgramMessageLine
+            tone="warn"
+            messageKey={`deload-active:${deloadEndsAt.toISOString()}`}
+            message={`Deload week active · ends ${deloadEndsAt.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}`}
+          />
+        ) : showDeloadCompleteBanner ? (
+          <AktProgramMessageLine
+            tone="neutral"
+            messageKey="deload-complete"
+            message="Deload complete — back to full training"
+            onDismiss={dismissDeloadCompleteBanner}
+          />
+        ) : (
+          <AktProgramMessageLine message={null} />
         )}
 
         {lastSameWorkout && (
