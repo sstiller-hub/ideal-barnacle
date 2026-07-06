@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { type WorkoutRoutine, getRoutineById, saveRoutine } from "@/lib/routine-storage"
@@ -84,6 +84,11 @@ type Exercise = {
     progress: string
   }
 }
+
+// Run synchronous DOM-affecting reads (e.g. localStorage-backed UI state)
+// before paint on the client, while falling back to useEffect on the server
+// to avoid React's "useLayoutEffect does nothing on the server" warning.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
 
 function extractRestSeconds(notes?: string): number {
   if (!notes) return 90
@@ -909,7 +914,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   }, [])
 
-  useEffect(() => {
+  // Reload plate settings synchronously before paint on exercise switch. Using
+  // useEffect here painted the new active exercise with the previous exercise's
+  // plate visibility/mode/starting weight for one frame, then corrected it after
+  // the effect ran — the visible flicker. A layout effect commits the new
+  // exercise's settings before the browser paints, so there is no stale frame.
+  useIsomorphicLayoutEffect(() => {
     if (currentExercise?.name && typeof window !== "undefined") {
       const savedPref = localStorage.getItem(`plate_viz_${currentExercise.name}`)
       setShowPlateCalc(savedPref !== null ? JSON.parse(savedPref) : true)
