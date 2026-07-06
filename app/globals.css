@@ -117,6 +117,13 @@
   --duration-base: 200ms;
   --duration-slow: 300ms;
   --duration-entry: 400ms;
+
+  /* Glow — "earned light" for signal indicators. Capped at the calibrated
+     ceiling (not the prototype's brighter 0.55α). Not part of the canvas
+     sync; authored here for the indicator system. */
+  --glow-good: 0 0 8px rgba(52, 211, 153, 0.32);
+  --glow-warn: 0 0 8px rgba(251, 191, 36, 0.35);
+  --glow-warn-soft: 0 0 4px rgba(251, 191, 36, 0.15);
 }
 
 .dark {
@@ -174,6 +181,9 @@
   --radius-flat: var(--radius-flat);
   --radius-xs: var(--radius-xs);
   --radius-2xl: var(--radius-2xl);
+  --shadow-glow-good: var(--glow-good);
+  --shadow-glow-warn: var(--glow-warn);
+  --shadow-glow-warn-soft: var(--glow-warn-soft);
   --text-marquee: var(--text-marquee);
   --text-hero: var(--text-hero);
   --text-stage: var(--text-stage);
