@@ -148,7 +148,7 @@ export default function WorkoutSessionPage() {
                 Active Workout Detected
               </AlertDialogTitle>
               <div
-                className="text-white/40"
+                className="text-ink-40"
                 style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
               >
                 You have an active workout in progress ({activeSession?.routineName || "Workout"}). Would you like to
@@ -166,7 +166,7 @@ export default function WorkoutSessionPage() {
                   padding: "12px",
                 }}
               >
-                <span className="text-white/90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.02em" }}>
+                <span className="text-ink-90" style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.02em" }}>
                   Resume Existing
                 </span>
               </AlertDialogAction>
@@ -180,7 +180,7 @@ export default function WorkoutSessionPage() {
                   padding: "12px",
                 }}
               >
-                <span className="text-white/60" style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.02em" }}>
+                <span className="text-ink-50" style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.02em" }}>
                   Discard & Start New
                 </span>
               </AlertDialogAction>
@@ -194,7 +194,7 @@ export default function WorkoutSessionPage() {
                   padding: "10px",
                 }}
               >
-                <span className="text-white/40" style={{ fontSize: "11px", fontWeight: 400 }}>
+                <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
                   Cancel
                 </span>
               </AlertDialogCancel>

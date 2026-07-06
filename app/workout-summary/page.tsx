@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
@@ -433,15 +434,13 @@ export default function WorkoutSummaryPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span
-              className={`px-2 py-0.5 rounded-full ${
-                summary.baselineTotalVolume > 0
-                  ? "bg-emerald-500/10 text-emerald-700"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {deltaLabel}
-            </span>
+            {summary.baselineTotalVolume > 0 ? (
+              <Badge tone="good" className="normal-case tracking-normal">{deltaLabel}</Badge>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                {deltaLabel}
+              </span>
+            )}
             {summary.baselineTotalVolume > 0 && <span>vs last time</span>}
           </div>
           <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
@@ -472,9 +471,9 @@ export default function WorkoutSummaryPage() {
               </span>
             )}
             {summary.excludedSets > 0 && (
-              <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-1 rounded-full">
+              <Badge tone="warn" className="normal-case tracking-normal text-xs py-1">
                 ⚠️ {summary.excludedSets} sets excluded
-              </span>
+              </Badge>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -535,30 +534,19 @@ export default function WorkoutSummaryPage() {
                     </div>
                     <div className="flex flex-wrap gap-2 justify-end items-center">
                       {exerciseRating && (
-                        <span
-                          className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                            exerciseRating === "thumbs_up"
-                              ? "bg-emerald-500/10 text-emerald-700"
-                              : "bg-amber-500/10 text-amber-700"
-                          }`}
-                        >
+                        <Badge tone={exerciseRating === "thumbs_up" ? "good" : "warn"}>
                           {exerciseRating === "thumbs_up" ? "Felt good" : "Felt rough"}
-                        </span>
+                        </Badge>
                       )}
                       {!isWarmup && visibleBadges.length > 0 && (
                         <>
                           {visibleBadges.map((badge) => (
-                            <span
-                              key={badge}
-                              className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700"
-                            >
+                            <Badge key={badge} tone="good">
                               {badge}
-                            </span>
+                            </Badge>
                           ))}
                           {overflowCount > 0 && (
-                            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
-                              +{overflowCount}
-                            </span>
+                            <Badge tone="good">+{overflowCount}</Badge>
                           )}
                         </>
                       )}
@@ -579,9 +567,9 @@ export default function WorkoutSummaryPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {excluded > 0 && (
-                      <span className="text-xs text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      <Badge tone="warn" className="normal-case tracking-normal text-xs">
                         ⚠️ {excluded} sets excluded
-                      </span>
+                      </Badge>
                     )}
                     {isWarmup && (
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">

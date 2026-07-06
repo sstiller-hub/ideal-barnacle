@@ -2000,14 +2000,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 transition={restRemainingSeconds <= 10 ? { duration: 1, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
               >
                 <div className="flex flex-col items-start" style={{ paddingBottom: "3px" }}>
-                  <div className="text-white/35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
+                  <div className="text-ink-35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
                   {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
                     <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "2px" }}>
                       {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
                     </div>
                   )}
                 </div>
-                <div className="text-white leading-none" style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", fontFamily: "'Bebas Neue', sans-serif" }}>
+                <div className="text-white leading-none" style={{ fontSize: "32px", fontWeight: 400, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}>
                   {formatSeconds(restRemainingSeconds)}
                 </div>
               </motion.div>
@@ -2024,14 +2024,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "2px", padding: "5px 8px" }}
                   type="button"
                 >
-                  <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
+                  <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
                 </button>
                 <button
                   onClick={() => void setRestStateAndPersist(null)}
                   style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "2px", padding: "5px 10px" }}
                   type="button"
                 >
-                  <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>SKIP</span>
+                  <span className="text-ink-95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>SKIP</span>
                 </button>
               </div>
             </motion.div>
@@ -2047,21 +2047,21 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1
-                className="text-white/95"
-                style={{ fontSize: "20px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}
+                className="text-ink-95"
+                style={{ fontSize: "20px", fontWeight: 400, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "var(--font-display)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}
                 onClick={() => router.push(`/exercise/${encodeURIComponent(lsExercise.name)}?from=session`)}
               >
                 {getExerciseLabel(lsExercise.name)}
               </h1>
-              <div className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "'Archivo Narrow', sans-serif" }}>
+              <div className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
                 EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {formatSeconds(elapsedSeconds)}
               </div>
             </div>
 
             <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
               <div className="text-center">
-                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
-                <div className="text-white/70" style={{ fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{totalSetsCompleted}/{totalSets}</div>
+                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
+                <div className="text-ink-70" style={{ fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{totalSetsCompleted}/{totalSets}</div>
               </div>
               <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.06)" }} />
               <button
@@ -2094,7 +2094,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   key={ex.id}
                   onClick={() => void setExerciseIndex(index)}
                   type="button"
-                  className="transition-all duration-200"
+                  className="transition-all duration-base"
                   style={{
                     width: isCurrent ? "20px" : "5px",
                     height: "5px",
@@ -2150,7 +2150,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 }}
               >
                 {/* Set number */}
-                <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", color: "rgba(255,255,255,0.3)", fontFamily: "'Archivo Narrow', sans-serif", minWidth: "28px", flexShrink: 0 }}>
+                <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-label)", minWidth: "28px", flexShrink: 0 }}>
                   SET {setIndex + 1}
                 </div>
 
@@ -2249,7 +2249,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   {set.completed ? (
                     <Check size={14} strokeWidth={2} style={{ color: "rgba(255,255,255,0.8)" }} />
                   ) : (
-                    <div style={{ width: "10px", height: "10px", borderRadius: "1px", border: "1px solid rgba(255,255,255,0.35)" }} />
+                    <div style={{ width: "10px", height: "10px", borderRadius: "var(--radius-flat)", border: "1px solid rgba(255,255,255,0.35)" }} />
                   )}
                 </button>
 
@@ -2263,7 +2263,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       <div style={{
                         fontSize: "8px",
                         fontWeight: comparison?.status === "pr" ? 600 : 400,
-                        color: comparison?.status === "pr" ? "rgba(255,255,255,0.9)" : comparison?.status === "progressed" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.25)",
+                        color: comparison?.status === "pr" ? "var(--good)" : comparison?.status === "progressed" ? "var(--ink-50)" : "var(--ink-25)",
                         letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
                       }}>
                         {comparison.message}
@@ -2275,8 +2275,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 {/* Validation error */}
                 {(repCapError || showMissing) && (
                   <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-                    <AlertCircle size={8} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)" }} />
-                    <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)" }}>
+                    <AlertCircle size={8} strokeWidth={2} style={{ color: "var(--warn-ink)" }} />
+                    <div style={{ fontSize: "8px", color: "var(--warn-ink)" }}>
                       {repCapError ? `Max ${REP_MAX}` : missingWeight ? "Enter weight" : "Enter reps"}
                     </div>
                   </div>
@@ -2353,7 +2353,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               >
                 <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
                   <div
-                    className="text-white/35"
+                    className="text-ink-35"
                     style={{
                       fontSize: "8px",
                       fontWeight: 600,
@@ -2376,7 +2376,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     fontWeight: 400,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "var(--font-display)",
                   }}
                 >
                   {formatSeconds(restRemainingSeconds)}
@@ -2396,7 +2396,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     recordRestExtension(session?.id ?? "unknown")
                     setRestExtensionTrend(getRestExtensionTrend())
                   }}
-                  className="transition-colors duration-150 hover:bg-white/10"
+                  className="transition-colors duration-150 hover:bg-ink-08"
                   style={{
                     background: "rgba(255, 255, 255, 0.05)",
                     border: "none",
@@ -2405,7 +2405,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   }}
                   type="button"
                 >
-                  <span className="text-white/90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
+                  <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
                     +30s
                   </span>
                 </button>
@@ -2420,7 +2420,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   }}
                   type="button"
                 >
-                  <span className="text-white/95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
+                  <span className="text-ink-95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
                     SKIP
                   </span>
                 </button>
@@ -2437,17 +2437,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           }}
         >
           <div className="flex items-center justify-between gap-3 mb-4">
-            <button onClick={handleExit} className="text-white/30 hover:text-white/60 transition-colors" type="button">
+            <button onClick={handleExit} className="text-ink-30 hover:text-ink-50 transition-colors" type="button">
               <ArrowLeft size={18} strokeWidth={1.5} />
             </button>
 
             <div className="flex items-center gap-3 flex-1 justify-center">
               <div className="text-center">
-                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
+                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
                   VOLUME
                 </div>
                 <div
-                  className="text-white/70"
+                  className="text-ink-70"
                   style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
                 >
                   {Math.round(totalVolume).toLocaleString()}
@@ -2457,11 +2457,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               <div style={{ width: "1px", height: "20px", background: "rgba(255, 255, 255, 0.06)" }} />
 
               <div className="text-center">
-                <div className="text-white/30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
+                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
                   SETS
                 </div>
                 <div
-                  className="text-white/70"
+                  className="text-ink-70"
                   style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
                 >
                   {totalSetsCompleted}/{totalSets}
@@ -2474,7 +2474,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 if (!canFinishWorkout) return
                 void finishWorkout()
               }}
-              className="transition-all duration-200"
+              className="transition-all duration-base"
               style={{
                 fontSize: "9px",
                 fontWeight: 700,
@@ -2499,7 +2499,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 <button
                   key={exercise.id}
                   onClick={() => void setExerciseIndex(index)}
-                  className="transition-all duration-200"
+                  className="transition-all duration-base"
                   style={{
                     width: isCurrent ? "20px" : "5px",
                     height: "5px",
@@ -2579,8 +2579,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 <div style={{ marginBottom: isCompactSets ? "8px" : "16px" }}>
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div
-                      className="text-white/30 tracking-widest"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className="text-ink-30 tracking-widest"
+                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "var(--font-label)" }}
                     >
                       EXERCISE {exerciseIndex + 1} • {formatSeconds(elapsedSeconds)}
                     </div>
@@ -2625,7 +2625,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         type="button"
                       >
                         <span
-                          className={showPlateCalc ? "text-white/80" : "text-white/30"}
+                          className={showPlateCalc ? "text-ink-85" : "text-ink-30"}
                           style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.08em" }}
                         >
                           PLATES
@@ -2651,7 +2651,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           fontWeight: 500,
                           letterSpacing: "0.12em",
                           color: "rgba(255, 255, 255, 0.28)",
-                          fontFamily: "'Archivo Narrow', sans-serif",
+                          fontFamily: "var(--font-label)",
                           textTransform: "uppercase",
                         }}
                       >
@@ -2661,13 +2661,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   )}
 
                   <h1
-                    className="text-white/95"
+                    className="text-ink-95"
                     style={{
                       fontSize: "36px",
                       fontWeight: 400,
                       letterSpacing: "-0.02em",
                       lineHeight: "0.95",
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "var(--font-display)",
                       cursor: "pointer",
                     }}
                     onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}?from=session`)}
@@ -2677,16 +2677,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
                   {exercise.targetReps && (
                     <div
-                      className="text-white/25 mt-2"
-                      style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                      className="text-ink-25 mt-2"
+                      style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "var(--font-label)" }}
                     >
                       TARGET {exercise.targetReps} REPS
                     </div>
                   )}
 
                   <div
-                    className="text-white/20 flex items-center gap-2"
-                    style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "'Archivo Narrow', sans-serif", marginTop: "6px" }}
+                    className="text-ink-20 flex items-center gap-2"
+                    style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "var(--font-label)", marginTop: "6px" }}
                   >
                     <span>{exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}</span>
                     <span>•</span>
@@ -2726,12 +2726,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     return (
                       <div key={setKey}>
                         <div
-                          className="text-white/30 tracking-widest"
+                          className="text-ink-30 tracking-widest"
                           style={{
                             fontSize: "7px",
                             fontWeight: 500,
                             letterSpacing: "0.12em",
-                            fontFamily: "'Archivo Narrow', sans-serif",
+                            fontFamily: "var(--font-label)",
                             marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px",
                           }}
                         >
@@ -2802,7 +2802,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                               }}
                             />
                             <div
-                              className="text-white/25 text-center transition-colors duration-150"
+                              className="text-ink-25 text-center transition-colors duration-150"
                               style={{
                                 marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
@@ -2882,7 +2882,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                               }}
                             />
                             <div
-                              className="text-white/25 text-center transition-colors duration-150"
+                              className="text-ink-25 text-center transition-colors duration-150"
                               style={{
                                 marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
                                 fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
@@ -2931,7 +2931,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                   style={{
                                     width: "12px",
                                     height: "12px",
-                                    borderRadius: "1px",
+                                    borderRadius: "var(--radius-flat)",
                                     border: "1px solid rgba(255, 255, 255, 0.35)",
                                     background: "transparent",
                                     boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.05)",
@@ -2946,8 +2946,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         {(repCapError || showMissing) && (
                           <div className="mb-3">
                             <div className="flex items-center gap-2">
-                              <AlertCircle size={10} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-                              <div style={{ fontSize: "9px", fontWeight: 400, color: "rgba(255, 255, 255, 0.3)" }}>
+                              <AlertCircle size={10} strokeWidth={2} style={{ color: "var(--warn-ink)" }} />
+                              <div style={{ fontSize: "9px", fontWeight: 400, color: "var(--warn-ink)" }}>
                                 {repCapError && `Reps cannot exceed ${REP_MAX}`}
                                 {!repCapError && missingWeight && "Enter weight"}
                                 {!repCapError && !missingWeight && missingReps && "Enter reps"}
@@ -2965,7 +2965,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px" }}
                           >
                             <div
-                              className="text-white/20"
+                              className="text-ink-20"
                               style={{
                                 fontSize: isCompressedCompletedSet ? "7px" : isCompactSets ? "8px" : "9px",
                                 fontWeight: 400,
@@ -2982,12 +2982,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                   fontWeight: comparison?.status === "pr" ? 600 : 400,
                                   color:
                                     comparison?.status === "pr"
-                                      ? "rgba(255, 255, 255, 0.9)"
+                                      ? "var(--good)"
                                       : comparison?.status === "progressed"
-                                        ? "rgba(255, 255, 255, 0.5)"
+                                        ? "var(--ink-50)"
                                         : comparison?.status === "recovery"
-                                          ? "rgba(255, 255, 255, 0.25)"
-                                          : "rgba(255, 255, 255, 0.3)",
+                                          ? "var(--ink-25)"
+                                          : "var(--ink-30)",
                                   letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
                                 }}
                               >
@@ -3021,13 +3021,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                 type="button"
                               >
                                 <span
-                                  className="text-white/80"
+                                  className="text-ink-85"
                                   style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
                                 >
                                   {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
                                 </span>
                               </button>
-                              <span className="text-white/30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
+                              <span className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
                                 BAR
                               </span>
                               <input
@@ -3091,7 +3091,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                           height: `${getPlateHeight()}px`,
                                           background: getPlateColor(),
                                           border: "1px solid rgba(255, 255, 255, 0.1)",
-                                          borderRadius: "1px",
+                                          borderRadius: "var(--radius-flat)",
                                         }}
                                       />
                                     )
@@ -3104,14 +3104,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                                   height: "5px",
                                   background: "rgba(160, 160, 160, 0.4)",
                                   border: "1px solid rgba(255, 255, 255, 0.1)",
-                                  borderRadius: "1px",
+                                  borderRadius: "var(--radius-flat)",
                                   marginLeft: "4px",
                                 }}
                               />
                             </div>
 
                             <div
-                              className="text-white/30"
+                              className="text-ink-30"
                               style={{ fontSize: "8px", fontWeight: 500, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}
                             >
                               {plates.map((plate, plateIndex) => (
@@ -3141,8 +3141,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       style={{ marginTop: "24px" }}
                     >
                       <div
-                        className="text-white/25 text-center"
-                        style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "'Archivo Narrow', sans-serif", marginBottom: "12px" }}
+                        className="text-ink-25 text-center"
+                        style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)", marginBottom: "12px" }}
                       >
                         HOW DID THIS FEEL?
                       </div>
@@ -3162,7 +3162,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           }}
                         >
                           <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "var(--font-label)" }}>
                             ROUGH
                           </span>
                         </button>
@@ -3181,7 +3181,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           }}
                         >
                           <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "var(--font-label)" }}>
                             GOOD
                           </span>
                         </button>
@@ -3209,8 +3209,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
                         )}
                         <span
-                          className="text-white/25"
-                          style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                          className="text-ink-25"
+                          style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", fontFamily: "var(--font-label)" }}
                         >
                           {exercise.rating === "thumbs_up" ? "FELT GOOD" : "FELT ROUGH"}
                         </span>
@@ -3224,7 +3224,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             cursor: "pointer",
                             fontSize: "8px",
                             color: "rgba(255, 255, 255, 0.2)",
-                            fontFamily: "'Archivo Narrow', sans-serif",
+                            fontFamily: "var(--font-label)",
                             letterSpacing: "0.08em",
                           }}
                         >
@@ -3259,7 +3259,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                           color: "rgba(255, 255, 255, 0.4)",
                           boxShadow: "0 0 14px rgba(255, 255, 255, 0.05)",
                           cursor: "pointer",
-                          fontFamily: "'Archivo Narrow', sans-serif",
+                          fontFamily: "var(--font-label)",
                         }}
                       >
                         PROGRESSIVE OVERLOAD ↑

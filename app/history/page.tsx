@@ -90,7 +90,7 @@ export default function HistoryPage() {
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200"
+              className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
               style={{
                 background: "transparent",
                 border: "none",

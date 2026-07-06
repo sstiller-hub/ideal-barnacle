@@ -194,15 +194,15 @@ export default function VolumeHistoryPage() {
             </Button>
             <div>
               <div
-                className="text-white/25 tracking-widest"
-                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "'Archivo Narrow', sans-serif" }}
+                className="text-ink-25 tracking-widest"
+                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
               >
                 TRAINING VOLUME
               </div>
-              <h1 className="text-white/95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
+              <h1 className="text-ink-95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
                 Volume by Exercise
               </h1>
-              <p className="text-white/35" style={{ fontSize: "11px" }}>
+              <p className="text-ink-35" style={{ fontSize: "11px" }}>
                 {exercises.length} exercises tracked
               </p>
             </div>
@@ -227,7 +227,7 @@ export default function VolumeHistoryPage() {
             style={{
               background: "rgba(255, 255, 255, 0.02)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "16px",
+              borderRadius: "var(--radius-2xl)",
               padding: "14px",
             }}
           >
@@ -236,7 +236,7 @@ export default function VolumeHistoryPage() {
                 fontSize: "7px",
                 fontWeight: 500,
                 letterSpacing: "0.18em",
-                fontFamily: "'Archivo Narrow', sans-serif",
+                fontFamily: "var(--font-label)",
                 color: "rgba(255,255,255,0.25)",
                 marginBottom: "8px",
               }}
@@ -249,7 +249,7 @@ export default function VolumeHistoryPage() {
                 <div style={{
                   position: "absolute", top: 0, left: 0, zIndex: 1,
                   fontSize: "8px", color: "rgba(255,255,255,0.20)",
-                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontFamily: "var(--font-label)",
                   lineHeight: 1, pointerEvents: "none",
                 }}>
                   {formatMaxVol(maxVol)}
@@ -365,13 +365,13 @@ export default function VolumeHistoryPage() {
             <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1.5px", background: "rgba(255,255,255,0.6)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
                   Volume
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1px", background: "rgba(255,255,255,0.25)", borderTop: "1px dashed rgba(255,255,255,0.25)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "'Archivo Narrow', sans-serif" }}>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
                   Rolling avg
                 </span>
               </div>
@@ -427,7 +427,7 @@ export default function VolumeHistoryPage() {
                     ? "rgba(255,255,255,0.70)"
                     : "rgba(255,255,255,0.40)",
                   marginBottom: "10px",
-                  fontFamily: "'Archivo Narrow', sans-serif",
+                  fontFamily: "var(--font-label)",
                   letterSpacing: "0.05em",
                 }}
               >
@@ -450,7 +450,7 @@ export default function VolumeHistoryPage() {
                     fontWeight: 500,
                     letterSpacing: "0.18em",
                     color: "rgba(255,255,255,0.25)",
-                    fontFamily: "'Archivo Narrow', sans-serif",
+                    fontFamily: "var(--font-label)",
                     marginBottom: "6px",
                   }}
                 >
@@ -497,26 +497,26 @@ export default function VolumeHistoryPage() {
             <button
               key={exercise.name}
               onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
-              className="w-full text-left transition-all duration-200"
+              className="w-full text-left transition-all duration-base"
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "16px",
+                borderRadius: "var(--radius-2xl)",
                 padding: "14px",
               }}
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-white/90" style={{ fontSize: "13px", fontWeight: 500 }}>
+                  <div className="text-ink-90" style={{ fontSize: "13px", fontWeight: 500 }}>
                     {exercise.name}
                   </div>
-                  <div className="text-white/35" style={{ fontSize: "10px" }}>
+                  <div className="text-ink-35" style={{ fontSize: "10px" }}>
                     Last volume: {Math.round(exercise.lastVolume).toLocaleString()} lbs
                   </div>
                 </div>
                 <div className="text-right">
                   {typeof exercise.trendPct === "number" && (
-                    <div className="text-white/50" style={{ fontSize: "10px" }}>
+                    <div className="text-ink-50" style={{ fontSize: "10px" }}>
                       {exercise.trendPct >= 0 ? "+" : ""}
                       {exercise.trendPct}%
                     </div>
@@ -539,7 +539,7 @@ export default function VolumeHistoryPage() {
 
         {exercises.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-white/40">No volume data yet</p>
+            <p className="text-ink-40">No volume data yet</p>
           </div>
         )}
       </div>
