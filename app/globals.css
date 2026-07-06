@@ -68,6 +68,55 @@
   --glass-bg: rgba(26, 26, 26, 0.8);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-shadow: 0 18px 45px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.3);
+
+  /* Ink scale — canonical white-alpha ladder (rgba(255,255,255,a)) */
+  --ink-95: rgba(255, 255, 255, 0.95);
+  --ink-90: rgba(255, 255, 255, 0.90);
+  --ink-85: rgba(255, 255, 255, 0.85);
+  --ink-70: rgba(255, 255, 255, 0.70);
+  --ink-50: rgba(255, 255, 255, 0.50);
+  --ink-40: rgba(255, 255, 255, 0.40);
+  --ink-35: rgba(255, 255, 255, 0.35);
+  --ink-30: rgba(255, 255, 255, 0.30);
+  --ink-25: rgba(255, 255, 255, 0.25);
+  --ink-20: rgba(255, 255, 255, 0.20);
+  --ink-15: rgba(255, 255, 255, 0.15);
+  --ink-12: rgba(255, 255, 255, 0.12);
+  --ink-08: rgba(255, 255, 255, 0.08);
+  --ink-06: rgba(255, 255, 255, 0.06);
+  --ink-04: rgba(255, 255, 255, 0.04);
+  --ink-02: rgba(255, 255, 255, 0.02);
+
+  /* Semantic tone accents — the only chromatic values in the app, used
+     sparingly on earned indicators (PR chips, attention chips) */
+  --good: rgba(52, 211, 153, 1);     /* emerald-400 */
+  --good-tint: rgba(52, 211, 153, 0.10);
+  --good-ink: rgba(52, 211, 153, 0.70);
+  --warn: rgba(251, 191, 36, 1);      /* amber-400 */
+  --warn-tint: rgba(251, 191, 36, 0.10);
+  --warn-ink: rgba(251, 191, 36, 0.70);
+
+  /* Typography — font roles (Bebas Neue + Archivo Narrow loaded above;
+     Geist + Geist Mono loaded via next/font in layout.tsx) */
+  --font-display: "Bebas Neue", "Impact", sans-serif;
+  --font-label: "Archivo Narrow", "Helvetica Neue Condensed", sans-serif;
+
+  /* Typography — display ladder beyond the app's default marquee size */
+  --text-marquee: 48px;
+  --text-hero: 72px;
+  --text-stage: 96px;
+
+  /* Radius — entries not already covered by the calc-derived scale below */
+  --radius-flat: 1px;
+  --radius-xs: 4px;
+  --radius-2xl: 16px;
+
+  /* Motion */
+  --ease-theatre: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 160ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-entry: 400ms;
 }
 
 .dark {
@@ -114,6 +163,20 @@
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-display: var(--font-display);
+  --font-label: var(--font-label);
+  --color-good: var(--good);
+  --color-good-tint: var(--good-tint);
+  --color-good-ink: var(--good-ink);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-warn-ink: var(--warn-ink);
+  --radius-flat: var(--radius-flat);
+  --radius-xs: var(--radius-xs);
+  --radius-2xl: var(--radius-2xl);
+  --text-marquee: var(--text-marquee);
+  --text-hero: var(--text-hero);
+  --text-stage: var(--text-stage);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
