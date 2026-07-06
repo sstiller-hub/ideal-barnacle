@@ -6,7 +6,7 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
 export type ProgramMessageTone = "warn" | "neutral"
 
 export interface AktProgramMessageLineProps {
-  /** The message to render. `null`/empty keeps the slot reserved but blank. */
+  /** The message to render. `null`/empty collapses the slot once mounted. */
   message: ReactNode | null
   /** Visual register. `warn` is the amber, glowing, earned/actionable line; `neutral` is the dim status line. */
   tone?: ProgramMessageTone
@@ -21,8 +21,10 @@ export interface AktProgramMessageLineProps {
   className?: string
 }
 
-// The line always occupies this height, whether or not a message is present, so
-// a message appearing (or the entry animation) never reflows the page around it.
+// Reserved height for the pre-mount/SSR paint (so hydration never mismatches)
+// and for whenever a message is actually showing (so it appearing doesn't
+// reflow the page around it). Once we know post-mount that there's no
+// message, the slot collapses to zero instead of leaving a blank strip.
 const RESERVED_MIN_HEIGHT = 38
 
 /**
@@ -71,9 +73,14 @@ export default function AktProgramMessageLine({
     return () => cancelAnimationFrame(raf)
   }, [showMessage, key])
 
-  // Reserved-but-empty slot: holds vertical space so nothing shifts.
+  // Reserved-but-empty slot: holds vertical space only until we know whether a
+  // message is coming. Once mounted confirms there isn't one, drop the slot
+  // entirely rather than leaving a permanent blank gap on every message-free day.
   if (!showMessage) {
-    return <div className={className} aria-hidden style={{ minHeight: RESERVED_MIN_HEIGHT }} />
+    if (!mounted) {
+      return <div className={className} aria-hidden style={{ minHeight: RESERVED_MIN_HEIGHT }} />
+    }
+    return null
   }
 
   const isWarn = tone === "warn"
