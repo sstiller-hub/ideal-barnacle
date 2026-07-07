@@ -584,7 +584,7 @@ export default function WorkoutSummaryPage() {
         </div>
 
         <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border py-4">
-          <Button onClick={() => router.push("/")} className="w-full h-12 text-base">
+          <Button onClick={() => router.push("/")} className="w-full text-base">
             Done
           </Button>
         </div>
