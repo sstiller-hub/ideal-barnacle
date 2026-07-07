@@ -78,6 +78,39 @@ export function isNewBest(currentValue: number, previousValue: number | null): b
   return currentValue > previousValue
 }
 
+export type PastWorkoutTiming = {
+  duration?: number | null
+  durationUnit?: "seconds" | "minutes" | null
+  stats?: { completedSets?: number } | null
+}
+
+/** Average seconds spent per completed set across past workouts, or null if there's no usable timing data. */
+export function computeAverageSecondsPerSet(workouts: PastWorkoutTiming[]): number | null {
+  let totalSeconds = 0
+  let totalSets = 0
+  for (const workout of workouts) {
+    const completedSets = workout.stats?.completedSets ?? 0
+    if (completedSets <= 0) continue
+    if (typeof workout.duration !== "number" || workout.duration <= 0) continue
+    const seconds = workout.durationUnit === "minutes" ? workout.duration * 60 : workout.duration
+    totalSeconds += seconds
+    totalSets += completedSets
+  }
+  return totalSets > 0 ? totalSeconds / totalSets : null
+}
+
+export type PaceStatus = "fast" | "on_pace" | "slow"
+
+const PACE_FAST_RATIO = 0.85
+const PACE_SLOW_RATIO = 1.15
+
+/** Compares a live in-workout pace (seconds/set) against a historical average to flag rushing or dragging. */
+export function classifyPace(currentSecondsPerSet: number, averageSecondsPerSet: number): PaceStatus {
+  if (currentSecondsPerSet <= averageSecondsPerSet * PACE_FAST_RATIO) return "fast"
+  if (currentSecondsPerSet >= averageSecondsPerSet * PACE_SLOW_RATIO) return "slow"
+  return "on_pace"
+}
+
 export type DatedWorkoutVolume = {
   date: string | Date | null | undefined
   volume: number

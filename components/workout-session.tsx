@@ -49,6 +49,7 @@ import {
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
+import { computeAverageSecondsPerSet, classifyPace } from "@/lib/workout-analytics"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
 import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
@@ -771,6 +772,23 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const count = typeof exercise?.targetSets === "number" ? exercise.targetSets : exercise?.sets?.length ?? 0
     return sum + count
   }, 0)
+
+  const averageSecondsPerSet = useMemo(() => {
+    const history = getWorkoutHistory()
+    const sameRoutine = history.filter(
+      (workout) => normalizeExerciseName(workout.name ?? "") === normalizeExerciseName(routine.name)
+    )
+    return computeAverageSecondsPerSet(sameRoutine) ?? computeAverageSecondsPerSet(history)
+  }, [routine.name])
+
+  const pacePillLabel = (() => {
+    if (averageSecondsPerSet === null || totalSetsCompleted < 2 || elapsedSeconds <= 0) return null
+    const currentSecondsPerSet = elapsedSeconds / totalSetsCompleted
+    const status = classifyPace(currentSecondsPerSet, averageSecondsPerSet)
+    if (status === "fast") return { text: "FAST PACE", color: "var(--warn-ink)" }
+    if (status === "slow") return { text: "SLOW PACE", color: "var(--warn-ink)" }
+    return { text: "ON PACE", color: "var(--good-ink)" }
+  })()
 
   const formatSeconds = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -2055,6 +2073,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               </h1>
               <div className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
                 EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {formatSeconds(elapsedSeconds)}
+                {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
               </div>
             </div>
 
@@ -2583,6 +2602,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "var(--font-label)" }}
                     >
                       EXERCISE {exerciseIndex + 1} • {formatSeconds(elapsedSeconds)}
+                      {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
                     </div>
                     <div className="flex items-center gap-2">
                       {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
