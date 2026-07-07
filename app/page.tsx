@@ -2175,7 +2175,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex gap-3 overflow-x-auto"
+            className="flex gap-3 overflow-x-auto px-5"
             data-scroll-x="pr-cards-row-1"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
           >
