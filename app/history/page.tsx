@@ -145,10 +145,12 @@ export default function HistoryPage() {
                           </div>
                           <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
                             <div
-                              style={{ width: `${entry.pctGood}%`, background: "rgba(52, 211, 153, 0.7)" }}
+                              className="bg-good-ink"
+                              style={{ width: `${entry.pctGood}%` }}
                             />
                             <div
-                              style={{ width: `${100 - entry.pctGood}%`, background: "rgba(251, 191, 36, 0.7)" }}
+                              className="bg-warn-ink"
+                              style={{ width: `${100 - entry.pctGood}%` }}
                             />
                           </div>
                         </div>

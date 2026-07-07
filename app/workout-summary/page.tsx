@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +13,7 @@ import { copyWorkoutToClipboard } from "@/lib/workout-export"
 import { toast } from "sonner"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
+import AktIndicatorChip from "@/components/akt-indicator-chip"
 
 type WorkoutRow = {
   id: string
@@ -392,9 +394,16 @@ export default function WorkoutSummaryPage() {
         style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
-            <span className="text-xl">‹</span>
-          </Button>
+          <button
+            type="button"
+            onClick={() => router.push("/history")}
+            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
+            style={{ background: "transparent", border: "none", padding: "0", cursor: "pointer" }}
+            aria-label="Back to workout history"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>Back</span>
+          </button>
           <div>
             <p className="text-xs text-muted-foreground">Workout Complete</p>
             <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
@@ -541,12 +550,19 @@ export default function WorkoutSummaryPage() {
                       {!isWarmup && visibleBadges.length > 0 && (
                         <>
                           {visibleBadges.map((badge) => (
-                            <Badge key={badge} tone="good">
-                              {badge}
-                            </Badge>
+                            <AktIndicatorChip
+                              key={badge}
+                              indicatorId={`${workout.id}:${exercise.id}:${badge}`}
+                              tone="good"
+                              label={badge}
+                            />
                           ))}
                           {overflowCount > 0 && (
-                            <Badge tone="good">+{overflowCount}</Badge>
+                            <AktIndicatorChip
+                              indicatorId={`${workout.id}:${exercise.id}:overflow`}
+                              tone="good"
+                              label={`+${overflowCount}`}
+                            />
                           )}
                         </>
                       )}
