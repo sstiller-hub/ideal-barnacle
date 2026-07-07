@@ -260,7 +260,6 @@ export default function WorkoutDetailPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs"
             onClick={async () => {
               try {
                 await copyWorkoutToClipboard(workout)
