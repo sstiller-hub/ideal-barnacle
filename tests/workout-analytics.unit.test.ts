@@ -2,6 +2,8 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {
   calculateE1rm,
+  classifyPace,
+  computeAverageSecondsPerSet,
   computeBestE1rmSet,
   computeWeekOverWeek,
   computeWeeklyPace,
@@ -10,6 +12,7 @@ import {
   isNewBest,
   type CompletedSetRecord,
   type DatedWorkoutVolume,
+  type PastWorkoutTiming,
 } from "../lib/workout-analytics"
 
 test("computeWorkoutVolume sums completed set volume only", () => {
@@ -184,4 +187,39 @@ test("computeWeeklyPace ignores workouts with no date and reports 0% with no pri
   assert.equal(pace.previousVolume, 0)
   // No previous volume → percent guarded to 0 by computeWeekOverWeek.
   assert.equal(pace.percent, 0)
+})
+
+test("computeAverageSecondsPerSet averages duration per completed set across workouts", () => {
+  const workouts: PastWorkoutTiming[] = [
+    { duration: 1200, durationUnit: "seconds", stats: { completedSets: 10 } }, // 120s/set
+    { duration: 20, durationUnit: "minutes", stats: { completedSets: 10 } }, // 1200s / 10 = 120s/set
+  ]
+  assert.equal(computeAverageSecondsPerSet(workouts), 120)
+})
+
+test("computeAverageSecondsPerSet ignores workouts with no sets or no duration", () => {
+  const workouts: PastWorkoutTiming[] = [
+    { duration: 600, durationUnit: "seconds", stats: { completedSets: 0 } },
+    { duration: undefined, stats: { completedSets: 5 } },
+    { duration: 0, durationUnit: "seconds", stats: { completedSets: 5 } },
+  ]
+  assert.equal(computeAverageSecondsPerSet(workouts), null)
+})
+
+test("computeAverageSecondsPerSet returns null for an empty history", () => {
+  assert.equal(computeAverageSecondsPerSet([]), null)
+})
+
+test("classifyPace flags rushing well ahead of the historical average", () => {
+  assert.equal(classifyPace(80, 120), "fast")
+})
+
+test("classifyPace flags dragging well behind the historical average", () => {
+  assert.equal(classifyPace(150, 120), "slow")
+})
+
+test("classifyPace treats values near the average as on pace", () => {
+  assert.equal(classifyPace(120, 120), "on_pace")
+  assert.equal(classifyPace(105, 120), "on_pace")
+  assert.equal(classifyPace(135, 120), "on_pace")
 })

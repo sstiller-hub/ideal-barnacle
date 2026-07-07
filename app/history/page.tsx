@@ -145,10 +145,12 @@ export default function HistoryPage() {
                           </div>
                           <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
                             <div
-                              style={{ width: `${entry.pctGood}%`, background: "rgba(52, 211, 153, 0.7)" }}
+                              className="bg-good-ink"
+                              style={{ width: `${entry.pctGood}%` }}
                             />
                             <div
-                              style={{ width: `${100 - entry.pctGood}%`, background: "rgba(251, 191, 36, 0.7)" }}
+                              className="bg-warn-ink"
+                              style={{ width: `${100 - entry.pctGood}%` }}
                             />
                           </div>
                         </div>
@@ -163,7 +165,11 @@ export default function HistoryPage() {
               </Card>
             )}
             {workouts.map((workout) => (
-              <Card key={workout.id} className="p-4 relative hover:bg-accent/50 transition-colors">
+              <Card
+                key={workout.id}
+                className="p-4 relative cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => router.push(`/history/${workout.id}`)}
+              >
                 <button
                   onClick={(e) => handleDelete(workout.id, e)}
                   className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors z-10"
