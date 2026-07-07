@@ -1327,7 +1327,7 @@ export default function Home() {
         }}
       >
         {devModeEnabled && (
-          <div className="px-5 pb-4 flex-shrink-0">
+          <div className="pb-4 flex-shrink-0">
             <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
               {(["scheduled", "rest", "completed", "activeSession"] as DayState[]).map((state) => (
                 <button
@@ -1365,7 +1365,7 @@ export default function Home() {
           onTouchEnd={handleDaySwipeEnd}
         >
         <div
-          className="px-5 pb-4"
+          className="pb-4"
           style={{
             paddingRight: "60px",
           }}
@@ -1471,10 +1471,10 @@ export default function Home() {
         </div>
 
         {showWorkoutPicker && !isPastDay && (
-          <div className="mt-6 -mx-5">
+          <div className="mt-6">
             <div className="fixed inset-0 z-40" onClick={() => setShowWorkoutPicker(false)} style={{ background: "transparent" }} />
             <div
-              className="relative z-50 flex gap-3 overflow-x-auto px-5 pb-1"
+              className="relative z-50 flex gap-3 overflow-x-auto pb-1"
               style={{
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
@@ -1582,7 +1582,7 @@ export default function Home() {
         )}
 
         {lastSameWorkout && (
-          <div className="px-5 mb-5">
+          <div className="mb-5">
             <button
               className="w-full text-left transition-all duration-base"
               onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
@@ -1639,7 +1639,7 @@ export default function Home() {
         )}
 
         {actualState === "completed" && workoutForDate && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div
               className="mb-6"
               style={{
@@ -1831,7 +1831,7 @@ export default function Home() {
         )}
 
         {actualState === "rest" && !weeklyReview && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div className="text-ink-20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
               Rest day — no workout scheduled
             </div>
@@ -1839,7 +1839,7 @@ export default function Home() {
         )}
 
         {actualState === "rest" && weeklyReview && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
@@ -1935,7 +1935,7 @@ export default function Home() {
           const exercises = nextWorkout.routine.exercises ?? []
           const compact = exercises.length >= 9
           return (
-            <div className="px-5 mb-2">
+            <div className="mb-2">
               <div className="flex items-center gap-2 mb-3">
                 <div
                   className="text-ink-25 tracking-widest"
@@ -2003,7 +2003,7 @@ export default function Home() {
         })()}
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
-          <div className="px-5 mb-2">
+          <div className="mb-2">
             <div className="mb-3 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
               {displayExercises.map((exercise: any, index: number) => (
                 <div
@@ -2141,7 +2141,7 @@ export default function Home() {
       </div>
 
       <div
-        className="px-5 mt-0 flex-shrink-0"
+        className="mt-0 flex-shrink-0"
         onTouchStart={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
         onTouchEnd={(event) => event.stopPropagation()}
@@ -2198,7 +2198,7 @@ export default function Home() {
           onTouchMoveCapture={(event) => event.stopPropagation()}
           onTouchEndCapture={(event) => event.stopPropagation()}
         >
-          <div className="px-5 flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
             <h2
               className="text-ink-25 tracking-widest"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
