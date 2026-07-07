@@ -165,7 +165,11 @@ export default function HistoryPage() {
               </Card>
             )}
             {workouts.map((workout) => (
-              <Card key={workout.id} className="p-4 relative hover:bg-accent/50 transition-colors">
+              <Card
+                key={workout.id}
+                className="p-4 relative cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => router.push(`/history/${workout.id}`)}
+              >
                 <button
                   onClick={(e) => handleDelete(workout.id, e)}
                   className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors z-10"
