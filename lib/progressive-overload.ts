@@ -94,11 +94,16 @@ type SessionPoint = {
  * counts as progress when its top weight beats the running best (by
  * `improvementTolerance`), OR it adds reps at that same weight. Adding load
  * while reps drop is therefore always progress — it never reads as a decline.
- * When every completed set in the history is unweighted (bodyweight work), best
- * reps per session is used instead. A REGRESSION (the working weight actually
- * dropping) is distinguished from a plain STALE (stuck at the same weight
- * without adding reps). Returns null when the exercise is progressing or there
- * is not enough history to judge.
+ * Judging only happens within the current training modality: starting from
+ * the latest session and walking backward, sessions stop counting the moment
+ * the exercise switches between added load and strict bodyweight. A
+ * deliberate switch to bodyweight-only work is never compared against an
+ * older weighted best (or vice versa) — that's a modality change, not a
+ * decline. Within a bodyweight-only streak, best reps per session is used in
+ * place of weight. A REGRESSION (the working weight actually dropping) is
+ * distinguished from a plain STALE (stuck at the same weight without adding
+ * reps). Returns null when the exercise is progressing or there is not enough
+ * history in the current modality to judge.
  */
 export function detectProgressStall(
   sessions: ExerciseSessionInput[],
@@ -138,14 +143,25 @@ export function detectProgressStall(
     top: topWorkingSet(session.sets),
   }))
 
-  const hasWeightedHistory = topSets.some(({ top }) => top !== null && top.weight > 0)
-  const metric: StallMetric = hasWeightedHistory ? "load" : "reps"
-
-  const points: SessionPoint[] = []
+  const allPoints: SessionPoint[] = []
   topSets.forEach(({ performedAt, timestamp, top }) => {
     if (top === null) return
-    points.push({ performedAt, timestamp, weight: top.weight, reps: top.reps })
+    allPoints.push({ performedAt, timestamp, weight: top.weight, reps: top.reps })
   })
+
+  if (allPoints.length === 0) return null
+
+  // Only compare sessions within the exercise's current modality. Walk back
+  // from the latest session and stop at the first modality switch so an
+  // older weighted best never reads as a "decline" once the user has settled
+  // into strict bodyweight work (or vice versa).
+  const latestIsWeighted = allPoints[allPoints.length - 1].weight > 0
+  let streakStart = allPoints.length - 1
+  while (streakStart > 0 && allPoints[streakStart - 1].weight > 0 === latestIsWeighted) {
+    streakStart -= 1
+  }
+  const points = allPoints.slice(streakStart)
+  const metric: StallMetric = latestIsWeighted ? "load" : "reps"
 
   if (points.length < config.stallSessionThreshold + 1) return null
 

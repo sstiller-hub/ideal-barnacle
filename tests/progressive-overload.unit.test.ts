@@ -152,6 +152,42 @@ test("bodyweight exercises fall back to best-reps progression", () => {
   assert.equal(detectProgressStall(progressing), null)
 })
 
+test("switching to strict bodyweight work is not a regression from an old weighted best", () => {
+  // Weighted for a while, then a deliberate switch to bodyweight-only reps.
+  // The old weighted best must not be used as the comparison baseline once
+  // the user has settled into the new modality: no REGRESSION, and the best
+  // is judged in reps within the bodyweight streak, not against the 10 lb best.
+  const sessions = [
+    session(0, [[12, 10]]),
+    session(3, [[12, 10]]),
+    session(6, [[12, 0]]),
+    session(9, [[12, 0]]),
+    session(12, [[12, 0]]),
+    session(15, [[12, 0]]),
+    session(18, [[12, 0]]),
+  ]
+  const result = detectProgressStall(sessions)
+  assert.ok(result)
+  assert.notEqual(result.flag, "REGRESSION")
+  assert.equal(result.metric, "reps")
+  assert.equal(result.bestWeight, 0)
+})
+
+test("a real regression within the same weighted modality still fires", () => {
+  const sessions = [
+    session(0, [[8, 100]]),
+    session(3, [[8, 100]]),
+    session(6, [[8, 60]]),
+    session(9, [[8, 60]]),
+    session(12, [[8, 60]]),
+    session(15, [[8, 60]]),
+  ]
+  const result = detectProgressStall(sessions)
+  assert.ok(result)
+  assert.equal(result.flag, "REGRESSION")
+  assert.equal(result.metric, "load")
+})
+
 test("sessions inside deload ranges are excluded from the analysis", () => {
   const sessions = [
     session(0, [[8, 100]]),
