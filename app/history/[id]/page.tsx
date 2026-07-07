@@ -1,6 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { ChevronLeft } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -241,9 +242,16 @@ export default function WorkoutDetailPage() {
         style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/history")}>
-            <span className="text-xl">‹</span>
-          </Button>
+          <button
+            type="button"
+            onClick={() => router.push("/history")}
+            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
+            style={{ background: "transparent", border: "none", padding: "0", cursor: "pointer" }}
+            aria-label="Back to workout history"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>Back</span>
+          </button>
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Workout Summary</p>
             <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
