@@ -96,8 +96,8 @@ test("Home shows sets remaining for active workout", async ({ page }) => {
   }
   await seedBaseStorage(page, { session })
   await page.goto("/")
-  await expect(page.getByText(/sets remaining/i)).toBeVisible()
-  await expect(page.getByText(/3 sets remaining/i)).toBeVisible()
+  await expect(page.getByText(/in progress · 3 sets left/i)).toBeVisible()
+  await expect(page.getByText("SETS LEFT", { exact: true })).toBeVisible()
 })
 
 test("Home treats legacy active status as resumable session", async ({ page }) => {

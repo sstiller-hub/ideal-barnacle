@@ -50,7 +50,7 @@ test("shows PRs section", async ({ page }) => {
 
   await page.goto("/")
 
-  await expect(page.getByText(/Personal Records/i)).toBeVisible()
+  await expect(page.getByText(/All-Time/i)).toBeVisible()
   await expect(page.getByTestId("pr-section").getByText("Overhand Row")).toBeVisible()
 })
 
@@ -78,6 +78,6 @@ test("PRs appear after schedule change to matching routine", async ({ page }) =>
   await expect(page.getByText("Schedule saved.")).toBeVisible()
 
   await page.goto("/")
-  await expect(page.getByText(/Personal Records/i)).toBeVisible()
+  await expect(page.getByText(/All-Time/i)).toBeVisible()
   await expect(page.getByTestId("pr-section").getByText("Overhand Row")).toBeVisible()
 })

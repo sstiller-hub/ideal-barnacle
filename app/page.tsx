@@ -43,13 +43,11 @@ import { computeWeekOverWeek, computeWeeklyPace } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
 import { getPrExcludedExercises } from "@/lib/pr-exclusions"
-import {
-  ArrowDown,
-  ArrowUp,
-  Settings,
-  ChevronRight,
-} from "lucide-react"
-import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
+import { Settings, ChevronRight } from "lucide-react"
+import { BandHeader } from "@/components/ledger/band-header"
+import { DeltaChip } from "@/components/ledger/delta-chip"
+import { Sparkline } from "@/components/ledger/sparkline"
+import { StatUnit } from "@/components/ledger/stat-unit"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 import AktProgramMessageLine from "@/components/akt-program-message-line"
@@ -69,6 +67,20 @@ function getRelativeDate(dateStr: string | null): string {
   if (diffDays < 7) return `${diffDays}d ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return `${Math.floor(diffDays / 30)}mo ago`
+}
+
+// Compressed relative date for DeltaChip context strings: TODAY / 3D / 1W / 2MO.
+function getRelativeDateAbbrev(dateStr: string | null): string {
+  if (!dateStr) return ""
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffTime = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays <= 0) return "TODAY"
+  if (diffDays < 7) return `${diffDays}D`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}W`
+  return `${Math.floor(diffDays / 30)}MO`
 }
 
 type WorkoutRoutine = {
@@ -165,7 +177,11 @@ export default function Home() {
   }
 
   const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
-  const formatVolume = (value: number) => Math.round(value).toLocaleString()
+  // The one volume formatter for this screen: "30.6K" at ≥1000, integer below.
+  const formatK = (value: number) => {
+    const abs = Math.abs(value)
+    return abs >= 1000 ? `${(abs / 1000).toFixed(1)}K` : `${Math.round(abs)}`
+  }
 
   const getWeekRange = useCallback((date: Date) => {
     const start = new Date(date)
@@ -961,6 +977,16 @@ export default function Home() {
     return { totalSets, remainingSets }
   }, [session?.exercises])
 
+  // Presentational aggregate for the TODAY band's SETS PLANNED stat.
+  const plannedSets = useMemo(() => {
+    return (displayExercises ?? []).reduce((sum: number, exercise: any) => {
+      if (typeof exercise?.targetSets === "number") return sum + exercise.targetSets
+      if (Array.isArray(exercise?.sets)) return sum + exercise.sets.length
+      if (typeof exercise?.sets === "number") return sum + exercise.sets
+      return sum
+    }, 0)
+  }, [displayExercises])
+
   // --- Progressive-overload context for the home screen ---
 
   // Most recent top set (by e1RM) for each exercise, excluding the selected
@@ -1262,6 +1288,21 @@ export default function Home() {
     }
   }
 
+  const relativeDayLabel = isToday()
+    ? "TODAY"
+    : isTomorrow()
+      ? "TOMORROW"
+      : isYesterday()
+        ? "YESTERDAY"
+        : isPastDay
+          ? "PAST"
+          : "UPCOMING"
+  const weekDelta = currentWeekVolumeSoFar - previousWeekVolume
+  const weekPercent = previousWeekVolume > 0 ? (weekDelta / previousWeekVolume) * 100 : 0
+  const weekOfLabel = getWeekRange(new Date())
+    .start.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    .toUpperCase()
+
   return (
     <>
       <button
@@ -1300,8 +1341,8 @@ export default function Home() {
                   onClick={() => setUiStateOverride(uiStateOverride === state ? null : state)}
                   className="flex-shrink-0 transition-all duration-base"
                   style={{
-                    background: uiStateOverride === state ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
-                    border: uiStateOverride === state ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid rgba(255, 255, 255, 0.06)",
+                    background: uiStateOverride === state ? "var(--ink-06)" : "var(--ink-02)",
+                    border: uiStateOverride === state ? "1px solid var(--ink-15)" : "1px solid var(--ink-08)",
                     borderRadius: "var(--radius-flat)",
                     padding: "6px 10px",
                   }}
@@ -1309,7 +1350,7 @@ export default function Home() {
                 >
                   <span
                     className={uiStateOverride === state ? "text-ink-70" : "text-ink-30"}
-                    style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
+                    style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     {state.toUpperCase()}
                   </span>
@@ -1335,59 +1376,36 @@ export default function Home() {
             paddingRight: "60px",
           }}
         >
-        <div className="flex items-start justify-between gap-4">
-          <div className="relative flex-shrink-0">
-            <div className="flex items-center gap-2 mb-1">
-              <button
-                onClick={handleDevModeActivation}
-                className="text-ink-25 tracking-widest select-none"
-                style={{
-                  fontSize: "7px",
-                  fontWeight: 500,
-                  letterSpacing: "0.18em",
-                  fontFamily: "var(--font-label)",
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  cursor: "default",
-                }}
-                type="button"
-              >
-                SCHEDULED
-              </button>
-              {actualState === "activeSession" && (
-                <div className="flex items-center gap-1.5">
-                  <div
-                    style={{
-                      width: "4px",
-                      height: "4px",
-                      borderRadius: "50%",
-                      background: "rgba(255, 255, 255, 0.5)",
-                      animation: "pulse 2s ease-in-out infinite",
-                    }}
-                  />
-                  <span
-                    className="text-ink-40"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
-                  >
-                    IN PROGRESS
-                  </span>
-                  {activeSessionProgress && (
-                    <span
-                      className="text-ink-30"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
-                    >
-                      • {activeSessionProgress.remainingSets} SETS REMAINING
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+        <div className="band-enter">
+          <button
+            onClick={handleDevModeActivation}
+            className="select-none text-left"
+            style={{
+              fontSize: "9px",
+              fontWeight: 600,
+              letterSpacing: "0.2em",
+              fontFamily: "var(--font-label)",
+              color: "var(--ink-35)",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "default",
+            }}
+            type="button"
+          >
+            <span style={{ color: "var(--ink-70)" }}>
+              {selectedDate.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()}
+            </span>
+            {"  "}
+            {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
+            {" · "}
+            {relativeDayLabel}
+          </button>
+          <div className="flex items-end justify-between gap-3">
             <button
               onClick={() => !isPastDay && setShowWorkoutPicker(!showWorkoutPicker)}
               disabled={isPastDay}
               className="text-left transition-opacity duration-base hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
-              style={{ paddingRight: "44px" }}
             >
               <h1
                 className="text-white"
@@ -1413,24 +1431,46 @@ export default function Home() {
                 />
               )}
             </button>
-          </div>
-
-          <div className="flex items-start gap-4" style={{ marginTop: "16px" }}>
-            <div className="flex items-center gap-1.5">
-              <div>
+            <div className="flex items-center gap-1.5 flex-shrink-0" style={{ marginBottom: "8px" }}>
+              {actualState === "completed" && (
                 <div
-                  className="text-ink-25 tracking-widest mb-1"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
-                >
-                  {isToday() ? "TODAY" : isTomorrow() ? "TOMORROW" : isYesterday() ? "YESTERDAY" : isPastDay ? "PAST" : "UPCOMING"}
-                </div>
-                <div className="text-ink-95" style={{ fontSize: "14px", fontWeight: 500, letterSpacing: "-0.01em", textAlign: "left" }}>
-                  {selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
-                </div>
-                <div className="text-ink-30 mt-0.5" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.01em" }}>
-                  {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                </div>
-              </div>
+                  style={{
+                    width: "5px",
+                    height: "5px",
+                    borderRadius: "50%",
+                    background: "var(--good)",
+                    boxShadow: "0 0 6px rgba(52, 211, 153, 0.5)",
+                  }}
+                />
+              )}
+              {actualState === "activeSession" && (
+                <div
+                  style={{
+                    width: "5px",
+                    height: "5px",
+                    borderRadius: "50%",
+                    background: "var(--ink-50)",
+                  }}
+                />
+              )}
+              <span
+                style={{
+                  fontSize: "9.5px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  fontFamily: "var(--font-label)",
+                  color: "var(--ink-50)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {actualState === "completed"
+                  ? "COMPLETE"
+                  : actualState === "activeSession"
+                    ? `IN PROGRESS${activeSessionProgress ? ` · ${activeSessionProgress.remainingSets} SETS LEFT` : ""}`
+                    : actualState === "rest"
+                      ? "REST DAY"
+                      : "SCHEDULED"}
+              </span>
             </div>
           </div>
         </div>
@@ -1451,28 +1491,28 @@ export default function Home() {
                 onClick={() => handleSelectWorkoutType(null)}
                 className="flex-shrink-0 transition-all duration-base"
                 style={{
-                  background: effectiveRestDay ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.02)",
-                  border: effectiveRestDay ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.06)",
+                  background: effectiveRestDay ? "var(--ink-04)" : "var(--ink-02)",
+                  border: effectiveRestDay ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
                   borderRadius: "var(--radius-flat)",
                   padding: "12px 18px",
                   minWidth: "100px",
                 }}
                 onMouseEnter={(e) => {
                   if (!effectiveRestDay) {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.10)"
+                    e.currentTarget.style.background = "var(--ink-04)"
+                    e.currentTarget.style.borderColor = "var(--ink-12)"
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!effectiveRestDay) {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)"
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
+                    e.currentTarget.style.background = "var(--ink-02)"
+                    e.currentTarget.style.borderColor = "var(--ink-08)"
                   }
                 }}
                 type="button"
               >
                 <div
-                  className={effectiveRestDay ? "text-ink-90" : "text-ink-50"}
+                  className={effectiveRestDay ? "text-ink-95" : "text-ink-70"}
                   style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
                 >
                   Rest
@@ -1486,8 +1526,8 @@ export default function Home() {
                     onClick={() => handleSelectWorkoutType(routine.id)}
                     className="flex-shrink-0 transition-all duration-base"
                     style={{
-                      background: isSelected ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.02)",
-                      border: isSelected ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.06)",
+                      background: isSelected ? "var(--ink-04)" : "var(--ink-02)",
+                      border: isSelected ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
                       borderRadius: "var(--radius-flat)",
                       padding: "12px 18px",
                       minWidth: "100px",
@@ -1495,20 +1535,20 @@ export default function Home() {
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
-                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.10)"
+                        e.currentTarget.style.background = "var(--ink-04)"
+                        e.currentTarget.style.borderColor = "var(--ink-12)"
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)"
-                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
+                        e.currentTarget.style.background = "var(--ink-02)"
+                        e.currentTarget.style.borderColor = "var(--ink-08)"
                       }
                     }}
                     type="button"
                   >
                     <div
-                      className={isSelected ? "text-ink-90" : "text-ink-50"}
+                      className={isSelected ? "text-ink-95" : "text-ink-70"}
                       style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
                     >
                       {routine.name}
@@ -1548,567 +1588,287 @@ export default function Home() {
           <AktProgramMessageLine message={null} />
         )}
 
-        {lastSameWorkout && (
-          <div className="px-5 mb-5">
-            <button
-              className="w-full text-left transition-all duration-base"
-              onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
-              style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.07)",
-                borderRadius: "var(--radius-xs)",
-                padding: "12px 14px",
-              }}
-              type="button"
-            >
-              <div className="flex items-center justify-between mb-2.5">
-                <span
-                  className="text-ink-30 tracking-widest"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-                >
-                  LAST {selectedTitle.toUpperCase()} · TO BEAT
-                </span>
-                <span className="text-ink-25" style={{ fontSize: "9px", fontWeight: 400 }}>
-                  {getRelativeDate(lastSameWorkout.date)}
-                </span>
+        {/* Band 1 — the day itself. One flat band; the identical BandHeader
+            anatomy carries the comparison chip for every state. */}
+        <div className="px-5 mb-6 band-enter" style={{ animationDelay: "70ms" }}>
+          <BandHeader label={relativeDayLabel}>
+            {actualState === "completed" && workoutForDate && completedComparison ? (
+              <DeltaChip
+                tone={completedComparison.delta > 0 ? "good" : "neutral"}
+                arrow={completedComparison.delta > 0 ? "up" : "down"}
+                value={
+                  completedComparison.delta > 0
+                    ? `+${formatK(completedComparison.delta)}`
+                    : formatK(completedComparison.delta)
+                }
+                pct={`${Math.abs(completedComparison.percent).toFixed(0)}%`}
+                context={`VS LAST ${deriveWorkoutType(workoutForDate.name).toUpperCase()} · ${getRelativeDateAbbrev(completedComparison.prevDate)}`}
+              />
+            ) : (actualState === "scheduled" || actualState === "activeSession") && lastSameWorkout ? (
+              <button
+                onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
+                style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                type="button"
+              >
+                <DeltaChip
+                  tone="neutral"
+                  value={formatK(lastSameWorkout.totalVolume)}
+                  context={`LAST ${selectedTitle.toUpperCase()} · TO BEAT · ${getRelativeDateAbbrev(lastSameWorkout.date)}`}
+                />
+              </button>
+            ) : null}
+          </BandHeader>
+
+          {actualState === "completed" && workoutForDate && (
+            <>
+              <div
+                className="flex items-baseline"
+                style={{ gap: "28px", marginBottom: isCompactExerciseList ? "12px" : "16px" }}
+              >
+                <StatUnit value={formatK(workoutForDate.stats.totalVolume)} unit="LB" label="VOLUME" />
+                <StatUnit value={`${workoutForDate.exercises?.length ?? 0}`} label="EXERCISES" />
+                {completedComparison && completedComparison.compared > 0 && (
+                  <StatUnit
+                    value={`${completedComparison.beaten}`}
+                    unit={`OF ${completedComparison.compared}`}
+                    label="LIFTS BEATEN"
+                  />
+                )}
               </div>
-              <div className="flex items-baseline gap-1.5 mb-3">
-                <span
-                  className="text-ink-85"
-                  style={{ fontSize: "18px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                >
-                  {formatVolume(lastSameWorkout.totalVolume)}
-                </span>
-                <span className="text-ink-20" style={{ fontSize: "8px", fontWeight: 400 }}>
-                  lb total
-                </span>
-              </div>
-              {lastSameWorkout.topLifts.length > 0 && (
-                <div className="space-y-1.5">
-                  {lastSameWorkout.topLifts.map((lift) => (
-                    <div key={lift.name} className="flex items-center justify-between">
-                      <span className="text-ink-50" style={{ fontSize: "10px", fontWeight: 400 }}>
-                        {getExerciseLabel(lift.name)}
-                      </span>
-                      <span
-                        className="text-ink-70"
-                        style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
-                      >
-                        {lift.weight} × {lift.reps}
-                        {lift.standsOut ? ` · set ${lift.ordinal}` : ""}
-                      </span>
-                    </div>
+
+              {displayExercises && displayExercises.length > 0 && (
+                <div style={{ marginBottom: "14px" }}>
+                  {displayExercises.map((exercise: any, index: number) => (
+                    <ReceiptRow
+                      key={exercise.id ?? `${exercise.name}-${index}`}
+                      index={index}
+                      name={getExerciseLabel(exercise.name)}
+                      right={`${exercise.targetSets ?? exercise.sets?.length ?? 0} sets`}
+                      compact={isCompactExerciseList}
+                    />
                   ))}
                 </div>
-              )}
-            </button>
-          </div>
-        )}
-
-        {actualState === "completed" && workoutForDate && (
-          <div className="px-5 mb-6">
-            <div
-              className="mb-6"
-              style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "var(--radius-flat)",
-                padding: isCompactExerciseList ? "12px" : "16px",
-              }}
-            >
-              <div
-                className="text-ink-25 tracking-widest mb-4"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-              >
-                {isPastDay ? "COMPLETED" : "COMPLETED TODAY"}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4" style={{ marginBottom: isCompactExerciseList ? "12px" : "24px" }}>
-                <div>
-                  <div
-                    className="text-ink-20 mb-1"
-                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
-                  >
-                    EXERCISES
-                  </div>
-                  <div
-                    className="text-ink-90"
-                    style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {workoutForDate.exercises?.length ?? 0}
-                  </div>
-                </div>
-                <div>
-                  <div
-                    className="text-ink-20 mb-1"
-                    style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
-                  >
-                    VOLUME
-                  </div>
-                  <div
-                    className="text-ink-90"
-                    style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {Math.round(workoutForDate.stats.totalVolume / 100) / 10}k
-                  </div>
-                  <div className="text-ink-15" style={{ fontSize: "7px", fontWeight: 400 }}>
-                    lbs
-                  </div>
-                </div>
-              </div>
-
-              {completedComparison && (
-                <button
-                  className="w-full text-left transition-all duration-base"
-                  onClick={() => router.push(`/history/${completedComparison.prevId}`)}
-                  style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: isCompactExerciseList ? "9px 10px" : "11px 12px",
-                    marginBottom: isCompactExerciseList ? "12px" : "16px",
-                  }}
-                  type="button"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span
-                      className="text-ink-25 tracking-widest"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "var(--font-label)" }}
-                    >
-                      VS LAST {deriveWorkoutType(workoutForDate.name).toUpperCase()}
-                    </span>
-                    <span className="text-ink-20" style={{ fontSize: "8px", fontWeight: 400 }}>
-                      {getRelativeDate(completedComparison.prevDate)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      {completedComparison.delta >= 0 ? (
-                        <ArrowUp size={10} strokeWidth={2} style={{ color: completedComparison.delta > 0 ? "#FF5733" : "rgba(255,255,255,0.3)" }} />
-                      ) : (
-                        <ArrowDown size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)" }} />
-                      )}
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: completedComparison.delta > 0 ? "#FF5733" : "rgba(255,255,255,0.5)",
-                          fontVariantNumeric: "tabular-nums",
-                          fontFamily: "var(--font-label)",
-                        }}
-                      >
-                        {completedComparison.delta >= 0 ? "+" : "-"}
-                        {Math.abs(Math.round(completedComparison.delta / 100) / 10)}k
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: 500,
-                          color: completedComparison.delta > 0 ? "rgba(255,87,51,0.6)" : "rgba(255,255,255,0.25)",
-                          fontVariantNumeric: "tabular-nums",
-                          fontFamily: "var(--font-label)",
-                        }}
-                      >
-                        ({Math.abs(completedComparison.percent).toFixed(0)}%)
-                      </span>
-                    </div>
-                    {completedComparison.compared > 0 && (
-                      <>
-                        <span className="text-ink-15" style={{ fontSize: "8px" }}>·</span>
-                        <span
-                          className="text-ink-40"
-                          style={{ fontSize: "10px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
-                        >
-                          {completedComparison.beaten} of {completedComparison.compared} lifts beaten
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
               )}
 
               <button
                 className="w-full transition-all duration-base"
                 style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  background: "var(--ink-02)",
+                  border: "1px solid var(--ink-08)",
                   borderRadius: "var(--radius-flat)",
                   padding: isCompactExerciseList ? "9px" : "11px",
+                  color: "var(--ink-70)",
                 }}
                 onClick={() => router.push(`/history/${workoutForDate.id}`)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"
+                  e.currentTarget.style.background = "var(--ink-04)"
+                  e.currentTarget.style.borderColor = "var(--ink-12)"
+                  e.currentTarget.style.color = "var(--ink-95)"
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)"
+                  e.currentTarget.style.background = "var(--ink-02)"
+                  e.currentTarget.style.borderColor = "var(--ink-08)"
+                  e.currentTarget.style.color = "var(--ink-70)"
                 }}
               >
-                <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
-                  View Details
-                </span>
+                <span style={{ fontSize: "11px", fontWeight: 400, color: "inherit" }}>View session</span>
               </button>
-            </div>
+            </>
+          )}
 
-            {displayExercises && displayExercises.length > 0 && (
-              <div className="mb-6 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
-                {displayExercises.map((exercise: any, index: number) => (
-                  <div
-                    key={exercise.id ?? `${exercise.name}-${index}`}
-                    className="flex items-center gap-3"
-                    style={{ opacity: 0.6, gap: isCompactExerciseList ? "6px" : undefined }}
-                  >
-                    <div
-                      className="text-ink-40"
-                      style={{
-                        fontSize: isCompactExerciseList ? "8px" : "9px",
-                        fontWeight: 500,
-                        fontVariantNumeric: "tabular-nums",
-                        minWidth: "12px",
-                      }}
-                    >
-                      {index + 1}
-                    </div>
-                    <div
-                      className="text-ink-90 flex-1"
-                      style={{
-                        fontSize: isCompactExerciseList ? "10px" : "11px",
-                        fontWeight: 400,
-                        letterSpacing: "0.005em",
-                      }}
-                    >
-                      {getExerciseLabel(exercise.name)}
-                    </div>
-                    <div
-                      className="text-ink-30"
-                      style={{
-                        fontSize: isCompactExerciseList ? "8px" : "9px",
-                        fontWeight: 400,
-                        letterSpacing: "0.01em",
-                      }}
-                    >
-                      {exercise.targetSets ?? exercise.sets?.length ?? 0} sets
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {actualState === "rest" && !weeklyReview && (
-          <div className="px-5 mb-6">
-            <div className="text-ink-20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
+          {actualState === "rest" && !weeklyReview && (
+            <div
+              className="text-center"
+              style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", color: "var(--ink-20)", padding: "24px 0" }}
+            >
               Rest day — no workout scheduled
             </div>
-          </div>
-        )}
+          )}
 
-        {actualState === "rest" && weeklyReview && (
-          <div className="px-5 mb-6">
-            <div
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "var(--radius-xs)",
-                padding: "18px",
-              }}
-            >
+          {actualState === "rest" && weeklyReview && (
+            <div style={{ marginBottom: "20px" }}>
               <div
-                className="text-ink-25 tracking-widest mb-1"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  fontFamily: "var(--font-label)",
+                  color: "var(--ink-35)",
+                  marginBottom: "4px",
+                }}
               >
                 {weeklyReview.variant === "review" ? "WEEK IN REVIEW" : "WEEK SO FAR"}
               </div>
-              <div
-                className="text-ink-70 mb-4"
-                style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.01em" }}
-              >
+              <div style={{ fontSize: "11px", fontWeight: 400, color: "var(--ink-50)", marginBottom: "14px" }}>
                 {weeklyReview.variant === "review"
                   ? "How the week went"
                   : "How the week is going so far"}
               </div>
 
-              <div className="flex items-stretch">
-                <div className="flex-1">
-                  <div
-                    className="text-ink-25 tracking-widest mb-1"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
-                  >
-                    SESSIONS
-                  </div>
-                  <div
-                    className="text-ink-95"
-                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
-                  >
-                    {weeklyReview.sessions}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div
-                    className="text-ink-25 tracking-widest mb-1"
-                    style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
-                  >
-                    {weeklyReview.variant === "review" ? "VOLUME" : "VOLUME SO FAR"}
-                  </div>
-                  <div
-                    className="text-ink-95"
-                    style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
-                  >
-                    {formatVolume(weeklyReview.volume)}
-                    <span className="text-ink-30" style={{ fontSize: "11px", marginLeft: "3px" }}>lb</span>
-                  </div>
-                </div>
+              <div className="flex items-baseline" style={{ gap: "28px" }}>
+                <StatUnit value={`${weeklyReview.sessions}`} label="SESSIONS" />
+                <StatUnit
+                  value={formatK(weeklyReview.volume)}
+                  unit="LB"
+                  label={weeklyReview.variant === "review" ? "VOLUME" : "VOLUME SO FAR"}
+                />
                 {weeklyReview.variant === "review" && (
-                  <div className="flex-1">
-                    <div
-                      className="text-ink-25 tracking-widest mb-1"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)" }}
-                    >
-                      PRS
-                    </div>
-                    <div
-                      className="text-ink-95"
-                      style={{ fontSize: "20px", fontWeight: 400, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-display)" }}
-                    >
-                      {weeklyReview.prCount}
-                    </div>
-                  </div>
+                  <StatUnit value={`${weeklyReview.prCount}`} label="PRS" />
                 )}
               </div>
 
               {weeklyReview.previousVolume > 0 && (
-                <div className="flex items-center gap-1.5 mt-4">
-                  {weeklyReview.wowPercent >= 0 ? (
-                    <ArrowUp size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                  ) : (
-                    <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                  )}
-                  <span
-                    className="text-ink-40"
-                    style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
-                  >
-                    {Math.abs(Math.round(weeklyReview.wowPercent))}%{" "}
-                    {weeklyReview.variant === "review" ? "vs last week" : "vs last week's pace"}
-                  </span>
+                <div style={{ marginTop: "14px" }}>
+                  <DeltaChip
+                    tone={weeklyReview.wowPercent > 0 ? "good" : "neutral"}
+                    arrow={weeklyReview.wowPercent >= 0 ? "up" : "down"}
+                    value={`${Math.abs(Math.round(weeklyReview.wowPercent))}%`}
+                    context={weeklyReview.variant === "review" ? "VS LAST WEEK" : "VS LAST WEEK'S PACE"}
+                  />
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {actualState === "rest" && nextWorkout && (() => {
-          const exercises = nextWorkout.routine.exercises ?? []
-          const compact = exercises.length >= 9
-          return (
-            <div className="px-5 mb-2">
-              <div className="flex items-center gap-2 mb-3">
-                <div
-                  className="text-ink-25 tracking-widest"
-                  style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-                >
-                  UP NEXT · {nextWorkout.label}
-                </div>
-                <div className="flex-1 h-px" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
-                <div
-                  className="text-ink-40"
-                  style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "0.01em" }}
-                >
-                  {deriveWorkoutType(nextWorkout.routine.name)}
+          {actualState === "rest" && nextWorkout && (() => {
+            const exercises = nextWorkout.routine.exercises ?? []
+            const compact = exercises.length >= 9
+            return (
+              <div>
+                <BandHeader label={`UP NEXT · ${nextWorkout.label}`}>
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--ink-40)", whiteSpace: "nowrap" }}>
+                    {deriveWorkoutType(nextWorkout.routine.name)}
+                  </span>
+                </BandHeader>
+                <div>
+                  {exercises.map((exercise: any, index: number) => {
+                    const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
+                    return (
+                      <ReceiptRow
+                        key={exercise.id ?? `${exercise.name}-${index}`}
+                        index={index}
+                        name={getExerciseLabel(exercise.name)}
+                        right={`${exercise.targetSets ?? exercise.sets ?? 0} × ${exercise.targetReps ?? exercise.reps ?? "-"}`}
+                        hint={
+                          last
+                            ? `last ${last.weight}×${last.reps}${last.standsOut ? ` · set ${last.ordinal}` : ""}`
+                            : null
+                        }
+                        compact={compact}
+                      />
+                    )
+                  })}
                 </div>
               </div>
-              <div className="space-y-2.5" style={{ gap: compact ? "6px" : undefined }}>
-                {exercises.map((exercise: any, index: number) => (
-                  <div
-                    key={exercise.id ?? `${exercise.name}-${index}`}
-                    className="flex items-center gap-3"
-                    style={{ opacity: 0.55, gap: compact ? "6px" : undefined }}
-                  >
-                    <div
-                      className="text-ink-40"
-                      style={{
-                        fontSize: compact ? "8px" : "9px",
-                        fontWeight: 500,
-                        fontVariantNumeric: "tabular-nums",
-                        minWidth: "12px",
-                      }}
-                    >
-                      {index + 1}
-                    </div>
-                    <div
-                      className="text-ink-90 flex-1"
-                      style={{ fontSize: compact ? "10px" : "11px", fontWeight: 400, letterSpacing: "0.005em" }}
-                    >
-                      {getExerciseLabel(exercise.name)}
-                    </div>
-                    <div className="flex flex-col items-end" style={{ gap: "1px" }}>
-                      <div
-                        className="text-ink-40"
-                        style={{ fontSize: compact ? "8px" : "9px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
-                      >
-                        {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
-                      </div>
-                      {(() => {
-                        const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
-                        return last ? (
-                          <div
-                            className="text-ink-30"
-                            style={{ fontSize: compact ? "7px" : "8px", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}
-                          >
-                            last {last.weight}×{last.reps}
-                            {last.standsOut ? ` · set ${last.ordinal}` : ""}
-                          </div>
-                        ) : null
-                      })()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
+            )
+          })()}
 
-        {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
-          <div className="px-5 mb-2">
-            <div className="mb-3 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
-              {displayExercises.map((exercise: any, index: number) => (
-                <div
-                  key={exercise.id ?? `${exercise.name}-${index}`}
-                  className="flex items-center gap-3"
-                  style={{ opacity: 0.7, gap: isCompactExerciseList ? "6px" : undefined }}
-                >
-                  <div
-                    className="text-ink-40"
-                    style={{
-                      fontSize: isCompactExerciseList ? "8px" : "9px",
-                      fontWeight: 500,
-                      fontVariantNumeric: "tabular-nums",
-                      minWidth: "12px",
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                  <div
-                    className="text-ink-90 flex-1"
-                    style={{
-                      fontSize: isCompactExerciseList ? "10px" : "11px",
-                      fontWeight: 400,
-                      letterSpacing: "0.005em",
-                    }}
-                  >
-                    {getExerciseLabel(exercise.name)}
-                  </div>
-                  <div className="flex flex-col items-end" style={{ gap: "1px" }}>
-                    <div
-                      className="text-ink-40"
-                      style={{
-                        fontSize: isCompactExerciseList ? "8px" : "9px",
-                        fontWeight: 400,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {exercise.targetSets ?? exercise.sets ?? 0} × {exercise.targetReps ?? exercise.reps ?? "-"}
-                    </div>
-                    {(() => {
-                      const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
-                      return last ? (
-                        <div
-                          className="text-ink-30"
-                          style={{
-                            fontSize: isCompactExerciseList ? "7px" : "8px",
-                            fontWeight: 400,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          last {last.weight}×{last.reps}
-                          {last.standsOut ? ` · set ${last.ordinal}` : ""}
-                        </div>
-                      ) : null
-                    })()}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              className="w-full transition-all duration-base"
-              style={{
-                background: actualState === "activeSession" ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.03)",
-                border: actualState === "activeSession" ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "var(--radius-flat)",
-                padding: "14px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)"
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = actualState === "activeSession" ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.03)"
-                e.currentTarget.style.borderColor = actualState === "activeSession" ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.08)"
-              }}
-              onClick={() => {
-                if (actualState === "activeSession") {
-                  handleResumeExisting()
-                  return
-                }
-                if (scheduledRoutine?.id) {
-                  handleStartWorkout(scheduledRoutine.id)
-                }
-              }}
-            >
-              <div className="flex items-center justify-center gap-2">
-                {actualState === "activeSession" && (
-                  <div
-                    style={{
-                      width: "5px",
-                      height: "5px",
-                      borderRadius: "50%",
-                      background: "rgba(255, 255, 255, 0.6)",
-                      animation: "pulse 2s ease-in-out infinite",
-                    }}
-                  />
+          {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
+            <>
+              <div
+                className="flex items-baseline"
+                style={{ gap: "28px", marginBottom: isCompactExerciseList ? "12px" : "16px" }}
+              >
+                <StatUnit value={`${displayExercises.length}`} label="EXERCISES" />
+                <StatUnit
+                  value={`${
+                    actualState === "activeSession" && activeSessionProgress
+                      ? activeSessionProgress.totalSets
+                      : plannedSets
+                  }`}
+                  label="SETS PLANNED"
+                />
+                {actualState === "activeSession" && activeSessionProgress && (
+                  <StatUnit value={`${activeSessionProgress.remainingSets}`} label="SETS LEFT" />
                 )}
-                <span className="text-ink-90" style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em" }}>
-                  {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
-                </span>
-                {actualState === "activeSession" && null}
               </div>
-            </button>
 
-            {actualState === "activeSession" && (
+              <div style={{ marginBottom: "14px" }}>
+                {displayExercises.map((exercise: any, index: number) => {
+                  const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
+                  return (
+                    <ReceiptRow
+                      key={exercise.id ?? `${exercise.name}-${index}`}
+                      index={index}
+                      name={getExerciseLabel(exercise.name)}
+                      right={`${exercise.targetSets ?? exercise.sets ?? 0} × ${exercise.targetReps ?? exercise.reps ?? "-"}`}
+                      hint={
+                        last
+                          ? `last ${last.weight}×${last.reps}${last.standsOut ? ` · set ${last.ordinal}` : ""}`
+                          : null
+                      }
+                      compact={isCompactExerciseList}
+                    />
+                  )
+                })}
+              </div>
+
               <button
-                className="w-full mt-3 transition-all duration-base"
+                className="w-full transition-all duration-base"
                 style={{
-                  background: "transparent",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  background: actualState === "activeSession" ? "var(--ink-04)" : "var(--ink-02)",
+                  border: actualState === "activeSession" ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
                   borderRadius: "var(--radius-flat)",
-                  padding: "12px",
+                  padding: "14px",
+                  color: actualState === "activeSession" ? "var(--ink-95)" : "var(--ink-70)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"
+                  e.currentTarget.style.background = "var(--ink-06)"
+                  e.currentTarget.style.borderColor = "var(--ink-12)"
+                  e.currentTarget.style.color = "var(--ink-95)"
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent"
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)"
+                  e.currentTarget.style.background = actualState === "activeSession" ? "var(--ink-04)" : "var(--ink-02)"
+                  e.currentTarget.style.borderColor = actualState === "activeSession" ? "var(--ink-12)" : "var(--ink-08)"
+                  e.currentTarget.style.color = actualState === "activeSession" ? "var(--ink-95)" : "var(--ink-70)"
                 }}
-                onClick={handleDiscardActiveWorkout}
+                onClick={() => {
+                  if (actualState === "activeSession") {
+                    handleResumeExisting()
+                    return
+                  }
+                  if (scheduledRoutine?.id) {
+                    handleStartWorkout(scheduledRoutine.id)
+                  }
+                }}
               >
-                <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.02em" }}>
-                  Discard Active Workout
+                <span style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", color: "inherit" }}>
+                  {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
                 </span>
               </button>
-            )}
 
-          </div>
-        )}
+              {actualState === "activeSession" && (
+                <button
+                  className="w-full mt-3 transition-all duration-base"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "12px",
+                    color: "var(--ink-40)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--ink-70)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--ink-40)"
+                  }}
+                  onClick={handleDiscardActiveWorkout}
+                >
+                  <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.02em", color: "inherit" }}>
+                    Discard Active Workout
+                  </span>
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
       </div>
       </div>
 
       <div
-        className="px-5 mt-0 flex-shrink-0"
+        className="px-5 mt-0 flex-shrink-0 band-enter"
+        style={{ animationDelay: "140ms" }}
         onTouchStart={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
         onTouchEnd={(event) => event.stopPropagation()}
@@ -2116,47 +1876,46 @@ export default function Home() {
         onTouchMoveCapture={(event) => event.stopPropagation()}
         onTouchEndCapture={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div
-            className="text-ink-25 tracking-widest"
-            style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-          >
-            PROGRESS
-          </div>
-          {progression.tracked > 0 && (
-            <div className="flex items-center gap-1">
-              {progression.up >= progression.down ? (
-                <ArrowUp size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-              ) : (
-                <ArrowDown size={9} strokeWidth={2} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-              )}
-              <span
-                className="text-ink-40"
-                style={{ fontSize: "9px", fontWeight: 500, letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
-              >
-                {progression.up} of {progression.tracked} lifts up
-              </span>
-            </div>
-          )}
-        </div>
+        <BandHeader label="THIS WEEK">
+          {canCompareWeekOverWeek && currentWeekVolumeSoFar > 0 && previousWeekVolume > 0 ? (
+            <DeltaChip
+              tone={weekDelta > 0 ? "good" : "neutral"}
+              arrow={weekDelta > 0 ? "up" : "down"}
+              value={formatK(weekDelta)}
+              pct={`${Math.abs(weekPercent).toFixed(0)}%`}
+              context="WK/WK"
+            />
+          ) : !canCompareWeekOverWeek ? (
+            <DeltaChip tone="neutral" value={formatK(previousWeekVolume)} context="PREV 7D" />
+          ) : null}
+        </BandHeader>
         <button
-          className="w-full text-left transition-all duration-base"
+          className="w-full text-left transition-opacity duration-base"
           onClick={() => router.push("/volume")}
-          style={{ background: "transparent", padding: 0 }}
+          style={{ background: "transparent", border: "none", padding: 0 }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = "0.85"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = "1"
+          }}
           type="button"
         >
-          <TrainingVolumeCard
-            currentWeekVolume={currentWeekVolumeSoFar}
-            previousWeekVolume={previousWeekVolume}
-            chartData={weeklyVolumesForCard}
-            canCompareWeekOverWeek={canCompareWeekOverWeek}
-          />
+          <div style={{ marginBottom: "10px" }}>
+            <StatUnit
+              value={formatK(currentWeekVolumeSoFar)}
+              unit="LB"
+              label={`VOLUME · WK OF ${weekOfLabel}`}
+            />
+          </div>
+          <Sparkline data={weeklyVolumesForCard} height={56} live domainPadding={5000} />
         </button>
       </div>
 
       {todayPRs.length > 0 && (
         <div
-          className="flex-shrink-0 pb-4"
+          className="flex-shrink-0 pb-4 band-enter"
+          style={{ animationDelay: "210ms" }}
           data-testid="pr-section"
           onTouchStart={(event) => event.stopPropagation()}
           onTouchMove={(event) => event.stopPropagation()}
@@ -2165,13 +1924,17 @@ export default function Home() {
           onTouchMoveCapture={(event) => event.stopPropagation()}
           onTouchEndCapture={(event) => event.stopPropagation()}
         >
-          <div className="px-5 flex items-center justify-between mb-4">
-            <h2
-              className="text-ink-25 tracking-widest"
-              style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-            >
-              PERSONAL RECORDS
-            </h2>
+          <div className="px-5">
+            <BandHeader label="ALL-TIME">
+              {progression.tracked > 0 && (
+                <DeltaChip
+                  tone={progression.up >= progression.down ? "good" : "neutral"}
+                  arrow={progression.up >= progression.down ? "up" : "down"}
+                  value={`${progression.up} OF ${progression.tracked}`}
+                  context="LIFTS UP"
+                />
+              )}
+            </BandHeader>
           </div>
 
           <div
@@ -2180,7 +1943,7 @@ export default function Home() {
             style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
           >
             {[...prRows.firstRow, ...prRows.secondRow].map((pr) => (
-              <PRCard
+              <AllTimePRCard
                 key={`pr-${pr.name}`}
                 exercise={pr.name}
                 reps={pr.reps}
@@ -2294,12 +2057,24 @@ export default function Home() {
           }
         }
 
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 0.6;
+        @keyframes bandEnter {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
           }
-          50% {
+          to {
             opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .band-enter {
+          animation: bandEnter 500ms var(--ease-theatre) both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .band-enter {
+            animation: none;
           }
         }
         `}</style>
@@ -2308,7 +2083,62 @@ export default function Home() {
   )
 }
 
-function PRCard({
+// One receipt row: two-digit index, name, tabular right column with an
+// optional "last WxR" hint. Compact density shrinks row padding only, never
+// the fonts.
+function ReceiptRow({
+  index,
+  name,
+  right,
+  hint,
+  compact,
+}: {
+  index: number
+  name: string
+  right?: string
+  hint?: string | null
+  compact?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3" style={{ padding: compact ? "3px 0" : "4.5px 0" }}>
+      <div
+        style={{
+          fontSize: "8.5px",
+          fontWeight: 500,
+          color: "var(--ink-30)",
+          fontVariantNumeric: "tabular-nums",
+          minWidth: "14px",
+        }}
+      >
+        {String(index + 1).padStart(2, "0")}
+      </div>
+      <div
+        className="flex-1"
+        style={{ fontSize: "11px", fontWeight: 400, color: "var(--ink-85)", letterSpacing: "0.005em" }}
+      >
+        {name}
+      </div>
+      <div className="flex flex-col items-end" style={{ gap: "1px" }}>
+        {right && (
+          <div
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {right}
+          </div>
+        )}
+        {hint && (
+          <div
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {hint}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AllTimePRCard({
   exercise,
   reps,
   weight,
@@ -2325,12 +2155,6 @@ function PRCard({
   trendPct?: number | null
   onClick?: () => void
 }) {
-  const chartSeries = chartData.length === 1 ? [chartData[0], chartData[0]] : chartData
-  const safeSeries = chartSeries.length > 0 ? chartSeries : [weight]
-  const formattedData = safeSeries.map((value, index) => ({ index, value }))
-  const changePercent = typeof trendPct === "number" ? trendPct : null
-  const isPositive = (changePercent ?? 0) > 0
-  const gradientId = `prGradient-${exercise.replace(/\s+/g, "-").toLowerCase()}`
   const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px) / 2), 260px)"
 
   return (
@@ -2340,229 +2164,63 @@ function PRCard({
       style={{ width: cardWidth, minWidth: cardWidth, padding: "0" }}
       type="button"
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="text-ink-35 pr-2" style={{ fontSize: "9px", fontWeight: 400, lineHeight: "1.3", letterSpacing: "0.005em" }}>
-          {exercise}
-        </div>
+      <div
+        style={{
+          fontSize: "9.5px",
+          fontWeight: 400,
+          lineHeight: "1.3",
+          letterSpacing: "0.005em",
+          color: "var(--ink-50)",
+          minHeight: "25px",
+          marginBottom: "8px",
+          paddingRight: "8px",
+        }}
+      >
+        {exercise}
+      </div>
 
-        {changePercent !== null && changePercent !== 0 && (
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            {isPositive ? (
-              <ArrowUp size={7} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-            ) : (
-              <ArrowDown size={7} strokeWidth={2.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-            )}
-            <span
-              style={{
-                fontSize: "7px",
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.3)",
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {Math.abs(changePercent)}%
-            </span>
-          </div>
+      <div className="flex items-baseline" style={{ gap: "6px", marginBottom: "10px" }}>
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "30px",
+            lineHeight: 1,
+            color: "var(--ink-95)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {reps}
+        </span>
+        <span style={{ fontSize: "10px", color: "var(--ink-25)" }}>&times;</span>
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "30px",
+            lineHeight: 1,
+            color: "var(--ink-95)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {weight}
+        </span>
+        <span style={{ fontSize: "10px", color: "var(--ink-25)", letterSpacing: "0.06em" }}>LB</span>
+      </div>
+
+      <div style={{ marginBottom: "8px" }}>
+        <Sparkline data={chartData.length > 0 ? chartData : [weight]} height={34} domainPadding={15} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span style={{ fontSize: "8px", fontWeight: 400, color: "var(--ink-25)" }}>{details}</span>
+        {typeof trendPct === "number" && trendPct !== 0 && (
+          <DeltaChip
+            tone={trendPct > 0 ? "good" : "neutral"}
+            arrow={trendPct > 0 ? "up" : "down"}
+            value={`${Math.abs(trendPct)}%`}
+            size="sm"
+          />
         )}
-      </div>
-
-      <div className="mb-5">
-        <div className="flex items-baseline gap-2">
-          <div
-            className="text-ink-95 font-display"
-            style={{ fontSize: "34px", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: "1", fontVariantNumeric: "tabular-nums" }}
-          >
-            {reps}
-          </div>
-          <div className="text-ink-15" style={{ fontSize: "11px", fontWeight: 400, marginBottom: "3px" }}>
-            ×
-          </div>
-          <div
-            className="text-ink-95 font-display"
-            style={{ fontSize: "34px", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: "1", fontVariantNumeric: "tabular-nums" }}
-          >
-            {weight}
-          </div>
-        </div>
-        <div className="text-ink-20 mt-1" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.02em" }}>
-          lbs
-        </div>
-      </div>
-
-      <div className="mb-3" style={{ height: "52px" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={formattedData} margin={{ top: 8, right: 0, left: 0, bottom: 8 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.12)" />
-                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
-              </linearGradient>
-            </defs>
-            <YAxis hide domain={[(dataMin: number) => dataMin - 15, (dataMax: number) => dataMax + 15]} />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke="rgba(255, 255, 255, 0.35)"
-              strokeWidth={1.5}
-              fill={`url(#${gradientId})`}
-              dot={(props) => {
-                const { cx, cy, index } = props
-                const safeCx = typeof cx === "number" ? cx : 0
-                const safeCy = typeof cy === "number" ? cy : 0
-                const isLast = index === formattedData.length - 1
-                return (
-                  <circle
-                    key={`pr-dot-${exercise}-${index}`}
-                    cx={safeCx}
-                    cy={safeCy}
-                    r={isLast ? 2 : 1}
-                    fill={isLast ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.25)"}
-                  />
-                )
-              }}
-              activeDot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="text-ink-20" style={{ fontSize: "7px", fontWeight: 400, letterSpacing: "0.01em" }}>
-        {details}
       </div>
     </button>
-  )
-}
-
-function TrainingVolumeCard({
-  currentWeekVolume,
-  previousWeekVolume,
-  chartData,
-  canCompareWeekOverWeek,
-}: {
-  currentWeekVolume: number
-  previousWeekVolume: number
-  chartData: number[]
-  canCompareWeekOverWeek: boolean
-}) {
-  const formattedData = chartData.map((value, index) => ({ week: index + 1, volume: value }))
-  const delta = currentWeekVolume - previousWeekVolume
-  const percent = previousWeekVolume ? (delta / previousWeekVolume) * 100 : 0
-  const isPositive = delta > 0
-  const arrowColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
-  const valueColor = isPositive ? "#FF5733" : "rgba(255, 255, 255, 0.25)"
-  const percentColor = isPositive ? "rgba(255, 87, 51, 0.6)" : "rgba(255, 255, 255, 0.2)"
-  const showWeekCompare = canCompareWeekOverWeek && currentWeekVolume > 0 && previousWeekVolume > 0
-  const displayVolume = currentWeekVolume
-  const formatVolumeK = (value: number) => {
-    const abs = Math.abs(value)
-    if (abs >= 1000) return `${(abs / 1000).toFixed(1)}k`
-    return `${abs.toFixed(0)}`
-  }
-
-  return (
-    <div>
-      <div className="mb-4">
-        <div className="flex items-baseline gap-2">
-          <div
-            className="text-ink-95 font-display"
-            style={{
-              fontSize: "34px",
-              fontWeight: 500,
-              letterSpacing: "-0.04em",
-              lineHeight: "1",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {formatVolumeK(displayVolume)}
-          </div>
-          <div className="text-ink-20" style={{ fontSize: "9px", fontWeight: 400, letterSpacing: "0.02em" }}>
-            lbs
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="text-ink-40"
-          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.16em", fontFamily: "var(--font-label)" }}
-        >
-          {showWeekCompare ? "WEEK/WEEK" : "THIS WEEK SO FAR"}
-        </div>
-        {showWeekCompare ? (
-          <div className="flex items-center gap-1.5">
-            {isPositive ? (
-              <ArrowUp size={10} strokeWidth={2} style={{ color: arrowColor }} />
-            ) : (
-              <ArrowDown size={10} strokeWidth={2} style={{ color: arrowColor }} />
-            )}
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                color: valueColor,
-                fontVariantNumeric: "tabular-nums",
-                fontFamily: "var(--font-label)",
-              }}
-            >
-              {formatVolumeK(Math.abs(delta))}
-            </div>
-            <div
-              style={{
-                fontSize: "9px",
-                fontWeight: 500,
-                color: percentColor,
-                fontVariantNumeric: "tabular-nums",
-                fontFamily: "var(--font-label)",
-              }}
-            >
-              ({Math.abs(percent).toFixed(1)}%)
-            </div>
-          </div>
-        ) : (
-          <div
-            className="text-ink-25"
-            style={{ fontSize: "9px", fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFamily: "var(--font-label)" }}
-          >
-            Prev 7d {formatVolumeK(previousWeekVolume)} lbs
-          </div>
-        )}
-      </div>
-
-      <div style={{ height: "56px", width: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={formattedData} margin={{ top: 5, right: 0, left: -4, bottom: 5 }}>
-            <defs>
-              <linearGradient id="volumeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.08)" />
-                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.00)" />
-              </linearGradient>
-            </defs>
-            <YAxis hide domain={[(dataMin: number) => dataMin - 5000, (dataMax: number) => dataMax + 5000]} />
-            <Area
-              type="monotone"
-              dataKey="volume"
-              stroke="rgba(255, 255, 255, 0.3)"
-              strokeWidth={1.5}
-              fill="url(#volumeGradient)"
-              dot={(props) => {
-                const { cx, cy, index } = props
-                const safeCx = typeof cx === "number" ? cx : 0
-                const safeCy = typeof cy === "number" ? cy : 0
-                return (
-                  <circle
-                    key={`vol-dot-${index}`}
-                    cx={safeCx}
-                    cy={safeCy}
-                    r={2.5}
-                    fill="rgba(255, 255, 255, 0.25)"
-                  />
-                )
-              }}
-              activeDot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
   )
 }
