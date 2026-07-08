@@ -237,19 +237,13 @@ test.describe("Active session: FINISH button", () => {
 // ─── Exercise navigation dots ─────────────────────────────────────────────────
 
 test.describe("Active session: exercise navigation", () => {
-  test("clicking a nav dot updates the session's current exercise index", async ({ page }) => {
+  test("clicking a rail segment updates the session's current exercise index", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
     await page.goto(`/workout/session?routineId=${routineA.id}`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
-    // Click the 3rd nav dot (index 2) — exercises with height:5px inline style
-    await page.evaluate(() => {
-      const dots = Array.from(document.querySelectorAll("button")).filter(
-        (btn) => btn.style.height === "5px" || btn.style.height === "20px"
-      )
-      const third = dots[2]
-      if (third) third.click()
-    })
+    // Click the 3rd exercise's progress-rail segment (index 2)
+    await page.getByRole("button", { name: /^Exercise 3 of/ }).click()
 
     await page.waitForFunction(() => {
       try {
@@ -261,22 +255,15 @@ test.describe("Active session: exercise navigation", () => {
     })
   })
 
-  test("nav dots reflect completed status for finished exercises", async ({ page }) => {
+  test("rail shows one segment per exercise", async ({ page }) => {
     // completeSession has all exercises done; uiExerciseIndex starts at 2
     await seedStorage(page, { session: completeSession })
     await page.goto(`/workout/session?routineId=${routineA.id}`)
     await expect(page.getByText("Overhead Press")).toBeVisible()
 
-    // All three dots should be visible (one per exercise)
-    const dots = page.locator("button[style*='height: 5px'], button[style*='height:5px']")
-    // Plus the wide current dot (20px): total 3 dots
-    const totalDots = await page
-      .evaluate(() =>
-        Array.from(document.querySelectorAll("button")).filter(
-          (btn) => btn.style.height === "5px" || btn.style.height === "20px"
-        ).length
-      )
-    expect(totalDots).toBe(routineA.exercises.length)
+    // One rail segment button per exercise (aria-label "Exercise N of M: …")
+    const segments = page.getByRole("button", { name: /^Exercise \d+ of/ })
+    await expect(segments).toHaveCount(routineA.exercises.length)
   })
 })
 
