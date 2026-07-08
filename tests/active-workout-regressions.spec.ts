@@ -218,7 +218,7 @@ test("completed set persists after reload", async ({ page }) => {
   await expect(page.locator('button[aria-label="Mark Set Incomplete"]')).toBeVisible({ timeout: 15000 })
 })
 
-test("shows NEW PR in active workout set row", async ({ page }) => {
+test("shows PR chip in active workout set row", async ({ page }) => {
   await seedBaseStorage(page, { history: buildHistory(100, 8) })
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
@@ -227,10 +227,10 @@ test("shows NEW PR in active workout set row", async ({ page }) => {
   await weightInput.fill("110")
   await repsInput.fill("8")
 
-  await expect(page.getByText("NEW PR!")).toBeVisible()
+  await expect(page.getByText(/PR ·/)).toBeVisible()
 })
 
-test("shows Recovery set when below last performance", async ({ page }) => {
+test("shows RECOVERY chip when below last performance", async ({ page }) => {
   await seedBaseStorage(page, { history: buildHistory(100, 8) })
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
@@ -239,26 +239,32 @@ test("shows Recovery set when below last performance", async ({ page }) => {
   await weightInput.fill("90")
   await repsInput.fill("8")
 
-  await expect(page.getByText("Recovery set")).toBeVisible()
+  await expect(page.getByText("RECOVERY")).toBeVisible()
 })
 
-test("completed set renders more compact in active exercise", async ({ page }) => {
+// The ledger redesign expresses set state through ink + the left state-edge only;
+// a set row is born at its final geometry and never resizes on completion. A
+// completed set's input must match the still-active set's input exactly.
+test("completed set keeps fixed geometry (no size morph)", async ({ page }) => {
   await seedBaseStorage(page)
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
-  const weightInput = page.locator('input[type="number"]').nth(0)
-  const repsInput = page.locator('input[type="number"]').nth(1)
-  const beforeBox = await weightInput.boundingBox()
-  await weightInput.fill("100")
-  await repsInput.fill("8")
+  const set1Weight = page.locator('input[type="number"]').nth(0)
+  const set1Reps = page.locator('input[type="number"]').nth(1)
+  const set2Weight = page.locator('input[type="number"]').nth(2)
+  await set1Weight.fill("100")
+  await set1Reps.fill("8")
 
   await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
-  await page.waitForTimeout(100)
+  // set 1 is now completed; set 2 is the current set. Both inputs are measured
+  // at the same instant (no web-font-load boundary between the two reads).
+  await expect(page.locator('button[aria-label="Mark Set Incomplete"]')).toBeVisible()
 
-  const afterBox = await weightInput.boundingBox()
-  expect(beforeBox && afterBox).toBeTruthy()
-  if (beforeBox && afterBox) {
-    expect(afterBox.height).toBeLessThan(beforeBox.height)
+  const completedBox = await set1Weight.boundingBox()
+  const activeBox = await set2Weight.boundingBox()
+  expect(completedBox && activeBox).toBeTruthy()
+  if (completedBox && activeBox) {
+    expect(completedBox.height).toBeCloseTo(activeBox.height, 1)
   }
 })
 

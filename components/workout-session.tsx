@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { type WorkoutRoutine, getRoutineById, saveRoutine } from "@/lib/routine-storage"
@@ -55,6 +55,9 @@ import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exerc
 import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
 import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown, ListOrdered } from "lucide-react"
 import { ReorderExercisesSheet } from "@/components/reorder-exercises-sheet"
+import { StatUnit } from "@/components/ledger/stat-unit"
+import { SessionClock } from "@/components/ledger/session-clock"
+import { DeltaChip } from "@/components/ledger/delta-chip"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
@@ -102,6 +105,98 @@ function extractRestSeconds(notes?: string): number {
 
 function normalizeExerciseName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
+// Headline volume in the ledger's k-vocabulary: "1.2K", "22.9K", "850".
+function formatVolumeK(value: number): string {
+  const abs = Math.abs(Math.round(value))
+  if (abs >= 1000) return `${(abs / 1000).toFixed(1)}K`
+  return `${abs}`
+}
+
+// Map the existing getSetComparison result onto DeltaChip props (§A4 table).
+// Returns null when there is no chip to show (no-history or missing data).
+function setComparisonToChip(
+  comparison: { status: string } | null,
+  set: { weight: number | null; reps: number | null },
+  last: { weight: number; reps: number } | null,
+): { tone: "good" | "neutral"; arrow?: "up" | "down"; value: string } | null {
+  if (!comparison || comparison.status === "no-history") return null
+  if (typeof set.weight !== "number" || typeof set.reps !== "number") return null
+  switch (comparison.status) {
+    case "pr":
+      return { tone: "good", value: `PR · ${set.weight} × ${set.reps}` }
+    case "progressed": {
+      if (!last) return null
+      const weightDelta = set.weight - last.weight
+      const repsDelta = set.reps - last.reps
+      const value = weightDelta > 0 ? `+${weightDelta} LB` : `+${repsDelta} REPS`
+      return { tone: "good", arrow: "up", value }
+    }
+    case "matched":
+      return { tone: "neutral", value: "MATCHED" }
+    case "recovery":
+      return { tone: "neutral", value: "RECOVERY" }
+    default:
+      return null
+  }
+}
+
+function calculatePlates(
+  weight: number,
+  startingWeight: number,
+  mode: "per-side" | "total",
+): { plate: number; count: number }[] {
+  const adjusted = Math.max(0, weight - startingWeight)
+  const plateWeight = mode === "per-side" ? adjusted / 2 : adjusted
+
+  if (plateWeight <= 0) return []
+
+  const availablePlates = [45, 35, 25, 10, 5, 2.5]
+  const plates: { plate: number; count: number }[] = []
+  let remaining = plateWeight
+
+  for (const plate of availablePlates) {
+    const count = Math.floor(remaining / plate)
+    if (count > 0) {
+      plates.push({ plate, count })
+      remaining -= plate * count
+    }
+  }
+
+  return plates
+}
+
+function getSetComparison(
+  set: Exercise["sets"][number],
+  last: { weight: number; reps: number } | null,
+  maxHistoricalVolume: number,
+) {
+  if (!last) return null
+  if (typeof set.weight !== "number" || typeof set.reps !== "number") {
+    return { status: "no-history", message: `Last: ${last.weight} × ${last.reps}` }
+  }
+
+  const volume = set.weight * set.reps
+  if (volume > maxHistoricalVolume) {
+    return { status: "pr", message: "NEW PR!" }
+  }
+
+  if (set.weight > last.weight || (set.weight === last.weight && set.reps > last.reps)) {
+    const weightDelta = set.weight - last.weight
+    const repsDelta = set.reps - last.reps
+    const delta =
+      weightDelta > 0
+        ? `${weightDelta} lb${weightDelta === 1 ? "" : "s"}`
+        : `${repsDelta} rep${repsDelta === 1 ? "" : "s"}`
+    return { status: "progressed", message: `+${delta}` }
+  }
+
+  if (set.weight === last.weight && set.reps === last.reps) {
+    return { status: "matched", message: "Matched last time" }
+  }
+
+  return { status: "recovery", message: "Recovery set" }
 }
 
 function getExerciseLabel(name: string): string {
@@ -184,6 +279,834 @@ function applyProgressiveOverload(
   return { reps: latest.reps, weight: latest.weight, mode: null }
 }
 
+type ExercisePageProps = {
+  exercise: any
+  exerciseIndex: number
+  currentExerciseIndex: number
+  exercisesCount: number
+  isDeload: boolean
+  showPlateCalc: boolean
+  plateDisplayMode: "per-side" | "total"
+  plateStartingWeight: number
+  focusedInput: string | null
+  validationTrigger: number
+  repCapErrors: Record<string, boolean>
+  sessionId: string | undefined
+  userId: string | null
+  maxSetVolumeByExercise: Map<string, number>
+  updateExerciseMachineSetting: (exerciseIndex: number, field: "seat", value: string) => void
+  handleTogglePlateCalc: () => void
+  updateSetDataForExercise: (exerciseIndex: number, setIndex: number, field: "reps" | "weight", value: number | null) => void
+  handleSetFieldFocus: (setId: string, field: "reps" | "weight") => void
+  handleSetFieldBlur: (setId: string, field: "reps" | "weight") => void
+  handleInputAutoSelect: (event: React.FocusEvent<HTMLInputElement>) => void
+  setFocusedInput: (value: string | null) => void
+  setRepCapErrors: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
+  setValidationTrigger: (value: number) => void
+  completeSet: (setIndex: number, options?: { startRest?: boolean; exerciseIndex?: number }) => void
+  rateExercise: (exerciseIndex: number, rating: ExerciseRating) => void
+  handleApplyProgressiveOverload: (exerciseIndex: number) => void
+  setPlateDisplayMode: (mode: "per-side" | "total") => void
+  setPlateStartingWeight: (value: number) => void
+  onOpenExercise: (name: string) => void
+  registerWeightRef: (setId: string, node: HTMLInputElement | null) => void
+  registerRepsRef: (setId: string, node: HTMLInputElement | null) => void
+}
+
+// One carousel page (one exercise). Module-level + React.memo so a per-second
+// clock tick (owned by SessionClock) never re-renders these pages, and so that
+// mutating one exercise re-renders only that page (props are passed stable from
+// the parent). Presentation only — all data mutations flow back through the
+// handler props.
+const ExercisePage = memo(function ExercisePage({
+  exercise,
+  exerciseIndex,
+  currentExerciseIndex,
+  exercisesCount,
+  isDeload,
+  showPlateCalc,
+  plateDisplayMode,
+  plateStartingWeight,
+  focusedInput,
+  validationTrigger,
+  repCapErrors,
+  sessionId,
+  userId,
+  maxSetVolumeByExercise,
+  updateExerciseMachineSetting,
+  handleTogglePlateCalc,
+  updateSetDataForExercise,
+  handleSetFieldFocus,
+  handleSetFieldBlur,
+  handleInputAutoSelect,
+  setFocusedInput,
+  setRepCapErrors,
+  setValidationTrigger,
+  completeSet,
+  rateExercise,
+  handleApplyProgressiveOverload,
+  setPlateDisplayMode,
+  setPlateStartingWeight,
+  onOpenExercise,
+  registerWeightRef,
+  registerRepsRef,
+}: ExercisePageProps) {
+  const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
+  const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
+  const isExerciseComplete =
+    exercise.sets.length > 0 &&
+    exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
+  const isCompactSets = exercise.sets.length >= 4
+  const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
+  const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
+  const showProgressiveOverload =
+    exerciseIndex === currentExerciseIndex &&
+    exerciseRepRange !== null &&
+    exercise.sets.length > 0 &&
+    exercise.sets.every(
+      (set: any) => set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
+    )
+
+  return (
+    <div
+      style={{
+        scrollSnapAlign: "start",
+        width: "100%",
+        flexShrink: 0,
+        paddingBottom: "120px",
+      }}
+    >
+      <div style={{ marginBottom: isCompactSets ? "10px" : "18px" }}>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div
+            style={{
+              fontFamily: "var(--font-label)",
+              fontSize: "9px",
+              fontWeight: 600,
+              letterSpacing: "0.2em",
+              color: "var(--ink-35)",
+            }}
+          >
+            EXERCISE {exerciseIndex + 1} OF {exercisesCount}
+          </div>
+          <div className="flex items-center gap-2">
+            {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
+              <input
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={exercise.machineSettings?.seat ?? ""}
+                onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
+                placeholder="SEAT"
+                className="transition-colors duration-150"
+                style={{
+                  background: "var(--ink-02)",
+                  border: "1px solid var(--ink-08)",
+                  borderRadius: "var(--radius-flat)",
+                  padding: "4px 9px",
+                  fontFamily: "var(--font-label)",
+                  fontSize: "8px",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  color: "var(--ink-70)",
+                  width: "52px",
+                  textAlign: "center",
+                }}
+              />
+            )}
+            <button
+              onClick={() => {
+                if (exerciseIndex !== currentExerciseIndex) return
+                handleTogglePlateCalc()
+              }}
+              className="transition-colors duration-150"
+              style={{
+                background: showPlateCalc ? "var(--ink-06)" : "var(--ink-02)",
+                border: `1px solid ${showPlateCalc ? "var(--ink-12)" : "var(--ink-08)"}`,
+                borderRadius: "var(--radius-flat)",
+                padding: "4px 9px",
+                fontFamily: "var(--font-label)",
+                fontSize: "8px",
+                fontWeight: 600,
+                letterSpacing: "0.1em",
+                color: showPlateCalc ? "var(--ink-85)" : "var(--ink-35)",
+              }}
+              type="button"
+            >
+              PLATES
+            </button>
+          </div>
+        </div>
+
+        {isDeload && (
+          <div
+            style={{
+              display: "inline-block",
+              marginBottom: "8px",
+              background: "var(--ink-02)",
+              border: "1px solid var(--ink-08)",
+              borderRadius: "var(--radius-flat)",
+              padding: "3px 9px",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-label)",
+                fontSize: "8px",
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                color: "var(--ink-35)",
+                textTransform: "uppercase",
+              }}
+            >
+              Deload Week
+            </span>
+          </div>
+        )}
+
+        <h1
+          style={{
+            fontSize: "40px",
+            fontWeight: 400,
+            letterSpacing: "-0.02em",
+            lineHeight: "0.95",
+            fontFamily: "var(--font-display)",
+            color: "var(--ink-95)",
+            cursor: "pointer",
+          }}
+          onClick={() => onOpenExercise(exercise.name)}
+        >
+          {getExerciseLabel(exercise.name)}
+        </h1>
+
+        <div
+          style={{
+            fontFamily: "var(--font-label)",
+            fontSize: "9px",
+            fontWeight: 500,
+            letterSpacing: "0.14em",
+            color: "var(--ink-30)",
+            marginTop: "8px",
+          }}
+        >
+          {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}
+          {exercise.targetReps ? ` · TARGET ${exercise.targetReps} REPS` : ""}
+          {!isExerciseComplete && (
+            <>
+              {" · "}
+              <span style={{ color: "var(--ink-50)", fontWeight: 600 }}>
+                NOW SET {activeSetIndex + 1}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col" style={{ gap: isCompactSets ? "14px" : "24px" }}>
+        {exercise.sets.map((set: any, setIndex: number) => {
+          const setKey = set.id ?? `${exercise.id}-${setIndex}`
+          const isActiveExercise = exerciseIndex === currentExerciseIndex
+          const isCurrentSet = isActiveExercise && setIndex === activeSetIndex
+          const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
+          const missingWeight = isMissingWeight(set.weight)
+          const missingReps = isMissingReps(set.reps)
+          const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
+          const focusedWeight = focusedInput === `${setKey}-weight`
+          const focusedReps = focusedInput === `${setKey}-reps`
+          const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, sessionId)
+          const comparison = getSetComparison(
+            set,
+            lastSet,
+            maxSetVolumeByExercise.get(normalizeExerciseName(exercise.name)) ?? 0
+          )
+          const chip =
+            isActiveExercise && typeof set.weight === "number" && typeof set.reps === "number"
+              ? setComparisonToChip(comparison, set, lastSet)
+              : null
+          const plates =
+            typeof set.weight === "number"
+              ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
+              : []
+          const isPlateSetActive =
+            exerciseIndex === currentExerciseIndex &&
+            !set.completed &&
+            plates.length > 0 &&
+            (isCurrentSet || focusedWeight || focusedReps)
+
+          // Fixed geometry — density varies per exercise (set count), never per set state.
+          const inputPadding = isCompactSets ? "12px 8px" : "15px 8px"
+          const inputFontSize = isCompactSets ? "22px" : "26px"
+          const valueColor = set.completed
+            ? "var(--ink-40)"
+            : isCurrentSet
+              ? "var(--ink-95)"
+              : "var(--ink-50)"
+          const weightBorder =
+            showMissing && missingWeight
+              ? "var(--ink-40)"
+              : focusedWeight
+                ? "var(--ink-20)"
+                : isCurrentSet
+                  ? "var(--ink-12)"
+                  : "transparent"
+          const repsBorder =
+            repCapError || (showMissing && missingReps)
+              ? "var(--ink-40)"
+              : focusedReps
+                ? "var(--ink-20)"
+                : isCurrentSet
+                  ? "var(--ink-12)"
+                  : "transparent"
+          const weightBg = focusedWeight ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
+          const repsBg = focusedReps ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
+
+          return (
+            <div
+              key={setKey}
+              style={{
+                paddingLeft: "14px",
+                borderLeft: `2px solid ${isCurrentSet ? "rgba(255, 255, 255, 0.8)" : "var(--ink-06)"}`,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: isCompactSets ? "6px" : "10px",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "8.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.18em",
+                    color: isCurrentSet ? "var(--ink-50)" : "var(--ink-30)",
+                  }}
+                >
+                  SET {String(setIndex + 1).padStart(2, "0")}
+                </span>
+                {isCurrentSet && (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-label)",
+                      fontSize: "7.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.18em",
+                      color: "var(--ink-50)",
+                    }}
+                  >
+                    NOW
+                  </span>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 44px",
+                  gap: "12px",
+                  alignItems: "stretch",
+                }}
+              >
+                <input
+                  type="number"
+                  ref={(node) => {
+                    if (set.id) registerWeightRef(set.id, node)
+                  }}
+                  value={set.weight ?? ""}
+                  onChange={(e) => {
+                    if (!canEditExercise) return
+                    const raw = e.target.value
+                    if (!raw.trim()) {
+                      void updateSetDataForExercise(exerciseIndex, setIndex, "weight", null)
+                      return
+                    }
+                    const parsed = parseNumber(raw)
+                    if (parsed === null || parsed < 0) return
+                    void updateSetDataForExercise(exerciseIndex, setIndex, "weight", parsed)
+                  }}
+                  onFocus={(e) => {
+                    if (set.id) handleSetFieldFocus(set.id, "weight")
+                    handleInputAutoSelect(e)
+                    setFocusedInput(`${setKey}-weight`)
+                  }}
+                  onBlur={() => {
+                    if (set.id) handleSetFieldBlur(set.id, "weight")
+                    setFocusedInput(null)
+                  }}
+                  placeholder="—"
+                  className="transition-colors duration-150"
+                  disabled={!canEditExercise}
+                  style={{
+                    width: "100%",
+                    background: weightBg,
+                    border: `1px solid ${weightBorder}`,
+                    borderRadius: "var(--radius-flat)",
+                    padding: inputPadding,
+                    fontSize: inputFontSize,
+                    fontWeight: 600,
+                    letterSpacing: "-0.02em",
+                    color: valueColor,
+                    fontVariantNumeric: "tabular-nums",
+                    outline: "none",
+                    textAlign: "center",
+                  }}
+                />
+
+                <input
+                  type="number"
+                  ref={(node) => {
+                    if (set.id) registerRepsRef(set.id, node)
+                  }}
+                  value={set.reps ?? ""}
+                  onChange={(e) => {
+                    if (!canEditExercise) return
+                    const raw = e.target.value
+                    if (!raw.trim()) {
+                      setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+                      void updateSetDataForExercise(exerciseIndex, setIndex, "reps", null)
+                      return
+                    }
+                    const parsed = parseNumber(raw)
+                    if (parsed === null) return
+                    if (parsed > REP_MAX) {
+                      setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
+                      return
+                    }
+                    setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
+                    const clamped = Math.max(REP_MIN, parsed)
+                    void updateSetDataForExercise(exerciseIndex, setIndex, "reps", clamped)
+                  }}
+                  onFocus={(e) => {
+                    if (set.id) handleSetFieldFocus(set.id, "reps")
+                    handleInputAutoSelect(e)
+                    setFocusedInput(`${setKey}-reps`)
+                  }}
+                  onBlur={() => {
+                    if (set.id) handleSetFieldBlur(set.id, "reps")
+                    setFocusedInput(null)
+                  }}
+                  placeholder="—"
+                  className="transition-colors duration-150"
+                  disabled={!canEditExercise}
+                  style={{
+                    width: "100%",
+                    background: repsBg,
+                    border: `1px solid ${repsBorder}`,
+                    borderRadius: "var(--radius-flat)",
+                    padding: inputPadding,
+                    fontSize: inputFontSize,
+                    fontWeight: 600,
+                    letterSpacing: "-0.02em",
+                    color: valueColor,
+                    fontVariantNumeric: "tabular-nums",
+                    outline: "none",
+                    textAlign: "center",
+                  }}
+                />
+
+                <button
+                  onClick={() => {
+                    if (!canEditExercise) return
+                    if (!set.completed && (isSetIncomplete(set) || repCapError)) {
+                      setValidationTrigger(Date.now())
+                      return
+                    }
+                    void completeSet(setIndex, { exerciseIndex, startRest: isCurrentSet })
+                  }}
+                  disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
+                  className="flex items-center justify-center transition-colors duration-150"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: set.completed ? "var(--ink-06)" : "var(--ink-02)",
+                    border: `1px solid ${set.completed ? "transparent" : "var(--ink-08)"}`,
+                    borderRadius: "var(--radius-flat)",
+                    opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
+                  }}
+                  type="button"
+                  aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
+                >
+                  {set.completed ? (
+                    <Check size={16} strokeWidth={2} style={{ color: "var(--ink-85)" }} />
+                  ) : (
+                    <div
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        borderRadius: "var(--radius-flat)",
+                        border: "1px solid var(--ink-35)",
+                        background: "transparent",
+                      }}
+                    />
+                  )}
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 44px", gap: "12px", marginTop: "5px" }}>
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  LB
+                </div>
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  REPS
+                </div>
+                <div />
+              </div>
+
+              <div
+                style={{
+                  minHeight: "18px",
+                  marginTop: isCompactSets ? "6px" : "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                {repCapError || showMissing ? (
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle size={10} strokeWidth={2} style={{ color: "var(--ink-40)" }} />
+                    <span
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "9px",
+                        fontWeight: 500,
+                        color: "var(--ink-40)",
+                      }}
+                    >
+                      {repCapError
+                        ? `Reps cannot exceed ${REP_MAX}`
+                        : missingWeight
+                          ? "Enter weight"
+                          : "Enter reps"}
+                    </span>
+                  </div>
+                ) : isActiveExercise && lastSet ? (
+                  <>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "8.5px",
+                        fontWeight: 500,
+                        letterSpacing: "0.1em",
+                        color: "var(--ink-25)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      LAST {lastSet.weight} × {lastSet.reps}
+                    </span>
+                    {chip && (
+                      <DeltaChip size="sm" tone={chip.tone} arrow={chip.arrow} value={chip.value} />
+                    )}
+                  </>
+                ) : null}
+              </div>
+
+              {showPlateCalc && isPlateSetActive && (
+                <div style={{ marginTop: isCompactSets ? "8px" : "12px" }}>
+                  <div className={`flex items-center gap-2 ${isCompactSets ? "mb-2" : "mb-3"}`}>
+                    <button
+                      className="transition-colors duration-150"
+                      style={{
+                        background: "var(--ink-02)",
+                        border: "1px solid var(--ink-08)",
+                        borderRadius: "var(--radius-flat)",
+                        padding: "4px 9px",
+                        fontFamily: "var(--font-label)",
+                        fontSize: "8px",
+                        fontWeight: 600,
+                        letterSpacing: "0.1em",
+                        color: "var(--ink-70)",
+                      }}
+                      onClick={() => {
+                        const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
+                        setPlateDisplayMode(nextMode)
+                        if (exercise.name) {
+                          localStorage.setItem(`plate_mode_${exercise.name}`, nextMode)
+                          if (userId) {
+                            void saveExerciseSettings(userId, exercise.name, { plateDisplayMode: nextMode })
+                          }
+                        }
+                      }}
+                      type="button"
+                    >
+                      {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
+                    </button>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "8px",
+                        fontWeight: 600,
+                        letterSpacing: "0.1em",
+                        color: "var(--ink-30)",
+                      }}
+                    >
+                      BAR
+                    </span>
+                    <input
+                      type="number"
+                      value={plateStartingWeight || ""}
+                      onChange={(e) => {
+                        const value = Number(e.target.value)
+                        const nextValue = Number.isNaN(value) ? 0 : Math.max(0, value)
+                        setPlateStartingWeight(nextValue)
+                        if (exercise.name) {
+                          localStorage.setItem(`plate_start_${exercise.name}`, String(nextValue))
+                          if (userId) {
+                            void saveExerciseSettings(userId, exercise.name, { barWeight: nextValue })
+                          }
+                        }
+                      }}
+                      onFocus={handleInputAutoSelect}
+                      className="transition-colors duration-150"
+                      style={{
+                        width: "52px",
+                        background: "var(--ink-02)",
+                        border: "1px solid var(--ink-08)",
+                        borderRadius: "var(--radius-flat)",
+                        padding: "4px 8px",
+                        fontSize: "13px",
+                        color: "var(--ink-70)",
+                        fontVariantNumeric: "tabular-nums",
+                        fontWeight: 600,
+                        textAlign: "center",
+                      }}
+                    />
+                  </div>
+
+                  <div className={`flex items-center gap-1.5 ${isCompactSets ? "mb-2" : "mb-3"}`}>
+                    {plates.map((plate, plateIndex) => (
+                      <div key={plateIndex} className="flex items-center gap-1">
+                        {Array.from({ length: plate.count }).map((_, countIndex) => {
+                          const getPlateColor = () => {
+                            if (plate.plate === 45) return "rgba(180, 60, 60, 0.6)"
+                            if (plate.plate === 35) return "rgba(60, 100, 180, 0.6)"
+                            if (plate.plate === 25) return "rgba(60, 160, 100, 0.6)"
+                            if (plate.plate === 10) return "rgba(200, 160, 70, 0.6)"
+                            if (plate.plate === 5) return "rgba(200, 200, 200, 0.6)"
+                            return "rgba(100, 100, 100, 0.6)"
+                          }
+
+                          const getPlateHeight = () => {
+                            if (plate.plate === 45) return 40
+                            if (plate.plate === 35) return 34
+                            if (plate.plate === 25) return 28
+                            if (plate.plate === 10) return 20
+                            if (plate.plate === 5) return 16
+                            return 12
+                          }
+
+                          return (
+                            <div
+                              key={countIndex}
+                              style={{
+                                width: "7px",
+                                height: `${getPlateHeight()}px`,
+                                background: getPlateColor(),
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "var(--radius-flat)",
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                    ))}
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "5px",
+                        background: "rgba(160, 160, 160, 0.4)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        borderRadius: "var(--radius-flat)",
+                        marginLeft: "4px",
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      fontFamily: "var(--font-label)",
+                      fontSize: "8px",
+                      fontWeight: 500,
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "0.02em",
+                      color: "var(--ink-30)",
+                    }}
+                  >
+                    {plates.map((plate, plateIndex) => (
+                      <span key={plateIndex}>
+                        {plateIndex > 0 && " + "}
+                        {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
+                      </span>
+                    ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <AnimatePresence>
+        {exerciseIndex === currentExerciseIndex && exercise.completed && !exercise.rating && (
+          <motion.div
+            key="exercise-rating"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={{ marginTop: "24px" }}
+          >
+            <div
+              className="text-center"
+              style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.2em", color: "var(--ink-35)", marginBottom: "12px" }}
+            >
+              HOW DID THIS FEEL?
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => void rateExercise(exerciseIndex, "thumbs_down")}
+                type="button"
+                className="transition-colors duration-150"
+                style={{
+                  background: "var(--ink-02)",
+                  border: "1px solid var(--ink-08)",
+                  borderRadius: "var(--radius-flat)",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "var(--ink-40)" }} />
+                <span style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.12em", color: "var(--ink-70)" }}>
+                  ROUGH
+                </span>
+              </button>
+              <button
+                onClick={() => void rateExercise(exerciseIndex, "thumbs_up")}
+                type="button"
+                className="transition-colors duration-150"
+                style={{
+                  background: "var(--ink-02)",
+                  border: "1px solid var(--ink-08)",
+                  borderRadius: "var(--radius-flat)",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "var(--ink-40)" }} />
+                <span style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.12em", color: "var(--ink-70)" }}>
+                  GOOD
+                </span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {exerciseIndex === currentExerciseIndex && exercise.completed && exercise.rating && (
+          <motion.div
+            key="exercise-rating-confirmed"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            style={{ marginTop: "24px" }}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {exercise.rating === "thumbs_up" ? (
+                <ThumbsUp size={12} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+              ) : (
+                <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+              )}
+              <span
+                style={{ fontFamily: "var(--font-label)", fontSize: "8px", fontWeight: 600, letterSpacing: "0.16em", color: "var(--ink-30)" }}
+              >
+                {exercise.rating === "thumbs_up" ? "FELT GOOD" : "FELT ROUGH"}
+              </span>
+              <button
+                onClick={() => void rateExercise(exerciseIndex, exercise.rating!)}
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "2px 4px",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-label)",
+                  fontSize: "8px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  color: "var(--ink-20)",
+                }}
+              >
+                UNDO
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showProgressiveOverload && (
+          <motion.div
+            key="progressive-overload"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
+          >
+            <button
+              onClick={() => void handleApplyProgressiveOverload(exerciseIndex)}
+              type="button"
+              className="transition-colors duration-150"
+              style={{
+                background: "var(--ink-02)",
+                border: "1px solid var(--ink-08)",
+                borderRadius: "var(--radius-flat)",
+                padding: "7px 16px",
+                fontFamily: "var(--font-label)",
+                fontSize: "9px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                color: "var(--ink-70)",
+                cursor: "pointer",
+              }}
+            >
+              PROGRESSIVE OVERLOAD ↑
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+})
+
 export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
   const router = useRouter()
   const [session, setSession] = useState<WorkoutSession | null>(null)
@@ -218,9 +1141,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const [, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const weightInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const repsInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map())
+  // True only when an index change came from explicit intent (set completion or
+  // a rail/dot tap) — the keyboard auto-focus effect requires it, so swiping
+  // never pops the keyboard.
+  const focusIntentRef = useRef(false)
   const restNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restNotificationEndsAtRef = useRef<number | null>(null)
   const [plateDisplayMode, setPlateDisplayMode] = useState<"per-side" | "total">("per-side")
@@ -781,6 +1707,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return computeAverageSecondsPerSet(sameRoutine) ?? computeAverageSecondsPerSet(history)
   }, [routine.name])
 
+  // Render-time elapsed for the (non-ticking) pace label — the live per-second
+  // clock is owned by SessionClock so it never re-renders this tree.
+  const elapsedSeconds = session?.startedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
+    : 0
+
   const pacePillLabel = (() => {
     if (averageSecondsPerSet === null || totalSetsCompleted < 2 || elapsedSeconds <= 0) return null
     const currentSecondsPerSet = elapsedSeconds / totalSetsCompleted
@@ -1032,20 +1964,41 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => window.clearTimeout(timeout)
   }, [currentExerciseIndex, isLandscapeMobile])
 
+  // Commit the exercise index the moment the swipe settles, using the native
+  // scrollend event where available. This replaces the fixed settle-debounce
+  // (the "wakes up late" feel); the debounce in handleScroll remains only as the
+  // fallback branch. setExerciseIndex is ref-based, so a once-attached listener
+  // never persists a stale session.
   useEffect(() => {
-    if (!session?.startedAt) return
-    const start = new Date(session.startedAt).getTime()
-    const update = () => {
-      const next = Math.max(0, Math.floor((Date.now() - start) / 1000))
-      setElapsedSeconds(next)
+    const container = scrollContainerRef.current
+    if (!container) return
+    if (!("onscrollend" in window)) return
+    const handleScrollEnd = () => {
+      if (isOrientationChangingRef.current) return
+      if (isScrollingProgrammatically.current) {
+        isScrollingProgrammatically.current = false
+        return
+      }
+      const pageWidth = container.offsetWidth
+      if (!pageWidth) return
+      const nextIndex = Math.round(container.scrollLeft / pageWidth)
+      if (nextIndex !== currentExerciseIndexRef.current) {
+        void setExerciseIndex(nextIndex)
+      }
     }
-    update()
-    const interval = window.setInterval(update, 1000)
-    return () => window.clearInterval(interval)
-  }, [session?.startedAt])
+    container.addEventListener("scrollend", handleScrollEnd)
+    return () => container.removeEventListener("scrollend", handleScrollEnd)
+    // isHydrated is a dep because the scroll container only mounts post-hydration;
+    // without it the effect runs once against a null ref and never re-attaches.
+  }, [isLandscapeMobile, isHydrated])
+
 
   useEffect(() => {
     if (!currentExercise) return
+    if (!focusIntentRef.current) {
+      return
+    }
+    focusIntentRef.current = false
     if (isResting) return
     const activeSet = currentExercise.sets[currentSetIndex]
     if (!activeSet?.id) return
@@ -1382,6 +2335,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   ) => {
     if (!session) return
+    // Completing a set is explicit intent — allow the auto-focus effect to move
+    // the keyboard to the next set (consumed there; suppressed while resting).
+    focusIntentRef.current = true
     const workoutId = session.workoutId
     const targetExerciseIndex = options?.exerciseIndex ?? currentExerciseIndex
     const shouldAutoRest = options?.startRest ?? targetExerciseIndex === currentExerciseIndex
@@ -1502,15 +2458,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     signalAutoSaved()
   }
 
+  // Reads the latest session/exercises via refs so it is safe to call from a
+  // once-attached scrollend listener as well as from fresh render closures.
   const setExerciseIndex = async (nextIndex: number) => {
-    if (!session) return
-    if (nextIndex < 0 || nextIndex >= exercises.length) return
-    if (nextIndex === currentExerciseIndex) return
+    const baseSession = sessionRef.current
+    if (!baseSession) return
+    if (nextIndex < 0 || nextIndex >= exercisesRef.current.length) return
+    if (nextIndex === currentExerciseIndexRef.current) return
 
     const updatedSession: WorkoutSession = {
-      ...session,
+      ...baseSession,
       currentExerciseIndex: nextIndex,
     }
+    sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     setValidationTrigger(0)
@@ -1616,18 +2576,24 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // exercise index 0 is never written to the session.
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
+      // Optimistic: highlight the rail segment while the swipe is still moving.
       if (nextIndex !== uiExerciseIndex) {
         setUiExerciseIndex(nextIndex)
       }
 
-      if (scrollSettleTimeoutRef.current) {
-        clearTimeout(scrollSettleTimeoutRef.current)
-      }
-      scrollSettleTimeoutRef.current = setTimeout(() => {
-        if (nextIndex !== currentExerciseIndexRef.current) {
-          void setExerciseIndex(nextIndex)
+      // Persist the index. Prefer the native scrollend event (handled by its own
+      // listener); only fall back to the settle-debounce where scrollend is
+      // unavailable (e.g. older iOS Safari).
+      if (!("onscrollend" in window)) {
+        if (scrollSettleTimeoutRef.current) {
+          clearTimeout(scrollSettleTimeoutRef.current)
         }
-      }, 120)
+        scrollSettleTimeoutRef.current = setTimeout(() => {
+          if (nextIndex !== currentExerciseIndexRef.current) {
+            void setExerciseIndex(nextIndex)
+          }
+        }, 120)
+      }
     })
   }
 
@@ -1906,62 +2872,84 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }, 2000)
   }
 
-  const calculatePlates = (
-    weight: number,
-    startingWeight: number,
-    mode: "per-side" | "total"
-  ): { plate: number; count: number }[] => {
-    const adjusted = Math.max(0, weight - startingWeight)
-    const plateWeight = mode === "per-side" ? adjusted / 2 : adjusted
-
-    if (plateWeight <= 0) return []
-
-    const availablePlates = [45, 35, 25, 10, 5, 2.5]
-    const plates: { plate: number; count: number }[] = []
-    let remaining = plateWeight
-
-    for (const plate of availablePlates) {
-      const count = Math.floor(remaining / plate)
-      if (count > 0) {
-        plates.push({ plate, count })
-        remaining -= plate * count
-      }
-    }
-
-    return plates
+  // Stable prop identities for the memoized ExercisePage. The heavy data
+  // handlers close over session/exercises, so they are wrapped through a "latest
+  // handlers" ref: the wrapper identity is stable (empty deps), but it always
+  // dispatches to the freshest handler — no stale closures, no touched internals.
+  const exercisePageHandlersRef = useRef({
+    updateExerciseMachineSetting,
+    handleTogglePlateCalc,
+    updateSetDataForExercise,
+    handleSetFieldFocus,
+    handleSetFieldBlur,
+    handleInputAutoSelect,
+    completeSet,
+    rateExercise,
+    handleApplyProgressiveOverload,
+  })
+  exercisePageHandlersRef.current = {
+    updateExerciseMachineSetting,
+    handleTogglePlateCalc,
+    updateSetDataForExercise,
+    handleSetFieldFocus,
+    handleSetFieldBlur,
+    handleInputAutoSelect,
+    completeSet,
+    rateExercise,
+    handleApplyProgressiveOverload,
   }
-
-  const getSetComparison = (
-    set: Exercise["sets"][number],
-    last: { weight: number; reps: number } | null,
-    maxHistoricalVolume: number
-  ) => {
-    if (!last) return null
-    if (typeof set.weight !== "number" || typeof set.reps !== "number") {
-      return { status: "no-history", message: `Last: ${last.weight} × ${last.reps}` }
-    }
-
-    const volume = set.weight * set.reps
-    if (volume > maxHistoricalVolume) {
-      return { status: "pr", message: "NEW PR!" }
-    }
-
-    if (set.weight > last.weight || (set.weight === last.weight && set.reps > last.reps)) {
-      const weightDelta = set.weight - last.weight
-      const repsDelta = set.reps - last.reps
-      const delta =
-        weightDelta > 0
-          ? `${weightDelta} lb${weightDelta === 1 ? "" : "s"}`
-          : `${repsDelta} rep${repsDelta === 1 ? "" : "s"}`
-      return { status: "progressed", message: `+${delta}` }
-    }
-
-    if (set.weight === last.weight && set.reps === last.reps) {
-      return { status: "matched", message: "Matched last time" }
-    }
-
-    return { status: "recovery", message: "Recovery set" }
-  }
+  const stableUpdateMachineSetting = useCallback(
+    (i: number, f: "seat", v: string) => exercisePageHandlersRef.current.updateExerciseMachineSetting(i, f, v),
+    [],
+  )
+  const stableTogglePlateCalc = useCallback(
+    () => exercisePageHandlersRef.current.handleTogglePlateCalc(),
+    [],
+  )
+  const stableUpdateSetData = useCallback(
+    (i: number, s: number, f: "reps" | "weight", v: number | null) =>
+      exercisePageHandlersRef.current.updateSetDataForExercise(i, s, f, v),
+    [],
+  )
+  const stableSetFieldFocus = useCallback(
+    (id: string, f: "reps" | "weight") => exercisePageHandlersRef.current.handleSetFieldFocus(id, f),
+    [],
+  )
+  const stableSetFieldBlur = useCallback(
+    (id: string, f: "reps" | "weight") => exercisePageHandlersRef.current.handleSetFieldBlur(id, f),
+    [],
+  )
+  const stableInputAutoSelect = useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => exercisePageHandlersRef.current.handleInputAutoSelect(e),
+    [],
+  )
+  const stableCompleteSet = useCallback(
+    (s: number, o?: { startRest?: boolean; exerciseIndex?: number }) =>
+      exercisePageHandlersRef.current.completeSet(s, o),
+    [],
+  )
+  const stableRateExercise = useCallback(
+    (i: number, r: ExerciseRating) => exercisePageHandlersRef.current.rateExercise(i, r),
+    [],
+  )
+  const stableApplyProgressiveOverload = useCallback(
+    (i: number) => exercisePageHandlersRef.current.handleApplyProgressiveOverload(i),
+    [],
+  )
+  const registerWeightRef = useCallback((setId: string, node: HTMLInputElement | null) => {
+    if (node) weightInputRefs.current.set(setId, node)
+    else weightInputRefs.current.delete(setId)
+  }, [])
+  const registerRepsRef = useCallback((setId: string, node: HTMLInputElement | null) => {
+    if (node) repsInputRefs.current.set(setId, node)
+    else repsInputRefs.current.delete(setId)
+  }, [])
+  const openExercisePage = useCallback(
+    (name: string) => {
+      router.push(`/exercise/${encodeURIComponent(name)}?from=session`)
+    },
+    [router],
+  )
 
   if (!isHydrated || exercises.length === 0) {
     return (
@@ -2008,7 +2996,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
                 borderColor: restRemainingSeconds <= 10 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)",
                 background: "rgba(0,0,0,0.75)",
-                borderRadius: "14px",
+                borderRadius: "var(--radius-xs)",
                 padding: "6px 10px",
               }}
             >
@@ -2039,14 +3027,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     recordRestExtension(session?.id ?? "unknown")
                     setRestExtensionTrend(getRestExtensionTrend())
                   }}
-                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "2px", padding: "5px 8px" }}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px" }}
                   type="button"
                 >
                   <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
                 </button>
                 <button
                   onClick={() => void setRestStateAndPersist(null)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "2px", padding: "5px 10px" }}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 10px" }}
                   type="button"
                 >
                   <span className="text-ink-95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>SKIP</span>
@@ -2072,7 +3060,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 {getExerciseLabel(lsExercise.name)}
               </h1>
               <div className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
-                EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {formatSeconds(elapsedSeconds)}
+                EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {session?.startedAt ? <SessionClock startedAt={session.startedAt} render={(f) => <>{f}</>} /> : formatSeconds(elapsedSeconds)}
                 {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
               </div>
             </div>
@@ -2085,15 +3073,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.06)" }} />
               <button
                 onClick={() => { if (!canFinishWorkout) return; void finishWorkout() }}
+                className="transition-colors duration-base"
                 style={{
-                  fontSize: "9px",
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  color: canFinishWorkout ? "#000" : "rgba(255,255,255,0.25)",
-                  background: canFinishWorkout ? "#fff" : "transparent",
-                  borderRadius: canFinishWorkout ? "4px" : "0",
-                  padding: canFinishWorkout ? "5px 10px" : "0",
-                  transition: "all 0.2s",
+                  fontFamily: "var(--font-label)",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.12em",
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-flat)",
+                  color: canFinishWorkout ? "var(--ink-95)" : "var(--ink-30)",
+                  background: canFinishWorkout ? "var(--ink-06)" : "var(--ink-02)",
+                  border: `1px solid ${canFinishWorkout ? "var(--ink-12)" : "var(--ink-08)"}`,
                 }}
                 type="button"
                 disabled={!canFinishWorkout}
@@ -2111,14 +3101,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               return (
                 <button
                   key={ex.id}
-                  onClick={() => void setExerciseIndex(index)}
+                  onClick={() => { focusIntentRef.current = true; void setExerciseIndex(index) }}
                   type="button"
                   className="transition-all duration-base"
                   style={{
                     width: isCurrent ? "20px" : "5px",
                     height: "5px",
                     background: isCurrent ? "rgba(255,255,255,0.5)" : isComplete ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
-                    borderRadius: "3px",
+                    borderRadius: "var(--radius-flat)",
                     border: "none",
                   }}
                 />
@@ -2155,6 +3145,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               set, lastSet,
               maxSetVolumeByExercise.get(normalizeExerciseName(lsExercise.name)) ?? 0
             )
+            const lsChip =
+              typeof set.weight === "number" && typeof set.reps === "number"
+                ? setComparisonToChip(comparison, set, lastSet)
+                : null
 
             return (
               <div
@@ -2201,7 +3195,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     style={{
                       background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
                       border: `1px solid ${showMissing && missingWeight ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.2)" : "transparent"}`,
-                      borderRadius: "2px", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
+                      borderRadius: "var(--radius-flat)", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
                       color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
@@ -2239,7 +3233,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     style={{
                       background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
                       border: `1px solid ${(repCapError || (showMissing && missingReps)) ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.2)" : "transparent"}`,
-                      borderRadius: "2px", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
+                      borderRadius: "var(--radius-flat)", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
                       color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
@@ -2259,7 +3253,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   style={{
                     width: "32px", height: "32px",
                     background: set.completed ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
-                    border: "none", borderRadius: "2px", flexShrink: 0,
+                    border: "none", borderRadius: "var(--radius-flat)", flexShrink: 0,
                     opacity: !lsCanEdit || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
                   }}
                   type="button"
@@ -2274,28 +3268,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
                 {/* Last set comparison */}
                 {lastSet && (
-                  <div style={{ minWidth: "72px", flexShrink: 0 }}>
-                    <div style={{ fontSize: "8px", fontWeight: 400, color: "rgba(255,255,255,0.2)", fontVariantNumeric: "tabular-nums" }}>
-                      Last: {lastSet.weight}×{lastSet.reps}
+                  <div className="flex flex-col items-start gap-1" style={{ minWidth: "72px", flexShrink: 0 }}>
+                    <div style={{ fontFamily: "var(--font-label)", fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", color: "var(--ink-20)", fontVariantNumeric: "tabular-nums" }}>
+                      LAST {lastSet.weight} × {lastSet.reps}
                     </div>
-                    {comparison?.status !== "no-history" && comparison?.message && (
-                      <div style={{
-                        fontSize: "8px",
-                        fontWeight: comparison?.status === "pr" ? 600 : 400,
-                        color: comparison?.status === "pr" ? "var(--good)" : comparison?.status === "progressed" ? "var(--ink-50)" : "var(--ink-25)",
-                        letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
-                      }}>
-                        {comparison.message}
-                      </div>
-                    )}
+                    {lsChip && <DeltaChip size="sm" tone={lsChip.tone} arrow={lsChip.arrow} value={lsChip.value} />}
                   </div>
                 )}
 
                 {/* Validation error */}
                 {(repCapError || showMissing) && (
                   <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-                    <AlertCircle size={8} strokeWidth={2} style={{ color: "var(--warn-ink)" }} />
-                    <div style={{ fontSize: "8px", color: "var(--warn-ink)" }}>
+                    <AlertCircle size={8} strokeWidth={2} style={{ color: "var(--ink-40)" }} />
+                    <div style={{ fontFamily: "var(--font-label)", fontSize: "8px", color: "var(--ink-40)" }}>
                       {repCapError ? `Max ${REP_MAX}` : missingWeight ? "Enter weight" : "Enter reps"}
                     </div>
                   </div>
@@ -2349,13 +3334,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 left: "calc(16px + env(safe-area-inset-left, 0px))",
                 right: "calc(16px + env(safe-area-inset-right, 0px))",
                 bottom: "calc(20px + env(safe-area-inset-bottom))",
-                borderColor:
-                  restRemainingSeconds <= 10
-                    ? "rgba(255, 255, 255, 0.35)"
-                    : "rgba(255, 255, 255, 0.15)",
-                background: "rgba(0, 0, 0, 0.55)",
-                borderRadius: "14px",
-                padding: "8px 10px",
+                borderColor: restRemainingSeconds <= 10 ? "var(--ink-35)" : "var(--ink-12)",
+                background: "rgba(13, 13, 15, 0.92)",
+                borderRadius: "var(--radius-xs)",
+                padding: "10px 14px",
                 pointerEvents: "auto",
               }}
             >
@@ -2371,31 +3353,45 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 }
               >
                 <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
-                  <div
-                    className="text-ink-35"
-                    style={{
-                      fontSize: "8px",
-                      fontWeight: 600,
-                      letterSpacing: "0.12em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    REST
+                  <div className="flex items-center" style={{ gap: "5px" }}>
+                    <span
+                      className="rest-breathe"
+                      style={{
+                        width: "4px",
+                        height: "4px",
+                        borderRadius: "50%",
+                        background: "var(--ink-85)",
+                        display: "inline-block",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "8px",
+                        fontWeight: 600,
+                        letterSpacing: "0.18em",
+                        color: "var(--ink-35)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      REST
+                    </span>
                   </div>
                   {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
-                    <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "3px" }}>
+                    <div style={{ fontFamily: "var(--font-label)", fontSize: "7.5px", fontWeight: 500, letterSpacing: "0.04em", color: "var(--ink-25)", lineHeight: 1, marginTop: "3px" }}>
                       {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
                     </div>
                   )}
                 </div>
                 <div
-                  className="text-white leading-none"
+                  className="leading-none"
                   style={{
-                    fontSize: "44px",
+                    fontSize: "38px",
                     fontWeight: 400,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
                     fontFamily: "var(--font-display)",
+                    color: "var(--ink-95)",
                   }}
                 >
                   {formatSeconds(restRemainingSeconds)}
@@ -2415,33 +3411,39 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     recordRestExtension(session?.id ?? "unknown")
                     setRestExtensionTrend(getRestExtensionTrend())
                   }}
-                  className="transition-colors duration-150 hover:bg-ink-08"
+                  className="transition-colors duration-150"
                   style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "none",
-                    borderRadius: "2px",
-                    padding: "6px 10px",
+                    background: "var(--ink-02)",
+                    border: "1px solid var(--ink-08)",
+                    borderRadius: "var(--radius-flat)",
+                    padding: "6px 12px",
+                    fontFamily: "var(--font-label)",
+                    fontSize: "9.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    color: "var(--ink-70)",
                   }}
                   type="button"
                 >
-                  <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em" }}>
-                    +30s
-                  </span>
+                  +30S
                 </button>
                 <button
                   onClick={() => void setRestStateAndPersist(null)}
-                  className="transition-colors duration-150 hover:bg-[rgba(255,255,255,0.1)]"
+                  className="transition-colors duration-150"
                   style={{
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "none",
-                    borderRadius: "2px",
+                    background: "var(--ink-06)",
+                    border: "1px solid var(--ink-12)",
+                    borderRadius: "var(--radius-flat)",
                     padding: "6px 12px",
+                    fontFamily: "var(--font-label)",
+                    fontSize: "9.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.1em",
+                    color: "var(--ink-95)",
                   }}
                   type="button"
                 >
-                  <span className="text-ink-95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>
-                    SKIP
-                  </span>
+                  SKIP
                 </button>
               </div>
             </motion.div>
@@ -2449,43 +3451,28 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         </AnimatePresence>
 
         <div
-          className="flex-shrink-0 pt-2 pb-2"
+          className="flex-shrink-0 pt-2"
           style={{
             paddingBottom: "12px",
             marginTop: "0px",
           }}
         >
           <div className="flex items-center justify-between gap-3 mb-4">
-            <button onClick={handleExit} className="text-ink-30 hover:text-ink-50 transition-colors" type="button">
+            <button onClick={handleExit} className="text-ink-30 hover:text-ink-50 transition-colors" type="button" style={{ flexShrink: 0 }}>
               <ArrowLeft size={18} strokeWidth={1.5} />
             </button>
 
-            <div className="flex items-center gap-3 flex-1 justify-center">
-              <div className="text-center">
-                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
-                  VOLUME
-                </div>
-                <div
-                  className="text-ink-70"
-                  style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
-                >
-                  {Math.round(totalVolume).toLocaleString()}
-                </div>
-              </div>
-
-              <div style={{ width: "1px", height: "20px", background: "rgba(255, 255, 255, 0.06)" }} />
-
-              <div className="text-center">
-                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "2px" }}>
-                  SETS
-                </div>
-                <div
-                  className="text-ink-70"
-                  style={{ fontSize: "13px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
-                >
-                  {totalSetsCompleted}/{totalSets}
-                </div>
-              </div>
+            <div className="flex items-center justify-center" style={{ gap: "18px", flex: 1 }}>
+              {session?.startedAt ? (
+                <SessionClock
+                  startedAt={session.startedAt}
+                  render={(formatted) => <StatUnit value={formatted} label="TIME" size="sm" />}
+                />
+              ) : (
+                <StatUnit value="0:00" label="TIME" size="sm" />
+              )}
+              <StatUnit value={formatVolumeK(totalVolume)} unit="LB" label="VOLUME" size="sm" />
+              <StatUnit value={`${totalSetsCompleted}`} unit={`/ ${totalSets}`} label="SETS" size="sm" />
             </div>
 
             <button
@@ -2493,15 +3480,18 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 if (!canFinishWorkout) return
                 void finishWorkout()
               }}
-              className="transition-all duration-base"
+              className="transition-colors duration-base"
               style={{
-                fontSize: "9px",
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                color: canFinishWorkout ? "#000" : "rgba(255, 255, 255, 0.25)",
-                background: canFinishWorkout ? "#fff" : "transparent",
-                borderRadius: canFinishWorkout ? "5px" : "0",
-                padding: canFinishWorkout ? "6px 12px" : "0",
+                flexShrink: 0,
+                fontFamily: "var(--font-label)",
+                fontSize: "10px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                padding: "7px 12px",
+                borderRadius: "var(--radius-flat)",
+                color: canFinishWorkout ? "var(--ink-95)" : "var(--ink-30)",
+                background: canFinishWorkout ? "var(--ink-06)" : "var(--ink-02)",
+                border: `1px solid ${canFinishWorkout ? "var(--ink-12)" : "var(--ink-08)"}`,
               }}
               type="button"
               disabled={!canFinishWorkout}
@@ -2510,52 +3500,72 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             </button>
           </div>
 
-          <div className="relative flex items-center justify-center gap-1.5 mb-4">
-            {exercises.map((exercise, index) => {
-              const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
-              const isCurrent = index === uiExerciseIndex
-              return (
-                <button
-                  key={exercise.id}
-                  onClick={() => void setExerciseIndex(index)}
-                  className="transition-all duration-base"
-                  style={{
-                    width: isCurrent ? "20px" : "5px",
-                    height: "5px",
-                    background: isCurrent
-                      ? "rgba(255, 255, 255, 0.5)"
-                      : isComplete
-                        ? "rgba(255, 255, 255, 0.3)"
-                        : "rgba(255, 255, 255, 0.1)",
-                    borderRadius: "3px",
-                  }}
-                  type="button"
-                />
-              )
-            })}
+          <div className="flex items-center" style={{ gap: "8px" }}>
+            <div style={{ display: "flex", gap: "3px", flex: 1 }}>
+              {exercises.map((exercise, index) => {
+                const isComplete = exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
+                const isCurrent = index === uiExerciseIndex
+                const totalExSets = exercise.sets.length
+                const completedEligible = exercise.sets.filter(
+                  (set: any) => set.completed && !isSetIncomplete(set)
+                ).length
+                const fillPct = totalExSets > 0 ? (completedEligible / totalExSets) * 100 : 0
+                const baseColor = isComplete
+                  ? "var(--ink-35)"
+                  : isCurrent
+                    ? "var(--ink-15)"
+                    : "var(--ink-10)"
+                const fillColor = isCurrent ? "rgba(255, 255, 255, 0.85)" : "rgba(255, 255, 255, 0.65)"
+                return (
+                  <button
+                    key={exercise.id}
+                    onClick={() => { focusIntentRef.current = true; void setExerciseIndex(index) }}
+                    type="button"
+                    aria-label={`Exercise ${index + 1} of ${exercises.length}: ${getExerciseLabel(exercise.name)}, ${completedEligible} of ${totalExSets} sets`}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        height: "3px",
+                        borderRadius: "1px",
+                        background: baseColor,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {!isComplete && fillPct > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            width: `${fillPct}%`,
+                            background: fillColor,
+                            borderRadius: "1px",
+                          }}
+                        />
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
             {exercises.length > 1 ? (
               <button
                 type="button"
                 aria-label="Reorder exercises"
                 onClick={() => setIsReorderOpen(true)}
-                className="absolute"
-                style={{ right: 0, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", padding: "4px" }}
+                style={{ flexShrink: 0, background: "transparent", border: "none", padding: "4px" }}
               >
-                <ListOrdered size={15} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+                <ListOrdered size={15} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
               </button>
             ) : null}
           </div>
-
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <div
-              style={{
-                height: "1px",
-                background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent)",
-                width: "200px",
-              }}
-            />
-          </div>
-
         </div>
 
         <div
@@ -2568,728 +3578,42 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {exercises.map((exercise: any, exerciseIndex: number) => {
-            const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
-            const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
-            const isCompactSets = exercise.sets.length >= 4
-            const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
-            const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
-            const showProgressiveOverload =
-              exerciseIndex === currentExerciseIndex &&
-              exerciseRepRange !== null &&
-              exercise.sets.length > 0 &&
-              exercise.sets.every(
-                (set: any) =>
-                  set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
-              )
-
-            return (
-              <div
-                key={exercise.id}
-                style={{
-                  scrollSnapAlign: "start",
-                  width: "100%",
-                  flexShrink: 0,
-                  paddingBottom: "120px",
-                  opacity: exerciseIndex === currentExerciseIndex ? 1 : 0.3,
-                  transition: "opacity 0.2s ease",
-                }}
-              >
-                <div style={{ marginBottom: isCompactSets ? "8px" : "16px" }}>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div
-                      className="text-ink-30 tracking-widest"
-                      style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.15em", fontFamily: "var(--font-label)" }}
-                    >
-                      EXERCISE {exerciseIndex + 1} • {formatSeconds(elapsedSeconds)}
-                      {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={exercise.machineSettings?.seat ?? ""}
-                          onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
-                          placeholder="Seat"
-                          className="transition-all duration-150"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.02)",
-                            border: "1px solid rgba(255, 255, 255, 0.06)",
-                            borderRadius: "2px",
-                            padding: "4px 8px",
-                            fontSize: "8px",
-                            color: "rgba(255, 255, 255, 0.7)",
-                            width: "48px",
-                            height: "22px",
-                          }}
-                        />
-                      )}
-                      <button
-                        onClick={() => {
-                          if (exerciseIndex !== currentExerciseIndex) return
-                          handleTogglePlateCalc()
-                        }}
-                        className="transition-all duration-150"
-                        style={{
-                          background: showPlateCalc ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)",
-                          border: "none",
-                          borderRadius: "2px",
-                          padding: "4px 8px",
-                          height: "22px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        type="button"
-                      >
-                        <span
-                          className={showPlateCalc ? "text-ink-85" : "text-ink-30"}
-                          style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.08em" }}
-                        >
-                          PLATES
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {isDeload && (
-                    <div
-                      style={{
-                        display: "inline-block",
-                        marginBottom: "6px",
-                        background: "rgba(255, 255, 255, 0.04)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                        borderRadius: "3px",
-                        padding: "3px 8px",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "8px",
-                          fontWeight: 500,
-                          letterSpacing: "0.12em",
-                          color: "rgba(255, 255, 255, 0.28)",
-                          fontFamily: "var(--font-label)",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Deload Week
-                      </span>
-                    </div>
-                  )}
-
-                  <h1
-                    className="text-ink-95"
-                    style={{
-                      fontSize: "36px",
-                      fontWeight: 400,
-                      letterSpacing: "-0.02em",
-                      lineHeight: "0.95",
-                      fontFamily: "var(--font-display)",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}?from=session`)}
-                  >
-                    {getExerciseLabel(exercise.name)}
-                  </h1>
-
-                  {exercise.targetReps && (
-                    <div
-                      className="text-ink-25 mt-2"
-                      style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "var(--font-label)" }}
-                    >
-                      TARGET {exercise.targetReps} REPS
-                    </div>
-                  )}
-
-                  <div
-                    className="text-ink-20 flex items-center gap-2"
-                    style={{ fontSize: "8px", fontWeight: 400, letterSpacing: "0.08em", fontFamily: "var(--font-label)", marginTop: "6px" }}
-                  >
-                    <span>{exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}</span>
-                    <span>•</span>
-                    <span>NOW: SET {activeSetIndex + 1}/{exercise.sets.length}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col" style={{ gap: isCompactSets ? "10px" : "28px" }}>
-                  {exercise.sets.map((set: any, setIndex: number) => {
-                    const setKey = set.id ?? `${exercise.id}-${setIndex}`
-                    const isActiveExercise = exerciseIndex === currentExerciseIndex
-                    const isCurrentSet = isActiveExercise && setIndex === activeSetIndex
-                    const isCompactCompleted = isActiveExercise && set.completed
-                    const isCompressedCompletedSet = isCompactSets && isCompactCompleted && !isCurrentSet
-                    const repCapError = repCapErrors[setKey] || set.validationFlags?.includes("reps_hard_invalid")
-                    const missingWeight = isMissingWeight(set.weight)
-                    const missingReps = isMissingReps(set.reps)
-                    const showMissing = Boolean(validationTrigger) && isCurrentSet && (missingWeight || missingReps)
-                    const lastSet = getMostRecentCompletedSetPerformance(exercise.name, setIndex, session?.id)
-                    const comparison = getSetComparison(
-                      set,
-                      lastSet,
-                      maxSetVolumeByExercise.get(normalizeExerciseName(exercise.name)) ?? 0
-                    )
-                    const plates =
-                      typeof set.weight === "number"
-                        ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
-                        : []
-                    const isPlateSetActive =
-                      exerciseIndex === currentExerciseIndex &&
-                      !set.completed &&
-                      plates.length > 0 &&
-                      (isCurrentSet ||
-                        focusedInput === `${setKey}-weight` ||
-                        focusedInput === `${setKey}-reps`)
-
-                    return (
-                      <div key={setKey}>
-                        <div
-                          className="text-ink-30 tracking-widest"
-                          style={{
-                            fontSize: "7px",
-                            fontWeight: 500,
-                            letterSpacing: "0.12em",
-                            fontFamily: "var(--font-label)",
-                            marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px",
-                          }}
-                        >
-                          SET {setIndex + 1}
-                        </div>
-
-                        <div
-                          className="flex items-center gap-3"
-                          style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "8px" : "12px" }}
-                        >
-                          <div className="flex-1 relative">
-                            <input
-                              type="number"
-                              value={set.weight ?? ""}
-                              onChange={(e) => {
-                                if (!canEditExercise) return
-                                const raw = e.target.value
-                                if (!raw.trim()) {
-                                  void updateSetDataForExercise(exerciseIndex, setIndex, "weight", null)
-                                  return
-                                }
-                                const parsed = parseNumber(raw)
-                                if (parsed === null || parsed < 0) return
-                                void updateSetDataForExercise(exerciseIndex, setIndex, "weight", parsed)
-                              }}
-                              onFocus={(e) => {
-                                if (set.id) handleSetFieldFocus(set.id, "weight")
-                                handleInputAutoSelect(e)
-                                setFocusedInput(`${setKey}-weight`)
-                              }}
-                              onBlur={() => {
-                                if (set.id) handleSetFieldBlur(set.id, "weight")
-                                setFocusedInput(null)
-                              }}
-                              placeholder="—"
-                              className="w-full transition-all duration-150"
-                              disabled={!canEditExercise}
-                              style={{
-                                background: set.completed
-                                  ? "rgba(255, 255, 255, 0.02)"
-                                  : focusedInput === `${setKey}-weight`
-                                    ? "rgba(255, 255, 255, 0.06)"
-                                    : "rgba(255, 255, 255, 0.03)",
-                                border: `1px solid ${
-                                  showMissing && missingWeight
-                                    ? "rgba(255, 255, 255, 0.4)"
-                                    : focusedInput === `${setKey}-weight`
-                                      ? "rgba(255, 255, 255, 0.2)"
-                                      : "transparent"
-                                }`,
-                                borderRadius: "2px",
-                                padding: isCompressedCompletedSet
-                                  ? "5px"
-                                  : isCompactCompleted
-                                    ? (isCompactSets ? "8px" : "12px")
-                                    : isCompactSets ? "9px" : "18px",
-                                fontSize: isCompressedCompletedSet
-                                  ? "16px"
-                                  : isCompactCompleted
-                                    ? (isCompactSets ? "18px" : "22px")
-                                    : isCompactSets ? "20px" : "28px",
-                                fontWeight: 600,
-                                letterSpacing: "-0.02em",
-                                color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
-                                fontVariantNumeric: "tabular-nums",
-                                outline: "none",
-                                textAlign: "center",
-                              }}
-                            />
-                            <div
-                              className="text-ink-25 text-center transition-colors duration-150"
-                              style={{
-                                marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
-                                fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
-                                fontWeight: 500,
-                                letterSpacing: "0.06em",
-                                color: focusedInput === `${setKey}-weight` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
-                              }}
-                            >
-                              LBS
-                            </div>
-                          </div>
-
-                          <div className="flex-1 relative">
-                            <input
-                              type="number"
-                              value={set.reps ?? ""}
-                              onChange={(e) => {
-                                if (!canEditExercise) return
-                                const raw = e.target.value
-                                if (!raw.trim()) {
-                                  setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
-                                  void updateSetDataForExercise(exerciseIndex, setIndex, "reps", null)
-                                  return
-                                }
-                                const parsed = parseNumber(raw)
-                                if (parsed === null) return
-                                if (parsed > REP_MAX) {
-                                  setRepCapErrors((prev) => ({ ...prev, [setKey]: true }))
-                                  return
-                                }
-                                setRepCapErrors((prev) => ({ ...prev, [setKey]: false }))
-                                const clamped = Math.max(REP_MIN, parsed)
-                                void updateSetDataForExercise(exerciseIndex, setIndex, "reps", clamped)
-                              }}
-                              onFocus={(e) => {
-                                if (set.id) handleSetFieldFocus(set.id, "reps")
-                                handleInputAutoSelect(e)
-                                setFocusedInput(`${setKey}-reps`)
-                              }}
-                              onBlur={() => {
-                                if (set.id) handleSetFieldBlur(set.id, "reps")
-                                setFocusedInput(null)
-                              }}
-                              placeholder="—"
-                              className="w-full transition-all duration-150"
-                              disabled={!canEditExercise}
-                              style={{
-                                background: set.completed
-                                  ? "rgba(255, 255, 255, 0.02)"
-                                  : focusedInput === `${setKey}-reps`
-                                    ? "rgba(255, 255, 255, 0.06)"
-                                    : "rgba(255, 255, 255, 0.03)",
-                                border: `1px solid ${
-                                  (repCapError || (showMissing && missingReps))
-                                    ? "rgba(255, 255, 255, 0.4)"
-                                    : focusedInput === `${setKey}-reps`
-                                      ? "rgba(255, 255, 255, 0.2)"
-                                      : "transparent"
-                                }`,
-                                borderRadius: "2px",
-                                padding: isCompressedCompletedSet
-                                  ? "5px"
-                                  : isCompactCompleted
-                                    ? (isCompactSets ? "8px" : "12px")
-                                    : isCompactSets ? "9px" : "18px",
-                                fontSize: isCompressedCompletedSet
-                                  ? "16px"
-                                  : isCompactCompleted
-                                    ? (isCompactSets ? "18px" : "22px")
-                                    : isCompactSets ? "20px" : "28px",
-                                fontWeight: 600,
-                                letterSpacing: "-0.02em",
-                                color: set.completed ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.95)",
-                                fontVariantNumeric: "tabular-nums",
-                                outline: "none",
-                                textAlign: "center",
-                              }}
-                            />
-                            <div
-                              className="text-ink-25 text-center transition-colors duration-150"
-                              style={{
-                                marginTop: isCompressedCompletedSet ? "2px" : isCompactSets ? "4px" : "6px",
-                                fontSize: isCompactCompleted ? (isCompactSets ? "6px" : "7px") : isCompactSets ? "7px" : "8px",
-                                fontWeight: 500,
-                                letterSpacing: "0.06em",
-                                color: focusedInput === `${setKey}-reps` ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)",
-                              }}
-                            >
-                              REPS
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-center">
-                            <button
-                              onClick={() => {
-                                if (!canEditExercise) return
-                                if (!set.completed && (isSetIncomplete(set) || repCapError)) {
-                                  setValidationTrigger(Date.now())
-                                  return
-                                }
-                                void completeSet(setIndex, { exerciseIndex, startRest: isCurrentSet })
-                              }}
-                              disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
-                              className="flex items-center justify-center transition-all duration-150"
-                              style={{
-                                width: isCompressedCompletedSet ? "30px" : "36px",
-                                height: isCompressedCompletedSet ? "30px" : "36px",
-                                background: set.completed
-                                  ? "rgba(255, 255, 255, 0.08)"
-                                  : "rgba(255, 255, 255, 0.03)",
-                                border: "none",
-                                borderRadius: "2px",
-                                opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
-                              }}
-                              type="button"
-                              aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
-                            >
-                              {set.completed ? (
-                                <Check
-                                  size={isCompressedCompletedSet ? 13 : 16}
-                                  strokeWidth={2}
-                                  style={{ color: "rgba(255, 255, 255, 0.8)" }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: "12px",
-                                    height: "12px",
-                                    borderRadius: "var(--radius-flat)",
-                                    border: "1px solid rgba(255, 255, 255, 0.35)",
-                                    background: "transparent",
-                                    boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.05)",
-                                  }}
-                                />
-                              )}
-                            </button>
-                          </div>
-
-                        </div>
-
-                        {(repCapError || showMissing) && (
-                          <div className="mb-3">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle size={10} strokeWidth={2} style={{ color: "var(--warn-ink)" }} />
-                              <div style={{ fontSize: "9px", fontWeight: 400, color: "var(--warn-ink)" }}>
-                                {repCapError && `Reps cannot exceed ${REP_MAX}`}
-                                {!repCapError && missingWeight && "Enter weight"}
-                                {!repCapError && !missingWeight && missingReps && "Enter reps"}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {isActiveExercise &&
-                          lastSet &&
-                          typeof set.weight === "number" &&
-                          typeof set.reps === "number" && (
-                          <div
-                            className="flex items-center gap-2"
-                            style={{ marginBottom: isCompressedCompletedSet ? "4px" : isCompactSets ? "6px" : "12px" }}
-                          >
-                            <div
-                              className="text-ink-20"
-                              style={{
-                                fontSize: isCompressedCompletedSet ? "7px" : isCompactSets ? "8px" : "9px",
-                                fontWeight: 400,
-                                fontVariantNumeric: "tabular-nums",
-                              }}
-                            >
-                              Last: {lastSet.weight} × {lastSet.reps}
-                            </div>
-                            {comparison?.status !== "no-history" && (
-                              <div
-                                className="flex items-center gap-1.5"
-                                style={{
-                                  fontSize: isCompressedCompletedSet ? "7px" : "9px",
-                                  fontWeight: comparison?.status === "pr" ? 600 : 400,
-                                  color:
-                                    comparison?.status === "pr"
-                                      ? "var(--good)"
-                                      : comparison?.status === "progressed"
-                                        ? "var(--ink-50)"
-                                        : comparison?.status === "recovery"
-                                          ? "var(--ink-25)"
-                                          : "var(--ink-30)",
-                                  letterSpacing: comparison?.status === "pr" ? "0.06em" : "0",
-                                }}
-                              >
-                                {comparison?.message}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {showPlateCalc && isPlateSetActive && (
-                          <div className={isCompactSets ? "mb-1" : "mb-3"}>
-                            <div className={`flex items-center gap-2 ${isCompactSets ? "mb-2" : "mb-3"}`}>
-                              <button
-                                className="transition-colors duration-150"
-                                style={{
-                                  background: "rgba(255, 255, 255, 0.08)",
-                                  border: "none",
-                                  borderRadius: "2px",
-                                  padding: "4px 8px",
-                                }}
-                                onClick={() => {
-                                  const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
-                                  setPlateDisplayMode(nextMode)
-                                  if (currentExercise?.name) {
-                                    localStorage.setItem(`plate_mode_${currentExercise.name}`, nextMode)
-                                    if (userId) {
-                                      void saveExerciseSettings(userId, currentExercise.name, { plateDisplayMode: nextMode })
-                                    }
-                                  }
-                                }}
-                                type="button"
-                              >
-                                <span
-                                  className="text-ink-85"
-                                  style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.06em" }}
-                                >
-                                  {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
-                                </span>
-                              </button>
-                              <span className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.06em" }}>
-                                BAR
-                              </span>
-                              <input
-                                type="number"
-                                value={plateStartingWeight || ""}
-                                onChange={(e) => {
-                                  const value = Number(e.target.value)
-                                  const nextValue = Number.isNaN(value) ? 0 : Math.max(0, value)
-                                  setPlateStartingWeight(nextValue)
-                                  if (currentExercise?.name) {
-                                    localStorage.setItem(`plate_start_${currentExercise.name}`, String(nextValue))
-                                    if (userId) {
-                                      void saveExerciseSettings(userId, currentExercise.name, { barWeight: nextValue })
-                                    }
-                                  }
-                                }}
-                                onFocus={handleInputAutoSelect}
-                                className="transition-colors duration-150"
-                                style={{
-                                  width: "52px",
-                                  background: "rgba(255, 255, 255, 0.04)",
-                                  border: "none",
-                                  borderRadius: "2px",
-                                  padding: "4px 8px",
-                                  fontSize: "13px",
-                                  color: "rgba(255, 255, 255, 0.8)",
-                                  fontVariantNumeric: "tabular-nums",
-                                  fontWeight: 600,
-                                  textAlign: "center",
-                                }}
-                              />
-                            </div>
-
-                            <div className={`flex items-center gap-1.5 ${isCompactSets ? "mb-2" : "mb-3"}`}>
-                              {plates.map((plate, plateIndex) => (
-                                <div key={plateIndex} className="flex items-center gap-1">
-                                  {Array.from({ length: plate.count }).map((_, countIndex) => {
-                                    const getPlateColor = () => {
-                                      if (plate.plate === 45) return "rgba(180, 60, 60, 0.6)"
-                                      if (plate.plate === 35) return "rgba(60, 100, 180, 0.6)"
-                                      if (plate.plate === 25) return "rgba(60, 160, 100, 0.6)"
-                                      if (plate.plate === 10) return "rgba(200, 160, 70, 0.6)"
-                                      if (plate.plate === 5) return "rgba(200, 200, 200, 0.6)"
-                                      return "rgba(100, 100, 100, 0.6)"
-                                    }
-
-                                    const getPlateHeight = () => {
-                                      if (plate.plate === 45) return 40
-                                      if (plate.plate === 35) return 34
-                                      if (plate.plate === 25) return 28
-                                      if (plate.plate === 10) return 20
-                                      if (plate.plate === 5) return 16
-                                      return 12
-                                    }
-
-                                    return (
-                                      <div
-                                        key={countIndex}
-                                        style={{
-                                          width: "7px",
-                                          height: `${getPlateHeight()}px`,
-                                          background: getPlateColor(),
-                                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                                          borderRadius: "var(--radius-flat)",
-                                        }}
-                                      />
-                                    )
-                                  })}
-                                </div>
-                              ))}
-                              <div
-                                style={{
-                                  width: "40px",
-                                  height: "5px",
-                                  background: "rgba(160, 160, 160, 0.4)",
-                                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                                  borderRadius: "var(--radius-flat)",
-                                  marginLeft: "4px",
-                                }}
-                              />
-                            </div>
-
-                            <div
-                              className="text-ink-30"
-                              style={{ fontSize: "8px", fontWeight: 500, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}
-                            >
-                              {plates.map((plate, plateIndex) => (
-                                <span key={plateIndex}>
-                                  {plateIndex > 0 && " + "}
-                                  {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
-                                </span>
-                              ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <AnimatePresence>
-                  {exerciseIndex === currentExerciseIndex &&
-                    exercise.completed &&
-                    !exercise.rating && (
-                    <motion.div
-                      key="exercise-rating"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 4 }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
-                      style={{ marginTop: "24px" }}
-                    >
-                      <div
-                        className="text-ink-25 text-center"
-                        style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", fontFamily: "var(--font-label)", marginBottom: "12px" }}
-                      >
-                        HOW DID THIS FEEL?
-                      </div>
-                      <div className="flex items-center justify-center gap-4">
-                        <button
-                          onClick={() => void rateExercise(exerciseIndex, "thumbs_down")}
-                          type="button"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.03)",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
-                            borderRadius: "3px",
-                            padding: "10px 20px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                          }}
-                        >
-                          <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "var(--font-label)" }}>
-                            ROUGH
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => void rateExercise(exerciseIndex, "thumbs_up")}
-                          type="button"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.03)",
-                            border: "1px solid rgba(255, 255, 255, 0.08)",
-                            borderRadius: "3px",
-                            padding: "10px 20px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                          }}
-                        >
-                          <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.4)" }} />
-                          <span style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255, 255, 255, 0.35)", fontFamily: "var(--font-label)" }}>
-                            GOOD
-                          </span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {exerciseIndex === currentExerciseIndex &&
-                    exercise.completed &&
-                    exercise.rating && (
-                    <motion.div
-                      key="exercise-rating-confirmed"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                      style={{ marginTop: "24px" }}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        {exercise.rating === "thumbs_up" ? (
-                          <ThumbsUp size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-                        ) : (
-                          <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "rgba(255, 255, 255, 0.3)" }} />
-                        )}
-                        <span
-                          className="text-ink-25"
-                          style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", fontFamily: "var(--font-label)" }}
-                        >
-                          {exercise.rating === "thumbs_up" ? "FELT GOOD" : "FELT ROUGH"}
-                        </span>
-                        <button
-                          onClick={() => void rateExercise(exerciseIndex, exercise.rating!)}
-                          type="button"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            padding: "2px 4px",
-                            cursor: "pointer",
-                            fontSize: "8px",
-                            color: "rgba(255, 255, 255, 0.2)",
-                            fontFamily: "var(--font-label)",
-                            letterSpacing: "0.08em",
-                          }}
-                        >
-                          UNDO
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {showProgressiveOverload && (
-                    <motion.div
-                      key="progressive-overload"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 4 }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
-                      style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
-                    >
-                      <button
-                        onClick={() => void handleApplyProgressiveOverload(exerciseIndex)}
-                        type="button"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.04)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          borderRadius: "3px",
-                          padding: "7px 16px",
-                          fontSize: "8px",
-                          fontWeight: 600,
-                          letterSpacing: "0.1em",
-                          color: "rgba(255, 255, 255, 0.4)",
-                          boxShadow: "0 0 14px rgba(255, 255, 255, 0.05)",
-                          cursor: "pointer",
-                          fontFamily: "var(--font-label)",
-                        }}
-                      >
-                        PROGRESSIVE OVERLOAD ↑
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )
-          })}
+          {exercises.map((exercise: any, exerciseIndex: number) => (
+            <ExercisePage
+              key={exercise.id}
+              exercise={exercise}
+              exerciseIndex={exerciseIndex}
+              currentExerciseIndex={currentExerciseIndex}
+              exercisesCount={exercises.length}
+              isDeload={isDeload}
+              showPlateCalc={showPlateCalc}
+              plateDisplayMode={plateDisplayMode}
+              plateStartingWeight={plateStartingWeight}
+              focusedInput={focusedInput}
+              validationTrigger={validationTrigger}
+              repCapErrors={repCapErrors}
+              sessionId={session?.id}
+              userId={userId}
+              maxSetVolumeByExercise={maxSetVolumeByExercise}
+              updateExerciseMachineSetting={stableUpdateMachineSetting}
+              handleTogglePlateCalc={stableTogglePlateCalc}
+              updateSetDataForExercise={stableUpdateSetData}
+              handleSetFieldFocus={stableSetFieldFocus}
+              handleSetFieldBlur={stableSetFieldBlur}
+              handleInputAutoSelect={stableInputAutoSelect}
+              setFocusedInput={setFocusedInput}
+              setRepCapErrors={setRepCapErrors}
+              setValidationTrigger={setValidationTrigger}
+              completeSet={stableCompleteSet}
+              rateExercise={stableRateExercise}
+              handleApplyProgressiveOverload={stableApplyProgressiveOverload}
+              setPlateDisplayMode={setPlateDisplayMode}
+              setPlateStartingWeight={setPlateStartingWeight}
+              onOpenExercise={openExercisePage}
+              registerWeightRef={registerWeightRef}
+              registerRepsRef={registerRepsRef}
+            />
+          ))}
         </div>
       </div>
 
@@ -3302,6 +3626,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
         input[type="number"] {
           -moz-appearance: textfield;
+        }
+
+        @keyframes rest-breathe {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
+        }
+        .rest-breathe {
+          animation: rest-breathe 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .rest-breathe { animation: none; opacity: 1; }
         }
       `}</style>
 
