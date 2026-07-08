@@ -49,7 +49,7 @@ import { DeltaChip } from "@/components/ledger/delta-chip"
 import { Sparkline } from "@/components/ledger/sparkline"
 import { StatUnit } from "@/components/ledger/stat-unit"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
-import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
+import WorkoutAlertsSheet from "@/components/workout-alerts-sheet"
 import AktProgramMessageLine from "@/components/akt-program-message-line"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
@@ -159,6 +159,7 @@ export default function Home() {
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
   const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
+  const [showAlertsSheet, setShowAlertsSheet] = useState(false)
   const { isDeload, deloadEndsAt, lastCompletedDeloadEndsAt } = useDeloadWeek()
   const [showDeloadCompleteBanner, setShowDeloadCompleteBanner] = useState(false)
 
@@ -1322,6 +1323,40 @@ export default function Home() {
       >
         <Settings size={16} strokeWidth={1.5} />
       </button>
+      {workoutAlerts.length > 0 && (
+        <button
+          onClick={() => setShowAlertsSheet(true)}
+          className="fixed z-[60]"
+          style={{
+            top: "calc(env(safe-area-inset-top, 0px) + 14px)",
+            right: "calc(50px + env(safe-area-inset-right, 0px))",
+            background: "transparent",
+            border: "none",
+            padding: "8px",
+            cursor: "pointer",
+            pointerEvents: "auto",
+          }}
+          aria-label={`${workoutAlerts.length} flagged exercise${workoutAlerts.length > 1 ? "s" : ""}`}
+          type="button"
+        >
+          <div
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "#F59E0B",
+              boxShadow: workoutAlerts.some((a) => a.tier === 1)
+                ? "0 0 6px rgba(239, 68, 68, 0.6)"
+                : "0 0 6px rgba(245, 158, 11, 0.6)",
+            }}
+          />
+        </button>
+      )}
+      <WorkoutAlertsSheet
+        alerts={showAlertsSheet ? workoutAlerts : []}
+        onDismiss={dismissWorkoutAlert}
+        onClose={() => setShowAlertsSheet(false)}
+      />
       <main
         className="relative flex flex-col overflow-hidden"
         style={{
@@ -1562,8 +1597,6 @@ export default function Home() {
       </div>
 
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
-        <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
-
         {/* Program-message slot — one line hosts every program state (active
             deload, deload complete, and future states) via AktProgramMessageLine.
             The slot reserves its space in all states so nothing reflows. */}
@@ -2033,6 +2066,17 @@ export default function Home() {
         <style>{`
         [data-scroll-x]::-webkit-scrollbar {
           display: none;
+        }
+
+        @keyframes slideUpSheet {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         @keyframes slideInDown {

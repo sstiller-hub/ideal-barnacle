@@ -55,21 +55,10 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                   </span>
                 </div>
                 <div
-                  className="text-ink-70 mb-1"
+                  className="text-ink-70"
                   style={{ fontSize: "12px", fontWeight: 400, lineHeight: "1.4" }}
                 >
                   {alert.message}
-                </div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 400,
-                    color: "var(--ink-35)",
-                    fontStyle: "italic" as const,
-                    lineHeight: "1.3",
-                  }}
-                >
-                  {alert.action}
                 </div>
               </div>
               <button

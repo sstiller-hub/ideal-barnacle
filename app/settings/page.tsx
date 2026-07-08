@@ -556,7 +556,7 @@ export default function SettingsPage() {
                     </Button>
                     <Button
                       onClick={handleRestoreFromGoogleDrive}
-                      className="w-full bg-transparent"
+                      className="w-full"
                       variant="outline"
                       disabled={!!backupStatus}
                     >
@@ -580,7 +580,7 @@ export default function SettingsPage() {
                   Download a backup file to your device or restore from a previous backup.
                 </p>
                 <div className="space-y-2">
-                  <Button onClick={handleDownloadBackup} className="w-full bg-transparent" variant="outline">
+                  <Button onClick={handleDownloadBackup} className="w-full" variant="outline">
                     Download Backup File
                   </Button>
                   <Button onClick={() => fileInputRef.current?.click()} className="w-full" variant="outline">
@@ -682,7 +682,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Replace all routines and schedule with the Growth v2 program.
                 </p>
-                <Button onClick={onResetGrowthV2} className="w-full" variant="destructive">
+                <Button onClick={onResetGrowthV2} className="w-full" variant="destructive" uppercase={false}>
                   Reset to Growth v2 (Wipes old routines)
                 </Button>
               </div>
