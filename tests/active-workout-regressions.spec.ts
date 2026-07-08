@@ -243,24 +243,28 @@ test("shows RECOVERY chip when below last performance", async ({ page }) => {
 })
 
 // The ledger redesign expresses set state through ink + the left state-edge only;
-// a set row is born at its final geometry and never resizes on completion.
+// a set row is born at its final geometry and never resizes on completion. A
+// completed set's input must match the still-active set's input exactly.
 test("completed set keeps fixed geometry (no size morph)", async ({ page }) => {
   await seedBaseStorage(page)
   await page.goto(`/workout/session?routineId=${routine.id}`)
 
-  const weightInput = page.locator('input[type="number"]').nth(0)
-  const repsInput = page.locator('input[type="number"]').nth(1)
-  await weightInput.fill("100")
-  await repsInput.fill("8")
-  const beforeBox = await weightInput.boundingBox()
+  const set1Weight = page.locator('input[type="number"]').nth(0)
+  const set1Reps = page.locator('input[type="number"]').nth(1)
+  const set2Weight = page.locator('input[type="number"]').nth(2)
+  await set1Weight.fill("100")
+  await set1Reps.fill("8")
 
   await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
-  await page.waitForTimeout(100)
+  // set 1 is now completed; set 2 is the current set. Both inputs are measured
+  // at the same instant (no web-font-load boundary between the two reads).
+  await expect(page.locator('button[aria-label="Mark Set Incomplete"]')).toBeVisible()
 
-  const afterBox = await weightInput.boundingBox()
-  expect(beforeBox && afterBox).toBeTruthy()
-  if (beforeBox && afterBox) {
-    expect(afterBox.height).toBeCloseTo(beforeBox.height, 1)
+  const completedBox = await set1Weight.boundingBox()
+  const activeBox = await set2Weight.boundingBox()
+  expect(completedBox && activeBox).toBeTruthy()
+  if (completedBox && activeBox) {
+    expect(completedBox.height).toBeCloseTo(activeBox.height, 1)
   }
 })
 
