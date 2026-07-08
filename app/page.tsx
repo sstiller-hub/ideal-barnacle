@@ -51,7 +51,7 @@ import {
 } from "lucide-react"
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
-import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
+import WorkoutAlertsSheet from "@/components/workout-alerts-sheet"
 import AktProgramMessageLine from "@/components/akt-program-message-line"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
@@ -147,6 +147,7 @@ export default function Home() {
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
   const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
+  const [showAlertsSheet, setShowAlertsSheet] = useState(false)
   const { isDeload, deloadEndsAt, lastCompletedDeloadEndsAt } = useDeloadWeek()
   const [showDeloadCompleteBanner, setShowDeloadCompleteBanner] = useState(false)
 
@@ -1281,6 +1282,40 @@ export default function Home() {
       >
         <Settings size={16} strokeWidth={1.5} />
       </button>
+      {workoutAlerts.length > 0 && (
+        <button
+          onClick={() => setShowAlertsSheet(true)}
+          className="fixed z-[60]"
+          style={{
+            top: "calc(env(safe-area-inset-top, 0px) + 14px)",
+            right: "calc(50px + env(safe-area-inset-right, 0px))",
+            background: "transparent",
+            border: "none",
+            padding: "8px",
+            cursor: "pointer",
+            pointerEvents: "auto",
+          }}
+          aria-label={`${workoutAlerts.length} flagged exercise${workoutAlerts.length > 1 ? "s" : ""}`}
+          type="button"
+        >
+          <div
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "#F59E0B",
+              boxShadow: workoutAlerts.some((a) => a.tier === 1)
+                ? "0 0 6px rgba(239, 68, 68, 0.6)"
+                : "0 0 6px rgba(245, 158, 11, 0.6)",
+            }}
+          />
+        </button>
+      )}
+      <WorkoutAlertsSheet
+        alerts={showAlertsSheet ? workoutAlerts : []}
+        onDismiss={dismissWorkoutAlert}
+        onClose={() => setShowAlertsSheet(false)}
+      />
       <main
         className="relative flex flex-col overflow-hidden"
         style={{
@@ -1292,7 +1327,7 @@ export default function Home() {
         }}
       >
         {devModeEnabled && (
-          <div className="px-5 pb-4 flex-shrink-0">
+          <div className="pb-4 flex-shrink-0">
             <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
               {(["scheduled", "rest", "completed", "activeSession"] as DayState[]).map((state) => (
                 <button
@@ -1330,7 +1365,7 @@ export default function Home() {
           onTouchEnd={handleDaySwipeEnd}
         >
         <div
-          className="px-5 pb-4"
+          className="pb-4"
           style={{
             paddingRight: "60px",
           }}
@@ -1436,10 +1471,10 @@ export default function Home() {
         </div>
 
         {showWorkoutPicker && !isPastDay && (
-          <div className="mt-6 -mx-5">
+          <div className="mt-6">
             <div className="fixed inset-0 z-40" onClick={() => setShowWorkoutPicker(false)} style={{ background: "transparent" }} />
             <div
-              className="relative z-50 flex gap-3 overflow-x-auto px-5 pb-1"
+              className="relative z-50 flex gap-3 overflow-x-auto pb-1"
               style={{
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
@@ -1522,8 +1557,6 @@ export default function Home() {
       </div>
 
       <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
-        <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} />
-
         {/* Program-message slot — one line hosts every program state (active
             deload, deload complete, and future states) via AktProgramMessageLine.
             The slot reserves its space in all states so nothing reflows. */}
@@ -1549,7 +1582,7 @@ export default function Home() {
         )}
 
         {lastSameWorkout && (
-          <div className="px-5 mb-5">
+          <div className="mb-5">
             <button
               className="w-full text-left transition-all duration-base"
               onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
@@ -1606,7 +1639,7 @@ export default function Home() {
         )}
 
         {actualState === "completed" && workoutForDate && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div
               className="mb-6"
               style={{
@@ -1798,7 +1831,7 @@ export default function Home() {
         )}
 
         {actualState === "rest" && !weeklyReview && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div className="text-ink-20 text-center" style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em", padding: "32px 0" }}>
               Rest day — no workout scheduled
             </div>
@@ -1806,7 +1839,7 @@ export default function Home() {
         )}
 
         {actualState === "rest" && weeklyReview && (
-          <div className="px-5 mb-6">
+          <div className="mb-6">
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
@@ -1902,7 +1935,7 @@ export default function Home() {
           const exercises = nextWorkout.routine.exercises ?? []
           const compact = exercises.length >= 9
           return (
-            <div className="px-5 mb-2">
+            <div className="mb-2">
               <div className="flex items-center gap-2 mb-3">
                 <div
                   className="text-ink-25 tracking-widest"
@@ -1970,7 +2003,7 @@ export default function Home() {
         })()}
 
         {(actualState === "scheduled" || actualState === "activeSession") && displayExercises && (
-          <div className="px-5 mb-2">
+          <div className="mb-2">
             <div className="mb-3 space-y-2.5" style={{ gap: isCompactExerciseList ? "6px" : undefined }}>
               {displayExercises.map((exercise: any, index: number) => (
                 <div
@@ -2108,7 +2141,7 @@ export default function Home() {
       </div>
 
       <div
-        className="px-5 mt-0 flex-shrink-0"
+        className="mt-0 flex-shrink-0"
         onTouchStart={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
         onTouchEnd={(event) => event.stopPropagation()}
@@ -2165,7 +2198,7 @@ export default function Home() {
           onTouchMoveCapture={(event) => event.stopPropagation()}
           onTouchEndCapture={(event) => event.stopPropagation()}
         >
-          <div className="px-5 flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
             <h2
               className="text-ink-25 tracking-widest"
               style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
@@ -2270,6 +2303,17 @@ export default function Home() {
         <style>{`
         [data-scroll-x]::-webkit-scrollbar {
           display: none;
+        }
+
+        @keyframes slideUpSheet {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         @keyframes slideInDown {

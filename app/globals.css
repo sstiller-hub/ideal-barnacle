@@ -360,3 +360,27 @@
 .animate-fall {
   animation: fall linear forwards;
 }
+
+/* Button actuation ring — theatrical touch feedback, see components/ui/button.tsx */
+.akt-actuation-ring {
+  position: absolute;
+  z-index: 0;
+  border-radius: 9999px;
+  border-width: 1.5px;
+  border-style: solid;
+  opacity: 0.9;
+  transform: scale(0);
+  pointer-events: none;
+  animation: akt-actuation-ring-pulse 440ms var(--ease-theatre) forwards;
+}
+
+@keyframes akt-actuation-ring-pulse {
+  from {
+    transform: scale(0);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
