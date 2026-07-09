@@ -2000,6 +2000,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
     focusIntentRef.current = false
     if (isResting) return
+    // No incomplete set remains (e.g. the last set was just completed) — there is
+    // nothing to advance to, so don't focus/select a completed field.
+    if (firstIncompleteIndex === -1) return
     const activeSet = currentExercise.sets[currentSetIndex]
     if (!activeSet?.id) return
     const weightNode = weightInputRefs.current.get(activeSet.id)
