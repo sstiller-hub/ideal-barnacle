@@ -629,7 +629,7 @@ const ExercisePage = memo(function ExercisePage({
                   }}
                   onFocus={(e) => {
                     if (set.id) handleSetFieldFocus(set.id, "weight")
-                    if (!isExerciseComplete) handleInputAutoSelect(e)
+                    handleInputAutoSelect(e)
                     setFocusedInput(`${setKey}-weight`)
                   }}
                   onBlur={() => {
@@ -681,7 +681,7 @@ const ExercisePage = memo(function ExercisePage({
                   }}
                   onFocus={(e) => {
                     if (set.id) handleSetFieldFocus(set.id, "reps")
-                    if (!isExerciseComplete) handleInputAutoSelect(e)
+                    handleInputAutoSelect(e)
                     setFocusedInput(`${setKey}-reps`)
                   }}
                   onBlur={() => {
@@ -2000,6 +2000,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
     focusIntentRef.current = false
     if (isResting) return
+    // No incomplete set remains (e.g. the last set was just completed) — there is
+    // nothing to advance to, so don't focus/select a completed field.
+    if (firstIncompleteIndex === -1) return
     const activeSet = currentExercise.sets[currentSetIndex]
     if (!activeSet?.id) return
     const weightNode = weightInputRefs.current.get(activeSet.id)
@@ -2969,9 +2972,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const lsCurrentSetIndex = lsExercise.sets.findIndex((s: any) => !s.completed)
     const lsActiveSetIndex = lsCurrentSetIndex === -1 ? 0 : lsCurrentSetIndex
     const lsCanEdit = uiExerciseIndex <= currentExerciseIndex
-    const lsIsExerciseComplete =
-      lsExercise.sets.length > 0 &&
-      lsExercise.sets.every((s: any) => s.completed && !isSetIncomplete(s))
 
     return (
       <div
@@ -3185,7 +3185,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     }}
                     onFocus={(e) => {
                       if (set.id) handleSetFieldFocus(set.id, "weight")
-                      if (!lsIsExerciseComplete) handleInputAutoSelect(e)
+                      handleInputAutoSelect(e)
                       setFocusedInput(`${setKey}-weight`)
                     }}
                     onBlur={() => {
@@ -3223,7 +3223,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     }}
                     onFocus={(e) => {
                       if (set.id) handleSetFieldFocus(set.id, "reps")
-                      if (!lsIsExerciseComplete) handleInputAutoSelect(e)
+                      handleInputAutoSelect(e)
                       setFocusedInput(`${setKey}-reps`)
                     }}
                     onBlur={() => {
