@@ -629,7 +629,7 @@ const ExercisePage = memo(function ExercisePage({
                   }}
                   onFocus={(e) => {
                     if (set.id) handleSetFieldFocus(set.id, "weight")
-                    handleInputAutoSelect(e)
+                    if (!isExerciseComplete) handleInputAutoSelect(e)
                     setFocusedInput(`${setKey}-weight`)
                   }}
                   onBlur={() => {
@@ -681,7 +681,7 @@ const ExercisePage = memo(function ExercisePage({
                   }}
                   onFocus={(e) => {
                     if (set.id) handleSetFieldFocus(set.id, "reps")
-                    handleInputAutoSelect(e)
+                    if (!isExerciseComplete) handleInputAutoSelect(e)
                     setFocusedInput(`${setKey}-reps`)
                   }}
                   onBlur={() => {
@@ -2969,6 +2969,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     const lsCurrentSetIndex = lsExercise.sets.findIndex((s: any) => !s.completed)
     const lsActiveSetIndex = lsCurrentSetIndex === -1 ? 0 : lsCurrentSetIndex
     const lsCanEdit = uiExerciseIndex <= currentExerciseIndex
+    const lsIsExerciseComplete =
+      lsExercise.sets.length > 0 &&
+      lsExercise.sets.every((s: any) => s.completed && !isSetIncomplete(s))
 
     return (
       <div
@@ -3182,7 +3185,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     }}
                     onFocus={(e) => {
                       if (set.id) handleSetFieldFocus(set.id, "weight")
-                      handleInputAutoSelect(e)
+                      if (!lsIsExerciseComplete) handleInputAutoSelect(e)
                       setFocusedInput(`${setKey}-weight`)
                     }}
                     onBlur={() => {
@@ -3220,7 +3223,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     }}
                     onFocus={(e) => {
                       if (set.id) handleSetFieldFocus(set.id, "reps")
-                      handleInputAutoSelect(e)
+                      if (!lsIsExerciseComplete) handleInputAutoSelect(e)
                       setFocusedInput(`${setKey}-reps`)
                     }}
                     onBlur={() => {
