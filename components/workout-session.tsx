@@ -3358,12 +3358,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
                   <div className="flex items-center" style={{ gap: "5px" }}>
                     <span
-                      className="rest-breathe"
+                      className="rest-shimmer"
                       style={{
                         width: "4px",
                         height: "4px",
                         borderRadius: "50%",
-                        background: "var(--ink-85)",
+                        background: "radial-gradient(circle at 35% 30%, #fff, rgba(255,255,255,0.9) 45%, rgba(255,255,255,0.72))",
                         display: "inline-block",
                       }}
                     />
@@ -3631,15 +3631,20 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           -moz-appearance: textfield;
         }
 
-        @keyframes rest-breathe {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
+        @keyframes rest-shimmer {
+          0%   { opacity: 0.5;  box-shadow: 0 0 1.5px rgba(255,255,255,0.15); }
+          8%   { opacity: 1;    box-shadow: 0 0 6px rgba(255,255,255,0.62), 0 0 11px rgba(255,255,255,0.3); }
+          22%  { opacity: 0.6;  box-shadow: 0 0 2px rgba(210,205,255,0.2); }
+          52%  { opacity: 0.86; box-shadow: 0 0 5px rgba(165,185,255,0.44), 0 0 9px rgba(190,160,255,0.22); }
+          70%  { opacity: 0.66; box-shadow: 0 0 2px rgba(200,190,255,0.18); }
+          100% { opacity: 0.5;  box-shadow: 0 0 1.5px rgba(255,255,255,0.15); }
         }
-        .rest-breathe {
-          animation: rest-breathe 2.4s ease-in-out infinite;
+        .rest-shimmer {
+          animation: rest-shimmer 3.4s ease-in-out infinite;
+          will-change: opacity, box-shadow;
         }
         @media (prefers-reduced-motion: reduce) {
-          .rest-breathe { animation: none; opacity: 1; }
+          .rest-shimmer { animation: none; opacity: 1; box-shadow: 0 0 3px rgba(255,255,255,0.25); }
         }
       `}</style>
 
