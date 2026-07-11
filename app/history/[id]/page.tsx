@@ -1,6 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { ChevronLeft } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -252,7 +253,7 @@ export default function WorkoutDetailPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">{totalVolume.toLocaleString()} lbs</div>
+                    <div className="text-sm font-medium text-foreground">{totalVolume.toLocaleString()} {plural(totalVolume, "lb", "lbs")}</div>
                     <div className="text-xs text-muted-foreground">volume</div>
                   </div>
                 </div>
@@ -291,7 +292,7 @@ export default function WorkoutDetailPage() {
                             <td className="px-3 py-2 font-medium text-foreground">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="mx-auto">
-                                  {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} lbs` : "—"}
+                                  {set.completed && set.weight !== null && set.weight !== undefined ? `${set.weight} ${plural(set.weight, "lb", "lbs")}` : "—"}
                                 </span>
                                 {weightDeltaLabel && (
                                   <span className="text-[10px] text-ink-40" style={{ fontWeight: 400 }}>
@@ -314,7 +315,7 @@ export default function WorkoutDetailPage() {
                             </td>
                             <td className="text-right px-3 py-2 text-muted-foreground">
                               {set.completed && set.weight !== null && set.reps !== null
-                                ? `${((set.weight ?? 0) * (set.reps ?? 0)).toLocaleString()} lbs`
+                                ? `${((set.weight ?? 0) * (set.reps ?? 0)).toLocaleString()} ${plural((set.weight ?? 0) * (set.reps ?? 0), "lb", "lbs")}`
                                 : "—"}
                             </td>
                           </tr>

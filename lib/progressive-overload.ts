@@ -1,3 +1,5 @@
+import { plural } from "./utils"
+
 export type StallSetInput = {
   reps: number | null
   weight: number | null
@@ -172,7 +174,7 @@ export function detectProgressStall(
   points.forEach((point, index) => {
     if (index === 0) return
     const addedLoad = metric === "load" && point.weight > bestWeight * (1 + config.improvementTolerance)
-    // Same working weight (within tolerance) for load lifts; always true for bodyweight.
+    // Same working weight (within tolerance) for loaded exercises; always true for bodyweight.
     const sameWeight = metric === "reps" || point.weight >= bestWeight * (1 - config.improvementTolerance)
     const addedReps = sameWeight && point.reps > bestReps
 
@@ -216,7 +218,7 @@ export function detectProgressStall(
 }
 
 function formatTopSet(weight: number, reps: number, metric: StallMetric): string {
-  if (metric === "reps") return `${Math.round(reps)} reps`
+  if (metric === "reps") return `${Math.round(reps)} ${plural(Math.round(reps), "rep", "reps")}`
   return `${Math.round(weight)} lb × ${Math.round(reps)}`
 }
 
@@ -255,7 +257,7 @@ export function buildStallAlertContent(
   return {
     flag: result.flag,
     tier: result.tier,
-    message: `No progression on ${exerciseName} in your last ${result.stalledSessions} sessions — still ${best} since ${formatDate(result.bestAt)}.`,
+    message: `No progression on ${exerciseName} in your last ${result.stalledSessions} ${plural(result.stalledSessions, "session", "sessions")} — still ${best} since ${formatDate(result.bestAt)}.`,
     action: "Add a rep at this weight, or bump the load and drop reps — either one counts.",
     context: buildContext(exerciseId, result),
   }

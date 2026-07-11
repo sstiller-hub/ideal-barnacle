@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { getWorkoutHistory } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -90,7 +91,7 @@ function buildSparklinePath(series: { volume: number }[], w: number, h: number):
 function formatMaxVol(v: number): string {
   if (v >= 10000) return `${Math.round(v / 1000)}k lbs`
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k lbs`
-  return `${Math.round(v)} lbs`
+  return `${Math.round(v)} ${plural(Math.round(v), "lb", "lbs")}`
 }
 
 type VolumePoint = { date: string; volume: number }
@@ -203,7 +204,7 @@ export default function VolumeHistoryPage() {
                 Volume by Exercise
               </h1>
               <p className="text-ink-35" style={{ fontSize: "11px" }}>
-                {exercises.length} exercises tracked
+                {exercises.length} {plural(exercises.length, "exercise", "exercises")} tracked
               </p>
             </div>
           </div>
@@ -395,11 +396,11 @@ export default function VolumeHistoryPage() {
                   {formatPeriodLabel(selectedPoint.date, aggregation)}
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.90)", letterSpacing: "-0.02em" }}>
-                  {Math.round(selectedPoint.volume).toLocaleString()} lbs
+                  {Math.round(selectedPoint.volume).toLocaleString()} {plural(Math.round(selectedPoint.volume), "lb", "lbs")}
                 </div>
                 {selectedPoint.rollingAvg !== null && (
                   <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>
-                    vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} lbs rolling avg
+                    vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} {plural(Math.round(selectedPoint.rollingAvg), "lb", "lbs")} rolling avg
                   </div>
                 )}
               </div>
@@ -511,7 +512,7 @@ export default function VolumeHistoryPage() {
                     {exercise.name}
                   </div>
                   <div className="text-ink-35" style={{ fontSize: "10px" }}>
-                    Last volume: {Math.round(exercise.lastVolume).toLocaleString()} lbs
+                    Last volume: {Math.round(exercise.lastVolume).toLocaleString()} {plural(Math.round(exercise.lastVolume), "lb", "lbs")}
                   </div>
                 </div>
                 <div className="text-right">

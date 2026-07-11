@@ -68,10 +68,11 @@ function buildSegmentedAreaPath(
 function formatMaxVol(v: number): string {
   if (v >= 10000) return `${Math.round(v / 1000)}k lbs`
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k lbs`
-  return `${Math.round(v)} lbs`
+  return `${Math.round(v)} ${plural(Math.round(v), "lb", "lbs")}`
 }
 
 import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { getExerciseHistory, getExerciseIdForName, normalizeExerciseName } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -286,7 +287,7 @@ export default function ExerciseHistoryPage() {
                 {exerciseName}
               </h1>
               <p className="text-ink-35" style={{ fontSize: "11px" }}>
-                {history.length} workouts logged
+                {history.length} {plural(history.length, "workout", "workouts")} logged
               </p>
             </div>
           </div>
@@ -459,11 +460,11 @@ export default function ExerciseHistoryPage() {
                   {formatPeriodLabel(selectedPoint.date, aggregation)}
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.90)", letterSpacing: "-0.02em" }}>
-                  {Math.round(selectedPoint.volume).toLocaleString()} lbs
+                  {Math.round(selectedPoint.volume).toLocaleString()} {plural(Math.round(selectedPoint.volume), "lb", "lbs")}
                 </div>
                 {selectedPoint.rollingAvg !== null && selectedPoint.volume > 0 && (
                   <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>
-                    vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} lbs rolling avg
+                    vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} {plural(Math.round(selectedPoint.rollingAvg), "lb", "lbs")} rolling avg
                   </div>
                 )}
               </div>
@@ -524,7 +525,7 @@ export default function ExerciseHistoryPage() {
                       <div key={idx} style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Set {idx + 1}</span>
                         <span style={{ fontSize: "12px", fontWeight: 500, color: "rgba(255,255,255,0.80)" }}>
-                          {set.weight} lbs × {set.reps} reps
+                          {set.weight} {plural(set.weight, "lb", "lbs")} × {set.reps} {plural(set.reps, "rep", "reps")}
                         </span>
                       </div>
                     ))}
@@ -572,7 +573,7 @@ export default function ExerciseHistoryPage() {
                         </div>
                         {vol > 0 && (
                           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.60)", fontWeight: 500 }}>
-                            {Math.round(vol).toLocaleString()} lbs
+                            {Math.round(vol).toLocaleString()} {plural(Math.round(vol), "lb", "lbs")}
                           </span>
                         )}
                       </div>
@@ -666,8 +667,8 @@ export default function ExerciseHistoryPage() {
             {ratingTrend.weightInsight && (
               <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginTop: "4px" }}>
                 {ratingTrend.weightInsight.roughHeavier
-                  ? `Rough sessions averaged ${ratingTrend.weightInsight.roughAvgWeight} lbs vs ${ratingTrend.weightInsight.goodAvgWeight} lbs when it felt good`
-                  : `Good sessions averaged ${ratingTrend.weightInsight.goodAvgWeight} lbs vs ${ratingTrend.weightInsight.roughAvgWeight} lbs when it felt rough`}
+                  ? `Rough sessions averaged ${ratingTrend.weightInsight.roughAvgWeight} ${plural(ratingTrend.weightInsight.roughAvgWeight, "lb", "lbs")} vs ${ratingTrend.weightInsight.goodAvgWeight} ${plural(ratingTrend.weightInsight.goodAvgWeight, "lb", "lbs")} when it felt good`
+                  : `Good sessions averaged ${ratingTrend.weightInsight.goodAvgWeight} ${plural(ratingTrend.weightInsight.goodAvgWeight, "lb", "lbs")} vs ${ratingTrend.weightInsight.roughAvgWeight} ${plural(ratingTrend.weightInsight.roughAvgWeight, "lb", "lbs")} when it felt rough`}
               </div>
             )}
           </div>
@@ -724,7 +725,7 @@ export default function ExerciseHistoryPage() {
                     VOLUME
                   </div>
                   <div className="text-ink-90" style={{ fontSize: "12px", fontWeight: 600 }}>
-                    {Math.round(volume).toLocaleString()} lbs
+                    {Math.round(volume).toLocaleString()} {plural(Math.round(volume), "lb", "lbs")}
                   </div>
                 </div>
               </div>
@@ -737,7 +738,7 @@ export default function ExerciseHistoryPage() {
                         Set {idx + 1}
                       </span>
                       <span className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
-                        {set.weight} lbs × {set.reps} reps
+                        {set.weight} {plural(set.weight, "lb", "lbs")} × {set.reps} {plural(set.reps, "rep", "reps")}
                       </span>
                     </div>
                   ))}

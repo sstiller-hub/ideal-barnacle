@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { ChevronLeft, X } from "lucide-react"
+import { plural } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -106,7 +107,7 @@ export default function HistoryPage() {
             </button>
             <div>
               <h1 className="text-lg font-bold text-foreground">Workout History</h1>
-              <p className="text-xs text-muted-foreground">{workouts.length} workouts completed</p>
+              <p className="text-xs text-muted-foreground">{workouts.length} {plural(workouts.length, "workout", "workouts")} completed</p>
             </div>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import { plural } from "./utils"
+
 export type WorkoutSet = {
   reps: number | null
   weight: number | null
@@ -286,7 +288,7 @@ export function comparePerformance(
   if (currentWeight > previousBestNormalized.weight) {
     return {
       status: "better",
-      message: `+${currentWeight - previousBestNormalized.weight} lbs from last time`,
+      message: `+${currentWeight - previousBestNormalized.weight} ${plural(currentWeight - previousBestNormalized.weight, "lb", "lbs")} from last time`,
       previousBest: previousBestNormalized,
     }
   }
@@ -294,7 +296,7 @@ export function comparePerformance(
   if (currentWeight === previousBestNormalized.weight && currentReps > previousBestNormalized.reps) {
     return {
       status: "better",
-      message: `+${currentReps - previousBestNormalized.reps} reps from last time`,
+      message: `+${currentReps - previousBestNormalized.reps} ${plural(currentReps - previousBestNormalized.reps, "rep", "reps")} from last time`,
       previousBest: previousBestNormalized,
     }
   }

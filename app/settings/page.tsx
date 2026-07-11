@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
@@ -777,7 +778,7 @@ export default function SettingsPage() {
                 <Button onClick={handleExportToHealth} className="w-full">
                   Export to Apple Health
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">{workouts.length} workouts ready to export</p>
+                <p className="text-xs text-muted-foreground mt-2">{workouts.length} {plural(workouts.length, "workout", "workouts")} ready to export</p>
               </div>
 
               <div>
@@ -945,7 +946,7 @@ export default function SettingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Send workouts to cloud</AlertDialogTitle>
               <AlertDialogDescription>
-                This will attempt to upload {manualSyncCandidateCount ?? 0} workouts from this device. If you have multiple
+                This will attempt to upload {manualSyncCandidateCount ?? 0} {plural(manualSyncCandidateCount ?? 0, "workout", "workouts")} from this device. If you have multiple
                 devices, conflicts can happen.
               </AlertDialogDescription>
             </AlertDialogHeader>

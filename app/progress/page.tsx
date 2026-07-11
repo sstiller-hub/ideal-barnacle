@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -78,7 +79,7 @@ export default function ProgressPage() {
         <div>
           <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
             <span>Exercise Progress</span>
-            <span className="text-xs font-normal text-muted-foreground">({exercises.length} exercises)</span>
+            <span className="text-xs font-normal text-muted-foreground">({exercises.length} {plural(exercises.length, "exercise", "exercises")})</span>
           </h2>
 
           {exercises.length === 0 ? (

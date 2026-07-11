@@ -8,8 +8,8 @@ type DeltaChipProps = {
 }
 
 // The single comparison component (band headers, PR cards, session set rows).
-// Tone rule: "good" only when the lifter beat something — a PR, a beaten
-// session, a lift trending up. Everything else, including declines, is
+// Tone rule: "good" only when the athlete beat something — a PR, a beaten
+// session, an exercise trending up. Everything else, including declines, is
 // "neutral". There is no "bad" tone; the app records, it does not judge.
 export function DeltaChip({ tone, arrow, value, pct, context, size = "md" }: DeltaChipProps) {
   const isGood = tone === "good"

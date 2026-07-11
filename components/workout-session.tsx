@@ -58,6 +58,7 @@ import { ReorderExercisesSheet } from "@/components/reorder-exercises-sheet"
 import { StatUnit } from "@/components/ledger/stat-unit"
 import { SessionClock } from "@/components/ledger/session-clock"
 import { DeltaChip } from "@/components/ledger/delta-chip"
+import { plural } from "@/lib/utils"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
@@ -130,7 +131,7 @@ function setComparisonToChip(
       if (!last) return null
       const weightDelta = set.weight - last.weight
       const repsDelta = set.reps - last.reps
-      const value = weightDelta > 0 ? `+${weightDelta} LB` : `+${repsDelta} REPS`
+      const value = weightDelta > 0 ? `+${weightDelta} LB` : `+${repsDelta} ${plural(repsDelta, "REP", "REPS")}`
       return { tone: "good", arrow: "up", value }
     }
     case "matched":
@@ -311,6 +312,8 @@ type ExercisePageProps = {
   onOpenExercise: (name: string) => void
   registerWeightRef: (setId: string, node: HTMLInputElement | null) => void
   registerRepsRef: (setId: string, node: HTMLInputElement | null) => void
+  isResting: boolean
+  restDockHeight: number
 }
 
 // One carousel page (one exercise). Module-level + React.memo so a per-second
@@ -350,6 +353,8 @@ const ExercisePage = memo(function ExercisePage({
   onOpenExercise,
   registerWeightRef,
   registerRepsRef,
+  isResting,
+  restDockHeight,
 }: ExercisePageProps) {
   const exerciseCurrentSetIndex = exercise.sets.findIndex((set: any) => !set.completed)
   const activeSetIndex = exerciseCurrentSetIndex === -1 ? 0 : exerciseCurrentSetIndex
@@ -489,8 +494,8 @@ const ExercisePage = memo(function ExercisePage({
             marginTop: "8px",
           }}
         >
-          {exercise.sets.length} SET{exercise.sets.length !== 1 ? "S" : ""}
-          {exercise.targetReps ? ` · TARGET ${exercise.targetReps} REPS` : ""}
+          {exercise.sets.length} {plural(exercise.sets.length, "SET", "SETS")}
+          {exercise.targetReps ? ` · TARGET ${exercise.targetReps} ${plural(Number(exercise.targetReps), "REP", "REPS")}` : ""}
           {!isExerciseComplete && (
             <>
               {" · "}
@@ -974,7 +979,17 @@ const ExercisePage = memo(function ExercisePage({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            style={{ marginTop: "24px" }}
+            style={
+              isResting
+                ? {
+                    position: "fixed",
+                    left: "calc(16px + env(safe-area-inset-left, 0px))",
+                    right: "calc(16px + env(safe-area-inset-right, 0px))",
+                    bottom: `calc(20px + env(safe-area-inset-bottom) + ${restDockHeight}px + 12px)`,
+                    zIndex: 71,
+                  }
+                : { marginTop: "24px" }
+            }
           >
             <div
               className="text-center"
@@ -1036,7 +1051,17 @@ const ExercisePage = memo(function ExercisePage({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            style={{ marginTop: "24px" }}
+            style={
+              isResting
+                ? {
+                    position: "fixed",
+                    left: "calc(16px + env(safe-area-inset-left, 0px))",
+                    right: "calc(16px + env(safe-area-inset-right, 0px))",
+                    bottom: `calc(20px + env(safe-area-inset-bottom) + ${restDockHeight}px + 12px)`,
+                    zIndex: 71,
+                  }
+                : { marginTop: "24px" }
+            }
           >
             <div className="flex items-center justify-center gap-2">
               {exercise.rating === "thumbs_up" ? (
@@ -1133,6 +1158,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [, setPendingRemoteUpdates] = useState<Record<string, boolean>>({})
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  // Measured height of the fixed rest dock, so the feeling-rating can be lifted
+  // clear of it (the exercise column doesn't scroll, so a fixed offset is the
+  // only way to keep the rating tappable while the dock is up).
+  const restDockRef = useRef<HTMLDivElement>(null)
+  const [restDockHeight, setRestDockHeight] = useState(0)
   const isScrollingProgrammatically = useRef(false)
   const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
@@ -1678,6 +1708,18 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
+
+  // Keep the measured rest-dock height in sync so the feeling-rating sits just
+  // above it. Measured on rest start (and on resize while resting).
+  useIsomorphicLayoutEffect(() => {
+    if (!isResting) return
+    const measure = () => {
+      if (restDockRef.current) setRestDockHeight(restDockRef.current.offsetHeight)
+    }
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [isResting])
 
   const totalVolume = exercises.reduce((sum: number, exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
@@ -3063,7 +3105,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 {getExerciseLabel(lsExercise.name)}
               </h1>
               <div className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
-                EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} SET{lsExercise.sets.length !== 1 ? "S" : ""}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} REPS` : ""} • {session?.startedAt ? <SessionClock startedAt={session.startedAt} render={(f) => <>{f}</>} /> : formatSeconds(elapsedSeconds)}
+                EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} {plural(lsExercise.sets.length, "SET", "SETS")}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} ${plural(Number(lsExercise.targetReps), "REP", "REPS")}` : ""} • {session?.startedAt ? <SessionClock startedAt={session.startedAt} render={(f) => <>{f}</>} /> : formatSeconds(elapsedSeconds)}
                 {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
               </div>
             </div>
@@ -3324,6 +3366,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           {isResting && restState ? (
             <motion.div
               key="rest-dock"
+              ref={restDockRef}
               className="fixed z-[70] flex items-center justify-between gap-3 border"
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -3615,6 +3658,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               onOpenExercise={openExercisePage}
               registerWeightRef={registerWeightRef}
               registerRepsRef={registerRepsRef}
+              isResting={isResting}
+              restDockHeight={restDockHeight}
             />
           ))}
         </div>

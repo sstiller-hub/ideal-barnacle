@@ -1,6 +1,7 @@
 "use client"
 
 import { Card } from "@/components/ui/card"
+import { plural } from "@/lib/utils"
 
 type ChartDataPoint = {
   date: string
@@ -53,10 +54,10 @@ export default function ExerciseProgressChart({ exerciseName, data }: ExercisePr
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="font-semibold text-sm">{exerciseName}</h3>
-          <p className="text-xs text-muted-foreground">{data.length} workouts tracked</p>
+          <p className="text-xs text-muted-foreground">{data.length} {plural(data.length, "workout", "workouts")} tracked</p>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-foreground">{latestWeight} lbs</div>
+          <div className="text-lg font-bold text-foreground">{latestWeight} {plural(latestWeight, "lb", "lbs")}</div>
           <div className="text-xs text-muted-foreground">Latest max</div>
         </div>
       </div>
@@ -68,7 +69,7 @@ export default function ExerciseProgressChart({ exerciseName, data }: ExercisePr
           {weightTrend !== "same" && (
             <span className={`text-xs font-medium ${weightTrend === "up" ? "text-success" : "text-destructive"}`}>
               {weightTrend === "up" ? "+" : ""}
-              {weightChange} lbs
+              {weightChange} {plural(weightChange, "lb", "lbs")}
             </span>
           )}
         </div>
@@ -83,7 +84,7 @@ export default function ExerciseProgressChart({ exerciseName, data }: ExercisePr
                   style={{
                     height: `${Math.max(heightPercent, 10)}%`,
                   }}
-                  title={`${point.maxWeight} lbs on ${formatDate(point.date)}`}
+                  title={`${point.maxWeight} ${plural(point.maxWeight, "lb", "lbs")} on ${formatDate(point.date)}`}
                 />
                 {(idx === 0 || idx === data.length - 1 || data.length <= 5) && (
                   <span className="text-[9px] text-muted-foreground rotate-0">
@@ -103,7 +104,7 @@ export default function ExerciseProgressChart({ exerciseName, data }: ExercisePr
           {volumeTrend !== "same" && (
             <span className={`text-xs font-medium ${volumeTrend === "up" ? "text-success" : "text-destructive"}`}>
               {volumeTrend === "up" ? "+" : ""}
-              {volumeChange.toLocaleString()} lbs
+              {volumeChange.toLocaleString()} {plural(volumeChange, "lb", "lbs")}
             </span>
           )}
         </div>
@@ -118,12 +119,12 @@ export default function ExerciseProgressChart({ exerciseName, data }: ExercisePr
                 style={{
                   height: `${Math.max(heightPercent, 10)}%`,
                 }}
-                title={`${point.totalVolume.toLocaleString()} lbs on ${formatDate(point.date)}`}
+                title={`${point.totalVolume.toLocaleString()} ${plural(point.totalVolume, "lb", "lbs")} on ${formatDate(point.date)}`}
               />
             )
           })}
         </div>
-        <div className="text-xs text-muted-foreground text-right mt-1">{latestVolume.toLocaleString()} lbs total</div>
+        <div className="text-xs text-muted-foreground text-right mt-1">{latestVolume.toLocaleString()} {plural(latestVolume, "lb", "lbs")} total</div>
       </div>
     </Card>
   )
