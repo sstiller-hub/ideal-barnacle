@@ -7,7 +7,7 @@ export type IndicatorTone = "good" | "warn"
 
 export interface AktIndicatorChipProps {
   /**
-   * Stable identity of the indicator — e.g. `${liftId}:${indicatorType}` or
+   * Stable identity of the indicator — e.g. `${exerciseId}:${indicatorType}` or
    * `${setId}:pr`. This gates the entry animation to genuine first appearance:
    * a chip with an id that has already been lit renders in steady state, so it
    * does NOT re-animate on scroll recycling (virtualized rows), filter changes,

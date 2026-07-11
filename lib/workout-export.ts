@@ -1,5 +1,6 @@
 import type { CompletedWorkout } from "./workout-storage"
 import { isSetEligibleForStats } from "./set-validation"
+import { plural } from "./utils"
 
 export function formatWorkoutAsText(workout: CompletedWorkout): string {
   const date = new Date(workout.startedAt ?? workout.date).toLocaleDateString("en-US", {
@@ -29,7 +30,7 @@ export function formatWorkoutAsText(workout: CompletedWorkout): string {
 
   lines.push(`${workout.name} — ${date}`)
   const meta = [
-    totalVolume ? `Volume: ${Math.round(totalVolume).toLocaleString()} lbs` : null,
+    totalVolume ? `Volume: ${Math.round(totalVolume).toLocaleString()} ${plural(Math.round(totalVolume), "lb", "lbs")}` : null,
     durationLabel ? `Duration: ${durationLabel}` : null,
   ]
     .filter(Boolean)
@@ -46,7 +47,7 @@ export function formatWorkoutAsText(workout: CompletedWorkout): string {
       completedSets.forEach((set, i) => {
         const weight = set.weight ?? 0
         const reps = set.reps ?? 0
-        lines.push(`  Set ${i + 1}: ${weight} lbs × ${reps}`)
+        lines.push(`  Set ${i + 1}: ${weight} ${plural(weight, "lb", "lbs")} × ${reps}`)
       })
     }
     lines.push("")

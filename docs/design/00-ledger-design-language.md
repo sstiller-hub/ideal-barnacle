@@ -19,7 +19,7 @@ Kova is a *system of record* (see CLAUDE.md → Product Philosophy). Systems of 
 
 1. **One vocabulary.** Repeated anatomy (band headers, chips, stat units) is the cohesion mechanism.
 2. **One numeral voice.** Every headline stat is Bebas numeral + small unit + condensed cap.
-3. **Color is earned.** Emerald (`--good`) appears only when the lifter beat something. Declines and neutrals stay in the ink ladder. Never red/orange for a down number — the app records, it does not judge.
+3. **Color is earned.** Emerald (`--good`) appears only when the athlete beat something. Declines and neutrals stay in the ink ladder. Never red/orange for a down number — the app records, it does not judge.
 4. **One surface, one radius.** Flat bands separated by hairlines. Only *interactive* elements get a border, always at `--radius-flat` (surfaces like the rest dock use `--radius-xs`). If it has a border, you can press it.
 5. **State changes ink, never layout.** No element changes size, position, or shape as a result of a state change. Exactly one element on screen may be permanently animated ("one live thing").
 
@@ -85,7 +85,7 @@ Styles:
 - `tone="good"`: color `--good-ink`, background `--good-tint`, border `1px solid rgba(52,211,153,.22)` (this one rgba is acceptable — it is the tint border; alternatively add nothing and reuse `--good-tint`).
 - `tone="neutral"`: color `--ink-40`, background `--ink-04`, border `1px solid var(--ink-08)`.
 
-**Tone assignment rule (enforce in callers):** `good` only for: session/lift volume that *beat* the previous same workout, a lift trending up, a PR, "N of M lifts up" when N ≥ M/2, day-complete status dot. Everything else — including *all* negative deltas — is `neutral`. There is no "bad" tone.
+**Tone assignment rule (enforce in callers):** `good` only for: session/exercise volume that *beat* the previous same workout, an exercise trending up, a PR, "N of M exercises up" when N ≥ M/2, day-complete status dot. Everything else — including *all* negative deltas — is `neutral`. There is no "bad" tone.
 
 ### 4.2 `StatUnit` — `components/ledger/stat-unit.tsx`
 
@@ -93,7 +93,7 @@ Styles:
 type StatUnitProps = {
   value: string                    // pre-formatted, e.g. "30.6K", "9", "120.9K", "2:32"
   unit?: string                    // "LB", "OF 8", "/ 24" — rendered inline after value
-  label: string                    // "VOLUME", "EXERCISES", "LIFTS BEATEN"
+  label: string                    // "VOLUME", "EXERCISES", "BEATEN"
   size?: "md" | "sm"               // md: 34px numeral (home bands); sm: 21px numeral (session top bar)
 }
 ```

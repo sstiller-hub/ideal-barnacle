@@ -48,6 +48,7 @@ import { BandHeader } from "@/components/ledger/band-header"
 import { DeltaChip } from "@/components/ledger/delta-chip"
 import { Sparkline } from "@/components/ledger/sparkline"
 import { StatUnit } from "@/components/ledger/stat-unit"
+import { plural } from "@/lib/utils"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsSheet from "@/components/workout-alerts-sheet"
 import AktProgramMessageLine from "@/components/akt-program-message-line"
@@ -1046,7 +1047,7 @@ export default function Home() {
       sorted.find((w) => notSelectedDay(w) && deriveWorkoutType(w.name) === selectedTitle)
     if (!match) return null
 
-    const topLifts = (match.exercises ?? [])
+    const topExercises = (match.exercises ?? [])
       .map((exercise: any) => {
         const top = topSetWithContext(exercise.sets)
         return top
@@ -1063,8 +1064,8 @@ export default function Home() {
       })
       .filter(
         (
-          lift
-        ): lift is {
+          exercise
+        ): exercise is {
           name: string
           weight: number
           reps: number
@@ -1072,7 +1073,7 @@ export default function Home() {
           total: number
           standsOut: boolean
           product: number
-        } => Boolean(lift)
+        } => Boolean(exercise)
       )
       .sort((a, b) => b.product - a.product)
       .slice(0, 3)
@@ -1081,11 +1082,11 @@ export default function Home() {
       id: match.id,
       date: match.date,
       totalVolume: match.stats?.totalVolume ?? 0,
-      topLifts,
+      topExercises,
     }
   }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
 
-  // Overall progression signal: how many tracked lifts are trending up vs down.
+  // Overall progression signal: how many tracked exercises are trending up vs down.
   const progression = useMemo(() => {
     let up = 0
     let down = 0
@@ -1099,7 +1100,7 @@ export default function Home() {
 
   // For a completed day: compare it against the previous time the same workout
   // was trained (by routine name, else Upper/Lower type) so the finished day
-  // answers "did I beat last time" — volume delta and lifts beaten.
+  // answers "did I beat last time" — volume delta and exercises beaten.
   const completedComparison = useMemo(() => {
     if (actualState !== "completed" || !workoutForDate) return null
     const current = workoutForDate
@@ -1336,7 +1337,7 @@ export default function Home() {
             cursor: "pointer",
             pointerEvents: "auto",
           }}
-          aria-label={`${workoutAlerts.length} flagged exercise${workoutAlerts.length > 1 ? "s" : ""}`}
+          aria-label={`${workoutAlerts.length} flagged ${plural(workoutAlerts.length, "exercise", "exercises")}`}
           type="button"
         >
           <div
@@ -1501,7 +1502,7 @@ export default function Home() {
                 {actualState === "completed"
                   ? "COMPLETE"
                   : actualState === "activeSession"
-                    ? `IN PROGRESS${activeSessionProgress ? ` · ${activeSessionProgress.remainingSets} SETS LEFT` : ""}`
+                    ? `IN PROGRESS${activeSessionProgress ? ` · ${activeSessionProgress.remainingSets} ${plural(activeSessionProgress.remainingSets, "SET LEFT", "SETS LEFT")}` : ""}`
                     : actualState === "rest"
                       ? "REST DAY"
                       : "SCHEDULED"}
@@ -1659,12 +1660,15 @@ export default function Home() {
                 style={{ gap: "28px", marginBottom: isCompactExerciseList ? "12px" : "16px" }}
               >
                 <StatUnit value={formatK(workoutForDate.stats.totalVolume)} unit="LB" label="VOLUME" />
-                <StatUnit value={`${workoutForDate.exercises?.length ?? 0}`} label="EXERCISES" />
+                <StatUnit
+                  value={`${workoutForDate.exercises?.length ?? 0}`}
+                  label={plural(workoutForDate.exercises?.length ?? 0, "EXERCISE", "EXERCISES")}
+                />
                 {completedComparison && completedComparison.compared > 0 && (
                   <StatUnit
                     value={`${completedComparison.beaten}`}
                     unit={`OF ${completedComparison.compared}`}
-                    label="LIFTS BEATEN"
+                    label="BEATEN"
                   />
                 )}
               </div>
@@ -1676,7 +1680,7 @@ export default function Home() {
                       key={exercise.id ?? `${exercise.name}-${index}`}
                       index={index}
                       name={getExerciseLabel(exercise.name)}
-                      right={`${exercise.targetSets ?? exercise.sets?.length ?? 0} sets`}
+                      right={`${exercise.targetSets ?? exercise.sets?.length ?? 0} ${plural(exercise.targetSets ?? exercise.sets?.length ?? 0, "set", "sets")}`}
                       compact={isCompactExerciseList}
                     />
                   ))}
@@ -1802,17 +1806,27 @@ export default function Home() {
                 className="flex items-baseline"
                 style={{ gap: "28px", marginBottom: isCompactExerciseList ? "12px" : "16px" }}
               >
-                <StatUnit value={`${displayExercises.length}`} label="EXERCISES" />
                 <StatUnit
-                  value={`${
+                  value={`${displayExercises.length}`}
+                  label={plural(displayExercises.length, "EXERCISE", "EXERCISES")}
+                />
+                {(() => {
+                  const setsPlanned =
                     actualState === "activeSession" && activeSessionProgress
                       ? activeSessionProgress.totalSets
                       : plannedSets
-                  }`}
-                  label="SETS PLANNED"
-                />
+                  return (
+                    <StatUnit
+                      value={`${setsPlanned}`}
+                      label={plural(setsPlanned, "SET PLANNED", "SETS PLANNED")}
+                    />
+                  )
+                })()}
                 {actualState === "activeSession" && activeSessionProgress && (
-                  <StatUnit value={`${activeSessionProgress.remainingSets}`} label="SETS LEFT" />
+                  <StatUnit
+                    value={`${activeSessionProgress.remainingSets}`}
+                    label={plural(activeSessionProgress.remainingSets, "SET LEFT", "SETS LEFT")}
+                  />
                 )}
               </div>
 
@@ -1964,7 +1978,7 @@ export default function Home() {
                   tone={progression.up >= progression.down ? "good" : "neutral"}
                   arrow={progression.up >= progression.down ? "up" : "down"}
                   value={`${progression.up} OF ${progression.tracked}`}
-                  context="LIFTS UP"
+                  context="EXERCISES UP"
                 />
               )}
             </BandHeader>

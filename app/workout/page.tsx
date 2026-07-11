@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { useState, useEffect } from "react"
 import { getRoutines, deleteRoutine, type WorkoutRoutine } from "@/lib/routine-storage"
@@ -136,7 +137,7 @@ export default function WorkoutsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">💪 {routine.exercises.length} exercises</span>
+                  <span className="flex items-center gap-1">💪 {routine.exercises.length} {plural(routine.exercises.length, "exercise", "exercises")}</span>
                   <span className="flex items-center gap-1">⏱️ {routine.estimatedTime}</span>
                   <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
                     {routine.category}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -421,7 +422,7 @@ export default function WorkoutSummaryPage() {
             <div>
               <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</div>
               <div className="text-3xl font-bold text-foreground tabular-nums">
-                {summary.totalVolume.toLocaleString()} lbs
+                {summary.totalVolume.toLocaleString()} {plural(summary.totalVolume, "lb", "lbs")}
               </div>
             </div>
             <div className="text-right">
@@ -481,7 +482,7 @@ export default function WorkoutSummaryPage() {
             )}
             {summary.excludedSets > 0 && (
               <Badge tone="warn" className="normal-case tracking-normal text-xs py-1">
-                ⚠️ {summary.excludedSets} sets excluded
+                ⚠️ {summary.excludedSets} {plural(summary.excludedSets, "set", "sets")} excluded
               </Badge>
             )}
           </div>
@@ -570,7 +571,7 @@ export default function WorkoutSummaryPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      Volume: <span className="text-foreground">{volume.toLocaleString()} lbs</span>
+                      Volume: <span className="text-foreground">{volume.toLocaleString()} {plural(volume, "lb", "lbs")}</span>
                     </span>
                     {delta && (
                       <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
@@ -584,7 +585,7 @@ export default function WorkoutSummaryPage() {
                   <div className="flex flex-wrap gap-2">
                     {excluded > 0 && (
                       <Badge tone="warn" className="normal-case tracking-normal text-xs">
-                        ⚠️ {excluded} sets excluded
+                        ⚠️ {excluded} {plural(excluded, "set", "sets")} excluded
                       </Badge>
                     )}
                     {isWarmup && (

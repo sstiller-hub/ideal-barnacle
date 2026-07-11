@@ -55,7 +55,7 @@ Three `StatUnit`s in a flex row, `gap: 28px`, baseline-aligned:
 
 - `value=30.6K unit=LB label=VOLUME` — from `workoutForDate.stats.totalVolume`, formatted `X.XK` ≥1000 else integer. **Use this same k-formatter everywhere on the screen** (extract one helper; today there are three).
 - `value=9 label=EXERCISES`
-- `value=3 unit="OF 8" label="LIFTS BEATEN"` — from `completedComparison.beaten/compared`; omit when null.
+- `value=3 unit="OF 8" label="BEATEN"` — from `completedComparison.beaten/compared`; omit when null.
 
 For **scheduled/activeSession**: `value={exercises} label=EXERCISES`, `value={totalSets} label=SETS PLANNED`, and for activeSession `value={remaining} label=SETS LEFT`.
 
@@ -78,12 +78,12 @@ Deload banners (`~1526–1609`): keep, restyle to §4.6 surface (`--ink-02`/`--i
 - `BandHeader label="THIS WEEK"`, right slot: week/week `DeltaChip` — `tone=good arrow=up` when delta>0, `tone=neutral arrow=down` otherwise; `value` = k-formatted |delta|, `pct` = %, `context="WK/WK"`. When `!canCompareWeekOverWeek` (mid-session): `tone=neutral value="{prev}K" context="PREV 7D"`. **This deletes the `#FF5733` usage at ~2511–2513.**
 - Body: one `StatUnit` `value=120.9K unit=LB label="VOLUME · WK OF {Mon date}"` + `Sparkline` of `weeklyVolumesForCard` with `live` — the pulsing endpoint is the screen's one live element (§5 of the design language). Height 56–60px.
 - The whole band stays a button → `/volume` as today, but with **no visible button chrome** (flat band; press feedback = ink only).
-- The "26 of 30 lifts up" `progression` indicator **moves out of this band** into the ALL-TIME header (it describes lifts, not the week).
+- The "26 of 30 exercises up" `progression` indicator **moves out of this band** into the ALL-TIME header (it describes exercises, not the week).
 - Delete `TrainingVolumeCard` once inlined.
 
 ## 5. Band 3 — ALL-TIME (replaces "PERSONAL RECORDS", ~2217–2256 + `PRCard`)
 
-- `BandHeader label="ALL-TIME"`, right slot: `DeltaChip` from `progression`: `tone=good arrow=up value="26 OF 30" context="LIFTS UP"` when `up ≥ down`, else `tone=neutral arrow=down`.
+- `BandHeader label="ALL-TIME"`, right slot: `DeltaChip` from `progression`: `tone=good arrow=up value="26 OF 30" context="EXERCISES UP"` when `up ≥ down`, else `tone=neutral arrow=down`.
 - PR cards keep the horizontal scroll row (`prRows` order and card width formula unchanged) but each card is rebuilt from the shared kit:
   - Name: 9.5px `--ink-50`, 2-line min-height.
   - Record: `StatUnit`-style `14 × 70 LB` — both numerals Bebas 30px `--ink-95`, `×` and `LB` as 10–11px `--ink-25` units.

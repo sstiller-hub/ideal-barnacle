@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { plural } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -125,7 +126,7 @@ export default function CreateRoutinePage() {
                   <div className="flex-1">
                     <div className="font-medium text-sm">{exercise.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {exercise.targetSets} sets × {exercise.targetReps} reps
+                      {exercise.targetSets} {plural(exercise.targetSets, "set", "sets")} × {exercise.targetReps} {plural(Number(exercise.targetReps), "rep", "reps")}
                     </div>
                   </div>
                   <button onClick={() => handleRemoveExercise(exercise.id)} className="text-destructive px-2">

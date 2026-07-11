@@ -1,6 +1,7 @@
 // lib/supabase-sync.ts
 import { supabase } from "@/lib/supabase"
 import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { plural } from "@/lib/utils"
 
 // Local outbox for offline-first sync
 const OUTBOX_KEY = "sync_outbox_v1"
@@ -417,7 +418,7 @@ export async function pullSupabaseToLocal() {
     localStorage.setItem("workout_history", JSON.stringify(merged))
   }
 
-  return { success: true, message: `Pulled ${cloudWorkouts.length} workout(s)` }
+  return { success: true, message: `Pulled ${cloudWorkouts.length} ${plural(cloudWorkouts.length, "workout", "workouts")}` }
 }
 
 export async function syncNow(options?: PushOptions) {
