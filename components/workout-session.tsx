@@ -2380,9 +2380,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   ) => {
     if (!session) return
-    // Completing a set is explicit intent — allow the auto-focus effect to move
-    // the keyboard to the next set (consumed there; suppressed while resting).
-    focusIntentRef.current = true
     const workoutId = session.workoutId
     const targetExerciseIndex = options?.exerciseIndex ?? currentExerciseIndex
     const shouldAutoRest = options?.startRest ?? targetExerciseIndex === currentExerciseIndex
@@ -2485,6 +2482,45 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         remainingSeconds: restSeconds,
       }, newExercises)
       scheduleRestNotification(restSeconds)
+    }
+
+    // Checking off a set clears any lingering text-box selection and auto-selects
+    // the next set's weight. The weight is already prefilled from progression, so
+    // it's rarely the user's next move — but keeping it selected leaves it one tap
+    // away to overwrite. Done imperatively (rather than via the auto-focus effect)
+    // so the rest countdown starting on the same tick can't cancel the pending
+    // focus, and so it lands even while resting. Only runs when a set was actually
+    // completed (not un-checked) on the exercise currently on screen.
+    const toggledSet = newExercises[targetExerciseIndex]?.sets?.[setIndex]
+    if (toggledSet?.completed && targetExerciseIndex === currentExerciseIndex) {
+      if (typeof document !== "undefined") {
+        const active = document.activeElement as HTMLElement | null
+        if (active && typeof active.blur === "function") active.blur()
+      }
+      setFocusedInput(null)
+      const nextExercise = newExercises[targetExerciseIndex]
+      const nextIncompleteIndex = nextExercise?.sets?.findIndex((s: any) => !s.completed) ?? -1
+      if (nextIncompleteIndex !== -1) {
+        const nextSet = nextExercise.sets[nextIncompleteIndex]
+        const weightNode = nextSet?.id ? weightInputRefs.current.get(nextSet.id) : null
+        const repsNode = nextSet?.id ? repsInputRefs.current.get(nextSet.id) : null
+        // Skip straight to reps when the weight is already logged but reps aren't.
+        const shouldFocusReps =
+          typeof nextSet.weight === "number" &&
+          nextSet.weight > 0 &&
+          (!nextSet.reps || nextSet.reps <= 0)
+        const focusTarget = shouldFocusReps ? repsNode : weightNode
+        if (focusTarget) {
+          window.setTimeout(() => {
+            try {
+              focusTarget.focus()
+              focusTarget.select()
+            } catch {
+              // ignore focus errors
+            }
+          }, 0)
+        }
+      }
     }
   }
 

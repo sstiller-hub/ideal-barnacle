@@ -283,6 +283,47 @@ test("plate toggle is single button and flips label", async ({ page }) => {
   expect(nextLabel).not.toBe(initialLabel)
 })
 
+// Checking off a set should hand focus to the next set's (already prefilled)
+// weight and select its text, so it's one tap from being overwritten — even
+// though a rest countdown starts on the same tap.
+test("checking a set auto-selects the next set's weight", async ({ page }) => {
+  const session = {
+    id: "auto-select-session",
+    routineId: routine.id,
+    routineName: routine.name,
+    status: "in_progress",
+    startedAt: new Date().toISOString(),
+    activeDurationSeconds: 0,
+    currentExerciseIndex: 0,
+    exercises: [
+      {
+        id: "ex-1",
+        name: "Overhand Row",
+        targetSets: 2,
+        targetReps: "6-8",
+        restTime: 120,
+        completed: false,
+        sets: [
+          { id: "s1", reps: 8, weight: 100, completed: false },
+          { id: "s2", reps: 8, weight: 105, completed: false },
+        ],
+      },
+    ],
+  }
+  await seedBaseStorage(page, { session })
+  await page.goto("/workout/session?routineId=" + routine.id)
+
+  // Complete set 1 (already valid: weight + reps filled).
+  await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
+  await expect(page.locator('button[aria-label="Mark Set Incomplete"]')).toBeVisible()
+
+  // The rest countdown has begun, yet set 2's weight input is now the focused
+  // element and its prefilled value is fully selected.
+  const set2Weight = page.locator('input[type="number"]').nth(2)
+  await expect(set2Weight).toBeFocused()
+  await expect(set2Weight).toHaveValue("105")
+})
+
 test("resumes active session when routine is missing from library", async ({ page }) => {
   await page.addInitScript(() => {
     if (localStorage.getItem("__resume_missing_routine_seeded") === "true") return
