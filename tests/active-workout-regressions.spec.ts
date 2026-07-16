@@ -283,10 +283,10 @@ test("plate toggle is single button and flips label", async ({ page }) => {
   expect(nextLabel).not.toBe(initialLabel)
 })
 
-// Checking off a set should hand focus to the next set's (already prefilled)
-// weight and select its text, so it's one tap from being overwritten — even
-// though a rest countdown starts on the same tap.
-test("checking a set auto-selects the next set's weight", async ({ page }) => {
+// Checking off a set should unselect all text boxes (drop the keyboard) and
+// must NOT auto-focus the next set's weight — that value is already prefilled
+// from progression, so it's left selectable but un-focused.
+test("checking a set clears selection and does not auto-focus the next weight", async ({ page }) => {
   const session = {
     id: "auto-select-session",
     routineId: routine.id,
@@ -313,14 +313,21 @@ test("checking a set auto-selects the next set's weight", async ({ page }) => {
   await seedBaseStorage(page, { session })
   await page.goto("/workout/session?routineId=" + routine.id)
 
+  // Focus set 1's weight so a text box is selected / keyboard is up.
+  const set1Weight = page.locator('input[type="number"]').nth(0)
+  await set1Weight.focus()
+  await expect(set1Weight).toBeFocused()
+
   // Complete set 1 (already valid: weight + reps filled).
   await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
   await expect(page.locator('button[aria-label="Mark Set Incomplete"]')).toBeVisible()
 
-  // The rest countdown has begun, yet set 2's weight input is now the focused
-  // element and its prefilled value is fully selected.
+  // No text box stays selected, and set 2's weight is NOT auto-focused — but its
+  // prefilled value is still there, ready to be tapped if the user wants it.
   const set2Weight = page.locator('input[type="number"]').nth(2)
-  await expect(set2Weight).toBeFocused()
+  await expect(set2Weight).not.toBeFocused()
+  const activeIsInput = await page.evaluate(() => document.activeElement?.tagName === "INPUT")
+  expect(activeIsInput).toBe(false)
   await expect(set2Weight).toHaveValue("105")
 })
 
