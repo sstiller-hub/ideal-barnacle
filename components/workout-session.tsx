@@ -143,17 +143,32 @@ function setComparisonToChip(
   }
 }
 
+// Some exercises are named for a specific machine that only accepts plates up
+// to a certain size. Keyed by normalized exercise name → the heaviest plate
+// (lb) that machine's pegs will take. Plates above the cap are excluded from
+// the plate-math suggestion for that exercise.
+const MAX_PLATE_BY_EXERCISE: Record<string, number> = {
+  "arsenal reloaded incline fly": 25,
+}
+
+function getMaxPlateForExercise(name: string): number | null {
+  return MAX_PLATE_BY_EXERCISE[normalizeExerciseName(name)] ?? null
+}
+
 function calculatePlates(
   weight: number,
   startingWeight: number,
   mode: "per-side" | "total",
+  maxPlate: number | null = null,
 ): { plate: number; count: number }[] {
   const adjusted = Math.max(0, weight - startingWeight)
   const plateWeight = mode === "per-side" ? adjusted / 2 : adjusted
 
   if (plateWeight <= 0) return []
 
-  const availablePlates = [45, 35, 25, 10, 5, 2.5]
+  const availablePlates = [45, 35, 25, 10, 5, 2.5].filter(
+    (plate) => maxPlate === null || plate <= maxPlate,
+  )
   const plates: { plate: number; count: number }[] = []
   let remaining = plateWeight
 
@@ -530,7 +545,12 @@ const ExercisePage = memo(function ExercisePage({
               : null
           const plates =
             typeof set.weight === "number"
-              ? calculatePlates(set.weight, plateStartingWeight, plateDisplayMode)
+              ? calculatePlates(
+                  set.weight,
+                  plateStartingWeight,
+                  plateDisplayMode,
+                  getMaxPlateForExercise(exercise.name),
+                )
               : []
           const isPlateSetActive =
             exerciseIndex === currentExerciseIndex &&
