@@ -1109,6 +1109,37 @@ export default function Home() {
     }
   }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
 
+  // How long the scheduled/active workout usually takes: the mean recorded
+  // duration across every past session of the same routine (matched by name,
+  // else by Upper/Lower type — mirroring lastSameWorkout). Sets a "this workout
+  // typically runs ~N min" expectation before you train. Null until there's at
+  // least one prior session with usable timing data.
+  const averageWorkoutDuration = useMemo(() => {
+    if (actualState !== "scheduled" && actualState !== "activeSession") return null
+    const routineName =
+      (actualState === "activeSession" ? session?.routineName : scheduledRoutine?.name) ?? null
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    const notSelectedDay = (workout: CompletedWorkout) => {
+      const workoutDate = new Date(workout.date)
+      workoutDate.setHours(0, 0, 0, 0)
+      return workoutDate.getTime() !== selected.getTime()
+    }
+    const byName = routineName
+      ? workoutHistory.filter((w) => notSelectedDay(w) && w.name === routineName)
+      : []
+    const matches =
+      byName.length > 0
+        ? byName
+        : workoutHistory.filter((w) => notSelectedDay(w) && deriveWorkoutType(w.name) === selectedTitle)
+    const durations = matches
+      .map((w) => getWorkoutDurationSeconds(w))
+      .filter((secs): secs is number => secs !== null && secs > 0)
+    if (durations.length === 0) return null
+    const avgSeconds = durations.reduce((sum, secs) => sum + secs, 0) / durations.length
+    return { seconds: avgSeconds, count: durations.length }
+  }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
+
   // Overall progression signal: how many tracked exercises are trending up vs down.
   const progression = useMemo(() => {
     let up = 0
@@ -1857,6 +1888,10 @@ export default function Home() {
                     label={plural(activeSessionProgress.remainingSets, "SET LEFT", "SETS LEFT")}
                   />
                 )}
+                {averageWorkoutDuration && (() => {
+                  const { value, unit } = formatDurationStat(averageWorkoutDuration.seconds)
+                  return <StatUnit value={value} unit={unit} label="AVG TIME" />
+                })()}
               </div>
 
               <div style={{ marginBottom: "14px" }}>
