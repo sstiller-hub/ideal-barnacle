@@ -84,6 +84,29 @@ function getRelativeDateAbbrev(dateStr: string | null): string {
   return `${Math.floor(diffDays / 30)}MO`
 }
 
+// Duration a completed workout took, in seconds. Prefer the stored `duration`
+// field; fall back to endedAt − startedAt for older records that predate it.
+function getWorkoutDurationSeconds(workout: CompletedWorkout): number | null {
+  if (typeof workout.duration === "number" && workout.duration > 0) return workout.duration
+  if (workout.startedAt && workout.endedAt) {
+    const secs = Math.floor(
+      (new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()) / 1000
+    )
+    return secs > 0 ? secs : null
+  }
+  return null
+}
+
+// Split a duration into a StatUnit value/unit pair: "52" MIN under an hour,
+// "1H 20" MIN beyond it — the big numeral stays a clean number either way.
+function formatDurationStat(seconds: number): { value: string; unit: string } {
+  const totalMinutes = Math.max(1, Math.round(seconds / 60))
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h > 0) return { value: `${h}H ${String(m).padStart(2, "0")}`, unit: "MIN" }
+  return { value: `${m}`, unit: "MIN" }
+}
+
 type WorkoutRoutine = {
   id: string
   name: string
@@ -1664,6 +1687,12 @@ export default function Home() {
                   value={`${workoutForDate.exercises?.length ?? 0}`}
                   label={plural(workoutForDate.exercises?.length ?? 0, "EXERCISE", "EXERCISES")}
                 />
+                {(() => {
+                  const durationSecs = getWorkoutDurationSeconds(workoutForDate)
+                  if (durationSecs === null) return null
+                  const { value, unit } = formatDurationStat(durationSecs)
+                  return <StatUnit value={value} unit={unit} label="DURATION" />
+                })()}
                 {completedComparison && completedComparison.compared > 0 && (
                   <StatUnit
                     value={`${completedComparison.beaten}`}
