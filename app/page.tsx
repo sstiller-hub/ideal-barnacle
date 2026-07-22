@@ -84,6 +84,29 @@ function getRelativeDateAbbrev(dateStr: string | null): string {
   return `${Math.floor(diffDays / 30)}MO`
 }
 
+// Duration a completed workout took, in seconds. Prefer the stored `duration`
+// field; fall back to endedAt − startedAt for older records that predate it.
+function getWorkoutDurationSeconds(workout: CompletedWorkout): number | null {
+  if (typeof workout.duration === "number" && workout.duration > 0) return workout.duration
+  if (workout.startedAt && workout.endedAt) {
+    const secs = Math.floor(
+      (new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()) / 1000
+    )
+    return secs > 0 ? secs : null
+  }
+  return null
+}
+
+// Split a duration into a StatUnit value/unit pair: "52" MIN under an hour,
+// "1H 20" MIN beyond it — the big numeral stays a clean number either way.
+function formatDurationStat(seconds: number): { value: string; unit: string } {
+  const totalMinutes = Math.max(1, Math.round(seconds / 60))
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h > 0) return { value: `${h}H ${String(m).padStart(2, "0")}`, unit: "MIN" }
+  return { value: `${m}`, unit: "MIN" }
+}
+
 type WorkoutRoutine = {
   id: string
   name: string
@@ -1086,6 +1109,37 @@ export default function Home() {
     }
   }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
 
+  // How long the scheduled/active workout usually takes: the mean recorded
+  // duration across every past session of the same routine (matched by name,
+  // else by Upper/Lower type — mirroring lastSameWorkout). Sets a "this workout
+  // typically runs ~N min" expectation before you train. Null until there's at
+  // least one prior session with usable timing data.
+  const averageWorkoutDuration = useMemo(() => {
+    if (actualState !== "scheduled" && actualState !== "activeSession") return null
+    const routineName =
+      (actualState === "activeSession" ? session?.routineName : scheduledRoutine?.name) ?? null
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    const notSelectedDay = (workout: CompletedWorkout) => {
+      const workoutDate = new Date(workout.date)
+      workoutDate.setHours(0, 0, 0, 0)
+      return workoutDate.getTime() !== selected.getTime()
+    }
+    const byName = routineName
+      ? workoutHistory.filter((w) => notSelectedDay(w) && w.name === routineName)
+      : []
+    const matches =
+      byName.length > 0
+        ? byName
+        : workoutHistory.filter((w) => notSelectedDay(w) && deriveWorkoutType(w.name) === selectedTitle)
+    const durations = matches
+      .map((w) => getWorkoutDurationSeconds(w))
+      .filter((secs): secs is number => secs !== null && secs > 0)
+    if (durations.length === 0) return null
+    const avgSeconds = durations.reduce((sum, secs) => sum + secs, 0) / durations.length
+    return { seconds: avgSeconds, count: durations.length }
+  }, [actualState, session?.routineName, scheduledRoutine?.name, selectedDate, workoutHistory, selectedTitle])
+
   // Overall progression signal: how many tracked exercises are trending up vs down.
   const progression = useMemo(() => {
     let up = 0
@@ -1664,6 +1718,12 @@ export default function Home() {
                   value={`${workoutForDate.exercises?.length ?? 0}`}
                   label={plural(workoutForDate.exercises?.length ?? 0, "EXERCISE", "EXERCISES")}
                 />
+                {(() => {
+                  const durationSecs = getWorkoutDurationSeconds(workoutForDate)
+                  if (durationSecs === null) return null
+                  const { value, unit } = formatDurationStat(durationSecs)
+                  return <StatUnit value={value} unit={unit} label="DURATION" />
+                })()}
                 {completedComparison && completedComparison.compared > 0 && (
                   <StatUnit
                     value={`${completedComparison.beaten}`}
@@ -1828,6 +1888,10 @@ export default function Home() {
                     label={plural(activeSessionProgress.remainingSets, "SET LEFT", "SETS LEFT")}
                   />
                 )}
+                {averageWorkoutDuration && (() => {
+                  const { value, unit } = formatDurationStat(averageWorkoutDuration.seconds)
+                  return <StatUnit value={value} unit={unit} label="AVG TIME" />
+                })()}
               </div>
 
               <div style={{ marginBottom: "14px" }}>
