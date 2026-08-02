@@ -1,0 +1,42 @@
+name: Harwich zoning monitor
+
+on:
+  schedule:
+    # 13:00 UTC daily (~08:00/09:00 US Eastern depending on DST).
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Run monitor
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+        run: python monitor.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage state.json whether it is brand new (first run) or modified.
+          git add state.json
+          if git diff --cached --quiet; then
+            echo "state.json unchanged; nothing to commit."
+          else
+            git commit -m "Update Harwich monitor state [skip ci]"
+            git push
+          fi
