@@ -3,3 +3,9 @@
 node_modules/
 test-results/
 tsconfig.tsbuildinfo
+
+# Python / Harwich monitor local dev
+__pycache__/
+*.pyc
+.env
+# NOTE: state.json is intentionally tracked so the workflow can persist it.
