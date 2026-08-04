@@ -107,6 +107,15 @@ function formatDurationStat(seconds: number): { value: string; unit: string } {
   return { value: `${m}`, unit: "MIN" }
 }
 
+// The clock window a completed workout ran, e.g. "4:47 PM – 6:07 PM". Mirrors
+// the range shown on the workout summary. Null when either endpoint is missing.
+function formatWorkoutTimeRange(workout: CompletedWorkout): string | null {
+  if (!workout.startedAt || !workout.endedAt) return null
+  const format = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  return `${format(workout.startedAt)} – ${format(workout.endedAt)}`
+}
+
 type WorkoutRoutine = {
   id: string
   name: string
@@ -1732,6 +1741,25 @@ export default function Home() {
                   />
                 )}
               </div>
+
+              {(() => {
+                const timeRange = formatWorkoutTimeRange(workoutForDate)
+                if (!timeRange) return null
+                return (
+                  <div
+                    style={{
+                      fontFamily: "var(--font-label)",
+                      fontSize: "10px",
+                      fontWeight: 400,
+                      letterSpacing: "0.06em",
+                      color: "var(--ink-30)",
+                      marginBottom: isCompactExerciseList ? "12px" : "16px",
+                    }}
+                  >
+                    {timeRange}
+                  </div>
+                )
+              })()}
 
               {displayExercises && displayExercises.length > 0 && (
                 <div style={{ marginBottom: "14px" }}>
