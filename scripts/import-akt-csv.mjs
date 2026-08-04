@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js"
 const CSV_PATH =
   process.argv[2] ||
   process.env.AKT_IMPORT_CSV_PATH ||
-  path.resolve(process.cwd(), "public/akt_import_FINAL.csv")
+  path.resolve(process.cwd(), "data/akt_import_FINAL.csv")
 const USER_ID = process.argv[3] || process.env.AKT_USER_ID
 const NO_OVERWRITE = process.argv.includes("--no-overwrite")
 
