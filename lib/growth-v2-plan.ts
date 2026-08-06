@@ -109,11 +109,12 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         notes: "Cue hips back; hamstrings first.",
       }),
       ex({
-        id: "legs2-single-rdl",
-        name: "Single-Leg RDL (supported)",
+        id: "legs2-seated-hip-abduction",
+        name: "Seated Hip Abduction",
         type: "strength",
-        targetSets: 2,
-        targetReps: "8-10",
+        targetSets: 3,
+        targetReps: "12-15",
+        notes: "Double progression: hit 15 on all sets before adding weight.",
       }),
       ex({
         id: "legs2-glute-ext",
@@ -144,6 +145,14 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
     updatedAt: nowIso(),
     exercises: [
       ex({ id: "upper2-overhand-row", name: "Overhand Row", type: "strength", targetSets: 4, targetReps: "6-9" }),
+      ex({
+        id: "upper2-neutral-grip-row",
+        name: "Neutral-Grip Row",
+        type: "strength",
+        targetSets: 3,
+        targetReps: "10-12",
+        notes: "Same machine as Overhand Row, vertical handles. Tracked separately.",
+      }),
       ex({ id: "upper2-incline-db", name: "Incline Dumbbell Bench", type: "strength", targetSets: 4, targetReps: "6-9" }),
       ex({ id: "upper2-rear-delt", name: "Rear Delt Cable Fly", type: "strength", targetSets: 3, targetReps: "12-15" }),
       ex({ id: "upper2-chest-fly", name: "Machine Chest Fly", type: "strength", targetSets: 3, targetReps: "10-15" }),
@@ -162,8 +171,11 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "8-12",
       }),
+      // Same slot id as the Shoulders & Arms entry on purpose: server-side PRs,
+      // stall alerts and the rating views all group by workout_exercises.exercise_id,
+      // so sharing the id keeps one unified history across both days.
+      ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 2, targetReps: "8-12" }),
       ex({ id: "upper2-side-crunch", name: "Side Crunch (Roman Chair)", type: "other", targetSets: 3, targetReps: "12-15" }),
-      ex({ id: "upper2-decline-knee", name: "Decline Bench Knee Raise", type: "other", targetSets: 3, targetReps: "12-15" }),
     ],
   },
   {
