@@ -422,12 +422,18 @@ test.describe("Browsing other days during an active workout", () => {
     ],
   }
 
-  test("swiping to another day leaves the active session view and shows a resume bar", async ({ page }) => {
+  // The session is read from localStorage in a mount effect, which then snaps the
+  // selected day to the session's day. Swiping before that lands would be undone,
+  // so wait for the active-session view before touching the day header.
+  const gotoHomeWithActiveSession = async (page: any) => {
     await seedBaseStorage(page, { session: activeSession })
     await page.goto("/")
-
     await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
     await expect(page.getByTestId("selected-day-label")).toHaveText("TODAY")
+  }
+
+  test("swiping to another day leaves the active session view and shows a resume bar", async ({ page }) => {
+    await gotoHomeWithActiveSession(page)
 
     await swipeHeader(page, "next")
 
@@ -445,18 +451,18 @@ test.describe("Browsing other days during an active workout", () => {
   })
 
   test("the resume bar returns to the in-progress session", async ({ page }) => {
-    await seedBaseStorage(page, { session: activeSession })
-    await page.goto("/")
+    await gotoHomeWithActiveSession(page)
     await swipeHeader(page, "next")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TOMORROW")
 
     await page.getByRole("button", { name: "Resume", exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/workout/session\\?routineId=${routine.id}`))
   })
 
   test("View day returns to the day the session was started on", async ({ page }) => {
-    await seedBaseStorage(page, { session: activeSession })
-    await page.goto("/")
+    await gotoHomeWithActiveSession(page)
     await swipeHeader(page, "next")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TOMORROW")
     await swipeHeader(page, "next")
     await expect(page.getByTestId("selected-day-label")).toHaveText("UPCOMING")
 
