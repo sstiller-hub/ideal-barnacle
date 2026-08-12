@@ -862,6 +862,13 @@ export default function Home() {
     })
   }
 
+  const goToSessionDay = () => {
+    if (!session) return
+    const target = session.startedAt ? new Date(session.startedAt) : new Date()
+    target.setHours(0, 0, 0, 0)
+    setSelectedDate(target)
+  }
+
   const handleDevModeActivation = () => {
     const newCount = devModeTapCount + 1
     setDevModeTapCount(newCount)
@@ -917,6 +924,18 @@ export default function Home() {
     return selected.getTime() === yesterday.getTime()
   }
 
+  const sessionDayLabel = (() => {
+    if (!session?.startedAt) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const sessionDate = new Date(session.startedAt)
+    sessionDate.setHours(0, 0, 0, 0)
+    const dayDiff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000)
+    if (dayDiff === 0) return "TODAY"
+    if (dayDiff === -1) return "YESTERDAY"
+    return sessionDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()
+  })()
+
   const effectiveRestDay = scheduleOverride?.workout === null ? true : scheduleOverride ? false : baseIsRestDay
   const scheduledWorkoutType = effectiveRestDay
     ? "Rest"
@@ -931,11 +950,14 @@ export default function Home() {
     selected.setHours(0, 0, 0, 0)
     return sessionDate.getTime() === selected.getTime()
   })()
+  // An active session belongs to the day it was started on. Any other day shows
+  // that day's own schedule, so the week stays browsable mid-workout.
+  const isSessionDay = session ? (session.startedAt ? isSelectedDateSessionDate : isToday()) : false
   const actualState =
     uiStateOverride ||
     (workoutForDate
       ? "completed"
-      : session && (isToday() || isSelectedDateSessionDate || !workoutForDate)
+      : isSessionDay
         ? "activeSession"
         : effectiveRestDay
           ? "rest"
@@ -1498,7 +1520,7 @@ export default function Home() {
             {"  "}
             {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
             {" · "}
-            {relativeDayLabel}
+            <span data-testid="selected-day-label">{relativeDayLabel}</span>
           </button>
           <div className="flex items-end justify-between gap-3">
             <button
@@ -2093,6 +2115,69 @@ export default function Home() {
                 onClick={() => router.push(`/exercise/${encodeURIComponent(pr.name)}`)}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {session && !isSessionDay && (
+        <div
+          className="fixed left-0 right-0 z-[70] px-5"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+        >
+          <div
+            className="flex items-center gap-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--ink-12)",
+              borderRadius: "var(--radius-flat)",
+              padding: "12px 14px",
+              boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <div className="flex-1 min-w-0 text-left">
+              <div
+                style={{
+                  fontSize: "9.5px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  fontFamily: "var(--font-label)",
+                  color: "var(--ink-50)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                IN PROGRESS
+                {sessionDayLabel ? ` · ${sessionDayLabel}` : ""}
+              </div>
+              <div
+                className="truncate"
+                style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", marginTop: "2px", color: "var(--ink-90)" }}
+              >
+                {session.routineName || "Workout"}
+              </div>
+            </div>
+            <button
+              onClick={goToSessionDay}
+              className="flex-shrink-0 transition-colors duration-base"
+              style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+              type="button"
+            >
+              View day
+            </button>
+            <button
+              onClick={handleResumeExisting}
+              className="flex-shrink-0 transition-all duration-base"
+              style={{
+                background: "var(--ink-08)",
+                border: "1px solid var(--ink-15)",
+                borderRadius: "var(--radius-flat)",
+                padding: "8px 14px",
+              }}
+              type="button"
+            >
+              <span style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.02em", color: "var(--ink-90)" }}>
+                Resume
+              </span>
+            </button>
           </div>
         </div>
       )}
