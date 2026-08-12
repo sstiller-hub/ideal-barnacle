@@ -370,3 +370,104 @@ test("resumes active session when routine is missing from library", async ({ pag
   await page.goto("/workout/session?routineId=legacy-routine-id")
   await expect(page.getByText("LEGACY ROW")).toBeVisible()
 })
+
+test.describe("Browsing other days during an active workout", () => {
+  test.use({ hasTouch: true })
+
+  const swipeHeader = async (page: any, direction: "next" | "previous") => {
+    await page.evaluate((dir: string) => {
+      const header = document.querySelector('[style*="pan-x"]') as HTMLElement | null
+      if (!header) throw new Error("day header not found")
+      const makeTouch = (x: number) =>
+        new Touch({ identifier: 1, target: header, clientX: x, clientY: 200 })
+      const fire = (type: string, x: number) => {
+        const touch = makeTouch(x)
+        header.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches: type === "touchend" ? [] : [touch],
+            targetTouches: type === "touchend" ? [] : [touch],
+            changedTouches: [touch],
+          }),
+        )
+      }
+      const startX = dir === "next" ? 300 : 60
+      const endX = dir === "next" ? 60 : 300
+      fire("touchstart", startX)
+      fire("touchmove", endX)
+      fire("touchend", endX)
+    }, direction)
+  }
+
+  const activeSession = {
+    id: "session-browse-days",
+    routineId: routine.id,
+    routineName: routine.name,
+    status: "in_progress",
+    startedAt: new Date().toISOString(),
+    currentExerciseIndex: 0,
+    exercises: [
+      {
+        id: "ex-1",
+        name: "Overhand Row",
+        targetSets: 2,
+        targetReps: "6-8",
+        completed: false,
+        sets: [
+          { id: "s1", reps: 8, weight: 100, completed: true },
+          { id: "s2", reps: null, weight: null, completed: false },
+        ],
+      },
+    ],
+  }
+
+  // The session is read from localStorage in a mount effect, which then snaps the
+  // selected day to the session's day. Swiping before that lands would be undone,
+  // so wait for the active-session view before touching the day header.
+  const gotoHomeWithActiveSession = async (page: any) => {
+    await seedBaseStorage(page, { session: activeSession })
+    await page.goto("/")
+    await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TODAY")
+  }
+
+  test("swiping to another day leaves the active session view and shows a resume bar", async ({ page }) => {
+    await gotoHomeWithActiveSession(page)
+
+    await swipeHeader(page, "next")
+
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TOMORROW")
+    // The day is no longer rendered as the active session…
+    await expect(page.getByRole("button", { name: "Resume Workout" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Discard Active Workout" })).toHaveCount(0)
+    // …but the workout stays reachable from the pinned bar.
+    await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible()
+
+    await swipeHeader(page, "previous")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TODAY")
+    await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Resume", exact: true })).toHaveCount(0)
+  })
+
+  test("the resume bar returns to the in-progress session", async ({ page }) => {
+    await gotoHomeWithActiveSession(page)
+    await swipeHeader(page, "next")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TOMORROW")
+
+    await page.getByRole("button", { name: "Resume", exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`/workout/session\\?routineId=${routine.id}`))
+  })
+
+  test("View day returns to the day the session was started on", async ({ page }) => {
+    await gotoHomeWithActiveSession(page)
+    await swipeHeader(page, "next")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TOMORROW")
+    await swipeHeader(page, "next")
+    await expect(page.getByTestId("selected-day-label")).toHaveText("UPCOMING")
+
+    await page.getByRole("button", { name: "View day" }).click()
+    await expect(page.getByTestId("selected-day-label")).toHaveText("TODAY")
+    await expect(page.getByRole("button", { name: "Resume Workout" })).toBeVisible()
+  })
+})
