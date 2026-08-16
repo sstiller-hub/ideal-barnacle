@@ -1,6 +1,13 @@
 import type { CompletedWorkout } from "./workout-storage"
-import { isSetEligibleForStats } from "./set-validation"
+import { isValidNumber } from "./set-validation"
 import { plural } from "./utils"
+
+// Looser than isSetEligibleForStats: a set that was performed but flagged as an
+// outlier still happened, so it belongs in an export meant for re-entry
+// elsewhere. Stats exclusion is a separate question from "did I do this set".
+function wasPerformed(set: { reps?: number | null; weight?: number | null; completed?: boolean }) {
+  return Boolean(set.completed) && isValidNumber(set.reps) && isValidNumber(set.weight)
+}
 
 export function formatWorkoutAsText(workout: CompletedWorkout): string {
   const date = new Date(workout.startedAt ?? workout.date).toLocaleDateString("en-US", {
@@ -40,7 +47,7 @@ export function formatWorkoutAsText(workout: CompletedWorkout): string {
 
   for (const exercise of workout.exercises) {
     lines.push(exercise.name)
-    const completedSets = (exercise.sets ?? []).filter((s) => isSetEligibleForStats(s))
+    const completedSets = (exercise.sets ?? []).filter(wasPerformed)
     if (completedSets.length === 0) {
       lines.push("  (no sets recorded)")
     } else {

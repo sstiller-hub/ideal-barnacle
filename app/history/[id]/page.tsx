@@ -162,6 +162,13 @@ export default function WorkoutDetailPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => router.push(`/workout-summary/transcribe?workoutId=${workout.id}`)}
+          >
+            Whoop
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={async () => {
               try {
                 await copyWorkoutToClipboard(workout)
