@@ -487,6 +487,13 @@ export default function WorkoutSummaryPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push(`/workout-summary/transcribe?workoutId=${workout.id}`)}
+            >
+              Log to Whoop
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => router.push(`/history/${workout.id}`)}>
               View workout details
             </Button>
