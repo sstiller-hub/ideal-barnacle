@@ -41,8 +41,6 @@ export default function PortraitLock({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  if (!isLandscapeMobile) return <>{children}</>
-
   // Rotate the portrait-designed content to fill the landscape viewport, so the
   // app looks identical to portrait no matter how the phone is held. In
   // landscape: vw > vh. We size the inner box as (100vh x 100vw) — portrait
@@ -52,21 +50,36 @@ export default function PortraitLock({ children }: { children: ReactNode }) {
   // Anything sizing itself to the full screen must use it rather than raw
   // dvh/vh units, which still resolve against the short landscape viewport and
   // would leave the bottom half of the box empty.
-  const innerStyle: CSSProperties = {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: "100vh",
-    height: "100vw",
-    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-    transformOrigin: "center center",
-    overflow: "hidden",
-    ["--app-vh" as string]: "100vw",
-  }
+  //
+  // Both branches render the same two wrapper elements. Returning bare children
+  // in portrait and a wrapped tree in landscape changes the element type at this
+  // position, so React tore down and rebuilt every page below on each rotation —
+  // during a workout that re-ran session init, re-synced every exercise draft,
+  // dropped keyboard focus mid-set, closed open sheets and replayed the page
+  // transition. `display: contents` keeps the portrait wrappers out of layout
+  // entirely, so they render identically to passing children straight through
+  // while giving React a stable tree to reconcile against.
+  const outerStyle: CSSProperties = isLandscapeMobile
+    ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden" }
+    : { display: "contents" }
+
+  const innerStyle: CSSProperties = isLandscapeMobile
+    ? {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        width: "100vh",
+        height: "100vw",
+        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+        transformOrigin: "center center",
+        overflow: "hidden",
+        ["--app-vh" as string]: "100vw",
+      }
+    : { display: "contents" }
 
   return (
-    <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden" }}>
-      <div className="portrait-lock-rotated" style={innerStyle}>
+    <div style={outerStyle}>
+      <div className={isLandscapeMobile ? "portrait-lock-rotated" : undefined} style={innerStyle}>
         {children}
       </div>
     </div>

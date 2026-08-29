@@ -1353,6 +1353,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isOrientationChangingRef = useRef(false)
+  // Last width the carousel was aligned against, so a relayout can be told
+  // apart from a scroll.
+  const pageWidthRef = useRef(0)
   const [repCapErrors, setRepCapErrors] = useState<Record<string, boolean>>({})
   const [, setRecentlySaved] = useState(false)
   const recentlySavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1437,11 +1440,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         scrollSettleTimeoutRef.current = null
       }
       isOrientationChangingRef.current = true
-      hasInitialScrollRef.current = false
       // The app is orientation-locked in software: PortraitLock rotates the
       // portrait layout to fill a landscape screen, so the session screen never
       // switches to its landscape layout. This effect still runs on rotation to
-      // reset the carousel scroll refs below, which the relayout depends on.
+      // block index writes while the viewport is mid-flip; re-aligning the
+      // carousel afterwards belongs to the resize observer below, which reacts
+      // to the container actually changing width.
       setIsLandscapeMobile(false)
       // Safety reset: if the matchMedia value doesn't change (e.g.
       // orientationchange fires without flipping landscape/portrait), the
@@ -2213,6 +2217,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           return
         }
         c.scrollTo({ left: currentExerciseIndex * width, behavior: "instant" })
+        pageWidthRef.current = width
         hasInitialScrollRef.current = true
         rafId = requestAnimationFrame(() => {
           isOrientationChangingRef.current = false
@@ -2232,6 +2237,47 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
     return () => window.clearTimeout(timeout)
   }, [currentExerciseIndex, isLandscapeMobile])
+
+  // Re-align the carousel whenever the page width changes under it.
+  //
+  // Turning the phone re-lays out PortraitLock's rotated box, and the width the
+  // carousel pages against can wobble for a few frames before it settles. The
+  // scroll offset left over from the old width then divides into a different
+  // exercise, and the first scroll event after the flip persists that as the
+  // active one — so rotating the phone silently moved the workout to another
+  // exercise. Snapping back to the active exercise on every real width change
+  // fixes that, and also covers the on-screen keyboard and the URL bar
+  // collapsing. Index writes stay blocked until the snap has landed, and the
+  // snap leaves the offset exactly on the active page, so a scroll event that
+  // slips through afterwards resolves to the same index and writes nothing.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    if (typeof ResizeObserver === "undefined") return
+
+    let rafId = 0
+    const observer = new ResizeObserver(() => {
+      const width = container.offsetWidth
+      // Mid-relayout the container can report 0; there is nothing to align to.
+      if (!width) return
+      if (width === pageWidthRef.current) return
+      pageWidthRef.current = width
+      isOrientationChangingRef.current = true
+      container.scrollTo({ left: currentExerciseIndexRef.current * width, behavior: "instant" })
+      hasInitialScrollRef.current = true
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        isOrientationChangingRef.current = false
+      })
+    })
+    observer.observe(container)
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(rafId)
+    }
+    // The container only mounts post-hydration; without isHydrated the effect
+    // runs once against a null ref and never attaches.
+  }, [isHydrated])
 
   // Commit the exercise index the moment the swipe settles, using the native
   // scrollend event where available. This replaces the fixed settle-debounce
@@ -4017,6 +4063,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
         <div
           ref={scrollContainerRef}
+          data-testid="exercise-pager"
           onScroll={handleScroll}
           className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden"
           style={{
