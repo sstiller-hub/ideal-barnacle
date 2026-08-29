@@ -49,6 +49,7 @@ import {
   type SyncState,
 } from "@/lib/workout-draft-storage"
 import { attemptWorkoutSync, ensureWorkoutSync } from "@/lib/workout-sync"
+import { clearActiveWorkoutRoute } from "@/lib/active-workout-route"
 import { computeAverageSecondsPerSet, classifyPace } from "@/lib/workout-analytics"
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
@@ -3084,6 +3085,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     deleteSetsForSession(session.id)
     deleteSession(session.id)
     saveCurrentSessionId(null)
+    clearActiveWorkoutRoute()
     setSession(null)
     setValidationTrigger(0)
     router.push(`/workout-summary?workoutId=${completedWorkoutId}`)
@@ -3099,6 +3101,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       setSession(updatedSession)
       await saveSession(updatedSession)
     }
+    // The user chose to leave the session screen, so home is now where they
+    // are. Drop the breadcrumb so a cold start lands on home rather than
+    // yanking them back into the workout.
+    clearActiveWorkoutRoute()
     router.push("/")
   }
 
