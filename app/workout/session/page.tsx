@@ -6,6 +6,7 @@ import WorkoutSession from "@/components/workout-session"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { getRoutineById, type WorkoutRoutine } from "@/lib/routine-storage"
+import { rememberActiveWorkoutRoute } from "@/lib/active-workout-route"
 import {
   deleteSession,
   deleteSetsForSession,
@@ -102,6 +103,16 @@ export default function WorkoutSessionPage() {
 
     setRoutine(toRoutineFromSession(current))
   }, [routineId, resolveRoutine, toRoutineFromSession])
+
+  // Leave a breadcrumb while the session screen is open. If the app is evicted
+  // from memory and relaunched at the manifest's start_url ("/"), the home
+  // screen uses this to send the user back into the workout they were in.
+  useEffect(() => {
+    if (!routine) return
+    rememberActiveWorkoutRoute(
+      routineId ? `/workout/session?routineId=${encodeURIComponent(routineId)}` : "/workout/session",
+    )
+  }, [routine, routineId])
 
   const handleResumeExisting = () => {
     if (!activeSession?.routineId) return

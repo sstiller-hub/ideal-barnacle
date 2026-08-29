@@ -21,6 +21,7 @@ import {
   saveCurrentSessionId,
   type WorkoutSession,
 } from "@/lib/autosave-workout-storage"
+import { clearActiveWorkoutRoute, getActiveWorkoutRoute } from "@/lib/active-workout-route"
 import { deleteWorkoutDraft } from "@/lib/workout-draft-storage"
 import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "@/lib/growth-v2-plan"
 import { formatExerciseName } from "@/lib/format-exercise-name"
@@ -178,6 +179,7 @@ export default function Home() {
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [pendingRoutineId, setPendingRoutineId] = useState<string | null>(null)
   const [session, setSession] = useState<WorkoutSession | null>(null)
+  const [isRestoringSession, setIsRestoringSession] = useState(false)
   const [scheduleOverride, setScheduleOverrideState] = useState<ScheduleOverrideResult | undefined>(undefined)
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -297,6 +299,22 @@ export default function Home() {
     setSession(currentSession)
     setPrExcludedNames(getPrExcludedExercises())
   }, [])
+
+  // Restore the user's place in an active workout after a cold start. The PWA
+  // relaunches at start_url ("/"), so a workout screen that gets evicted from
+  // memory while the app is backgrounded comes back as the home screen. When a
+  // breadcrumb from the session screen is still set and the workout really is
+  // still in progress, send the user back where they were. The breadcrumb is
+  // consumed either way, so a later visit to home stays on home and browsing
+  // other days mid-workout never bounces.
+  useEffect(() => {
+    const restoreRoute = getActiveWorkoutRoute()
+    if (!restoreRoute) return
+    clearActiveWorkoutRoute()
+    if (!getCurrentInProgressSession()) return
+    setIsRestoringSession(true)
+    router.replace(restoreRoute)
+  }, [router])
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow
@@ -1389,6 +1407,21 @@ export default function Home() {
   const weekOfLabel = getWeekRange(new Date())
     .start.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     .toUpperCase()
+
+  // A cold start that is being redirected back into the active workout paints
+  // the session screen next; showing the home screen for those few frames would
+  // be the same jarring "replaced my place" flash the redirect exists to fix.
+  if (isRestoringSession) {
+    return (
+      <div
+        className="min-h-screen"
+        style={{
+          background: "#0D0D0F",
+          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        }}
+      />
+    )
+  }
 
   return (
     <>
