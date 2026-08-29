@@ -37,6 +37,7 @@ import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
 import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
 import { getPrExcludedExercises, setPrExcludedExercises } from "@/lib/pr-exclusions"
+import { isRestSoundEnabled, playRestChime, setRestSoundEnabled } from "@/lib/session-feedback"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 
 export default function SettingsPage() {
@@ -55,6 +56,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [isThemeReady, setIsThemeReady] = useState(false)
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
+  const [restSoundEnabled, setRestSoundEnabledState] = useState(true)
   const [expandedSections, setExpandedSections] = useState<string[]>(["account"])
   const [manualSyncRunning, setManualSyncRunning] = useState(false)
   const [manualSyncReport, setManualSyncReport] = useState<ManualSyncReport | null>(null)
@@ -83,6 +85,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setIsThemeReady(true)
+  }, [])
+
+  useEffect(() => {
+    setRestSoundEnabledState(isRestSoundEnabled())
   }, [])
 
   useEffect(() => {
@@ -662,6 +668,29 @@ export default function SettingsPage() {
                     }}
                   >
                     {progressiveAutofillEnabled ? "On" : "Off"}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-4 mb-4">
+                  Play a chime when the rest timer runs out. iPhones have no
+                  vibration API in the browser, so this is the only rest cue that
+                  reaches you with the phone in a pocket.
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm">Rest timer sound</div>
+                  <Button
+                    type="button"
+                    variant={restSoundEnabled ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const next = !restSoundEnabled
+                      setRestSoundEnabledState(next)
+                      setRestSoundEnabled(next)
+                      // Turning it on is the one moment there is a user gesture
+                      // to unlock audio, so preview the cue here.
+                      if (next) playRestChime()
+                    }}
+                  >
+                    {restSoundEnabled ? "On" : "Off"}
                   </Button>
                 </div>
               </div>
