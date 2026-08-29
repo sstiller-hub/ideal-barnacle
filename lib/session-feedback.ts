@@ -3,7 +3,8 @@
 // During a working set the phone is usually face-down on a bench or in a
 // pocket, so every confirmation the session UI gives visually needs a channel
 // that lands without looking. Vibration covers Android; iOS Safari has no
-// Vibration API at all, so the rest-over cue there has to be audible.
+// Vibration API at all, so iOS falls back to the switch trick below for the
+// cues that come from a tap, and to an audible chime for the one that does not.
 
 const REST_SOUND_KEY = "rest_sound_enabled"
 
@@ -21,9 +22,46 @@ const PATTERNS: Record<HapticPattern, number | number[]> = {
   restOver: [90, 60, 90, 60, 180],
 }
 
+// Toggling an <input type="checkbox" switch> plays a system haptic on iOS
+// 17.4+, which is the only way to reach the Taptic Engine from a PWA. The
+// element is built once and kept off-screen; the haptic comes from the toggle
+// itself, so nothing ever needs to render or be read out.
+let switchLabel: HTMLLabelElement | null = null
+
+function getSwitchLabel(): HTMLLabelElement | null {
+  if (typeof document === "undefined") return null
+  if (!switchLabel) {
+    const label = document.createElement("label")
+    label.ariaHidden = "true"
+    label.style.display = "none"
+    const input = document.createElement("input")
+    input.type = "checkbox"
+    // Not in the TS DOM lib yet — it is iOS-only and unratified.
+    input.setAttribute("switch", "")
+    label.appendChild(input)
+    document.head.appendChild(label)
+    switchLabel = label
+  }
+  return switchLabel
+}
+
 export function haptic(pattern: HapticPattern): void {
   if (typeof navigator === "undefined") return
-  if (typeof navigator.vibrate !== "function") return
+
+  if (typeof navigator.vibrate !== "function") {
+    // iOS only fires the switch haptic inside user activation, so "restOver"
+    // — which comes off a timer, with no tap behind it — cannot use this and
+    // stays on playRestChime(). It also has one fixed intensity, so "tap" and
+    // "logged" feel the same here; the weight difference is Android-only.
+    if (pattern === "restOver") return
+    try {
+      getSwitchLabel()?.click()
+    } catch {
+      // Best-effort, same as vibration below.
+    }
+    return
+  }
+
   try {
     navigator.vibrate(PATTERNS[pattern])
   } catch {
