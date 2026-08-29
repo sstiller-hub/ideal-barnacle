@@ -59,8 +59,15 @@ import { StatUnit } from "@/components/ledger/stat-unit"
 import { SessionClock } from "@/components/ledger/session-clock"
 import { DeltaChip } from "@/components/ledger/delta-chip"
 import { plural } from "@/lib/utils"
+import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
+
+// Stepper granularity for the current set. 5 lb is the smallest jump most
+// racks and dumbbell sets actually offer; anything finer is faster to type
+// than to tap, so the keyboard stays the escape hatch for it.
+const WEIGHT_STEP = 5
+const REPS_STEP = 1
 
 type Exercise = {
   id: string
@@ -295,6 +302,83 @@ function applyProgressiveOverload(
   return { reps: latest.reps, weight: latest.weight, mode: null }
 }
 
+// The unit label under an input, flanked by decrement/increment. Replaces the
+// static label on the active set so the row costs no extra vertical space than
+// the ~20px the taller touch targets need.
+function StepperUnit({
+  label,
+  focused,
+  step,
+  onDecrement,
+  onIncrement,
+  decrementDisabled,
+  incrementDisabled,
+}: {
+  label: string
+  focused: boolean
+  step: number
+  onDecrement: () => void
+  onIncrement: () => void
+  decrementDisabled: boolean
+  incrementDisabled: boolean
+}) {
+  const buttonStyle = (disabled: boolean): React.CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "34px",
+    height: "28px",
+    flexShrink: 0,
+    background: "var(--ink-02)",
+    border: "1px solid var(--ink-08)",
+    borderRadius: "var(--radius-flat)",
+    color: "var(--ink-60)",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1,
+    opacity: disabled ? 0.3 : 1,
+    // Repeated taps on a small target otherwise trigger double-tap-to-zoom.
+    touchAction: "manipulation",
+  })
+
+  return (
+    <div className="flex items-center justify-between" style={{ gap: "4px" }}>
+      <button
+        type="button"
+        onClick={onDecrement}
+        disabled={decrementDisabled}
+        aria-label={`Decrease ${label} by ${step}`}
+        className="transition-colors duration-150"
+        style={buttonStyle(decrementDisabled)}
+      >
+        −
+      </button>
+      <span
+        className="transition-colors duration-150"
+        style={{
+          fontFamily: "var(--font-label)",
+          fontSize: "7.5px",
+          fontWeight: 600,
+          letterSpacing: "0.14em",
+          color: focused ? "var(--ink-50)" : "var(--ink-25)",
+        }}
+      >
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onIncrement}
+        disabled={incrementDisabled}
+        aria-label={`Increase ${label} by ${step}`}
+        className="transition-colors duration-150"
+        style={buttonStyle(incrementDisabled)}
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 type ExercisePageProps = {
   exercise: any
   exerciseIndex: number
@@ -327,6 +411,7 @@ type ExercisePageProps = {
   onOpenExercise: (name: string) => void
   registerWeightRef: (setId: string, node: HTMLInputElement | null) => void
   registerRepsRef: (setId: string, node: HTMLInputElement | null) => void
+  focusSetField: (setId: string, field: "reps" | "weight") => void
   isResting: boolean
   restDockHeight: number
 }
@@ -368,6 +453,7 @@ const ExercisePage = memo(function ExercisePage({
   onOpenExercise,
   registerWeightRef,
   registerRepsRef,
+  focusSetField,
   isResting,
   restDockHeight,
 }: ExercisePageProps) {
@@ -379,6 +465,35 @@ const ExercisePage = memo(function ExercisePage({
   const isCompactSets = exercise.sets.length >= 4
   const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
   const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
+
+  // Nudge a value without opening the keyboard. Sets arrive prefilled from the
+  // last session, so the overwhelmingly common edit is "one notch off what I
+  // did last time" — which used to cost a tap, a keyboard, a select-all and a
+  // dismiss.
+  const stepSetValue = (setIndex: number, field: "reps" | "weight", direction: 1 | -1) => {
+    if (!canEditExercise) return
+    const set = exercise.sets[setIndex]
+    if (!set || set.completed) return
+
+    if (field === "weight") {
+      const current = typeof set.weight === "number" ? set.weight : 0
+      const next = Math.max(0, current + direction * WEIGHT_STEP)
+      if (next === current) return
+      haptic("tap")
+      updateSetDataForExercise(exerciseIndex, setIndex, "weight", next)
+      return
+    }
+
+    const current = typeof set.reps === "number" ? set.reps : 0
+    const next = Math.min(REP_MAX, Math.max(REP_MIN, current + direction * REPS_STEP))
+    if (next === current) return
+    // Stepping can only ever land in range, so any standing cap error is stale.
+    const setKey = set.id ?? `${exercise.id}-${setIndex}`
+    setRepCapErrors((prev) => (prev[setKey] ? { ...prev, [setKey]: false } : prev))
+    haptic("tap")
+    updateSetDataForExercise(exerciseIndex, setIndex, "reps", next)
+  }
+
   const showProgressiveOverload =
     exerciseIndex === currentExerciseIndex &&
     exerciseRepRange !== null &&
@@ -582,6 +697,10 @@ const ExercisePage = memo(function ExercisePage({
                 : isCurrentSet
                   ? "var(--ink-12)"
                   : "transparent"
+          // Steppers only on the set being performed: they are the only place a
+          // value is realistically adjusted, and showing them on every row would
+          // cost ~20px each on a screen that does not scroll.
+          const showSteppers = isCurrentSet && canEditExercise && !set.completed
           const weightBg = focusedWeight ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
           const repsBg = focusedReps ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
 
@@ -661,6 +780,13 @@ const ExercisePage = memo(function ExercisePage({
                     if (set.id) handleSetFieldBlur(set.id, "weight")
                     setFocusedInput(null)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return
+                    e.preventDefault()
+                    if (set.id) focusSetField(set.id, "reps")
+                  }}
+                  inputMode="decimal"
+                  enterKeyHint="next"
                   placeholder="—"
                   className="transition-colors duration-150"
                   disabled={!canEditExercise}
@@ -713,6 +839,19 @@ const ExercisePage = memo(function ExercisePage({
                     if (set.id) handleSetFieldBlur(set.id, "reps")
                     setFocusedInput(null)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                    if (!canEditExercise || set.completed) return
+                    if (isSetIncomplete(set) || repCapError) {
+                      setValidationTrigger(Date.now())
+                      return
+                    }
+                    void completeSet(setIndex, { exerciseIndex, startRest: isCurrentSet })
+                  }}
+                  inputMode="numeric"
+                  enterKeyHint="done"
                   placeholder="—"
                   className="transition-colors duration-150"
                   disabled={!canEditExercise}
@@ -771,30 +910,55 @@ const ExercisePage = memo(function ExercisePage({
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 44px", gap: "12px", marginTop: "5px" }}>
-                <div
-                  className="text-center transition-colors duration-150"
-                  style={{
-                    fontFamily: "var(--font-label)",
-                    fontSize: "7.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.14em",
-                    color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
-                  }}
-                >
-                  LB
-                </div>
-                <div
-                  className="text-center transition-colors duration-150"
-                  style={{
-                    fontFamily: "var(--font-label)",
-                    fontSize: "7.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.14em",
-                    color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
-                  }}
-                >
-                  REPS
-                </div>
+                {showSteppers ? (
+                  <>
+                    <StepperUnit
+                      label="LB"
+                      focused={focusedWeight}
+                      onDecrement={() => stepSetValue(setIndex, "weight", -1)}
+                      onIncrement={() => stepSetValue(setIndex, "weight", 1)}
+                      decrementDisabled={(set.weight ?? 0) <= 0}
+                      incrementDisabled={false}
+                      step={WEIGHT_STEP}
+                    />
+                    <StepperUnit
+                      label="REPS"
+                      focused={focusedReps}
+                      onDecrement={() => stepSetValue(setIndex, "reps", -1)}
+                      onIncrement={() => stepSetValue(setIndex, "reps", 1)}
+                      decrementDisabled={typeof set.reps === "number" && set.reps <= REP_MIN}
+                      incrementDisabled={typeof set.reps === "number" && set.reps >= REP_MAX}
+                      step={REPS_STEP}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="text-center transition-colors duration-150"
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "7.5px",
+                        fontWeight: 600,
+                        letterSpacing: "0.14em",
+                        color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
+                      }}
+                    >
+                      LB
+                    </div>
+                    <div
+                      className="text-center transition-colors duration-150"
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "7.5px",
+                        fontWeight: 600,
+                        letterSpacing: "0.14em",
+                        color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
+                      }}
+                    >
+                      REPS
+                    </div>
+                  </>
+                )}
                 <div />
               </div>
 
@@ -1733,6 +1897,37 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
 
+  // The set the user is about to perform. During rest this is always the
+  // current exercise's first incomplete set, so the dock can both show it and
+  // log it — collapsing "wait, find the row, tap" into one tap.
+  const restNextSet = (() => {
+    if (!currentExercise || firstIncompleteIndex === -1) return null
+    const set = currentExercise.sets?.[firstIncompleteIndex]
+    if (!set) return null
+    return {
+      exerciseName: getExerciseLabel(currentExercise.name),
+      setIndex: firstIncompleteIndex,
+      weight: set.weight as number | null,
+      reps: set.reps as number | null,
+      ready: !isSetIncomplete(set) && !set.validationFlags?.includes("reps_hard_invalid"),
+    }
+  })()
+
+  const adjustRest = (deltaSeconds: number) => {
+    if (!isResting || !restState) return
+    // The floor keeps a -30 tap from silently ending rest; SKIP is the explicit
+    // way to do that.
+    const next = Math.max(5, restRemainingSeconds + deltaSeconds)
+    if (next === restRemainingSeconds) return
+    haptic("tap")
+    void setRestStateAndPersist({ ...restState, remainingSeconds: next })
+    scheduleRestNotification(next)
+    if (deltaSeconds > 0) {
+      recordRestExtension(session?.id ?? "unknown")
+      setRestExtensionTrend(getRestExtensionTrend())
+    }
+  }
+
   // Keep the measured rest-dock height in sync so the feeling-rating sits just
   // above it. Measured on rest start (and on resize while resting).
   useIsomorphicLayoutEffect(() => {
@@ -1868,12 +2063,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (!nextWithStart) {
       restNotificationEndsAtRef.current = null
     }
-    if (session) {
+    // Built off the ref, not the render closure: completeSet advances the
+    // exercise right after starting rest, and that write reads sessionRef — so
+    // the two have to agree or one of them silently loses the other's field.
+    const baseSession = sessionRef.current ?? session
+    if (baseSession) {
       const updatedSession: WorkoutSession = {
-        ...session,
+        ...baseSession,
         ...(latestExercises !== undefined ? { exercises: latestExercises } : {}),
         restTimer: nextWithStart || undefined,
       }
+      sessionRef.current = updatedSession
       setSession(updatedSession)
       await saveSession(updatedSession)
     }
@@ -1903,6 +2103,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   useEffect(() => {
     if (!isResting) return
     if (restRemainingSeconds <= 0) {
+      haptic("restOver")
+      playRestChime()
       void setRestStateAndPersist(null)
       if (restNotificationTimeoutRef.current) {
         clearTimeout(restNotificationTimeoutRef.current)
@@ -2404,6 +2606,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   ) => {
     if (!session) return
+    // WebAudio only unlocks from a user gesture. This runs before the first
+    // await, so it is still the tap that started rest — the chime can then fire
+    // later off a bare timer.
+    primeRestChime()
     const workoutId = session.workoutId
     const targetExerciseIndex = options?.exerciseIndex ?? currentExerciseIndex
     const shouldAutoRest = options?.startRest ?? targetExerciseIndex === currentExerciseIndex
@@ -2521,6 +2727,31 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         if (active && typeof active.blur === "function") active.blur()
       }
       setFocusedInput(null)
+    }
+    // Confirms the tap landed without the user having to look at the screen —
+    // the whole point of a check button you hit with a bar still in your hands.
+    if (toggledSet?.completed) haptic("logged")
+
+    // Nothing left to rest for. Without this the dock lingers over a FINISH
+    // button counting down to a set that does not exist.
+    if (workoutNowFinishable && restState) {
+      await setRestStateAndPersist(null, newExercises)
+    }
+
+    // Clearing an exercise used to leave the user parked on a finished page,
+    // having to swipe or hit the rail before they could log anything else.
+    // Advance for them — but without focus intent, since rest has just started
+    // and popping the keyboard into a rest period would be wrong.
+    if (
+      toggledSet?.completed &&
+      targetExerciseIndex === currentExerciseIndex &&
+      !workoutNowFinishable &&
+      canExerciseBeFinished(newExercises[targetExerciseIndex])
+    ) {
+      const nextIndex = newExercises.findIndex(
+        (ex: any, idx: number) => idx > targetExerciseIndex && !canExerciseBeFinished(ex),
+      )
+      if (nextIndex !== -1) await setExerciseIndex(nextIndex)
     }
   }
 
@@ -3025,6 +3256,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (node) repsInputRefs.current.set(setId, node)
     else repsInputRefs.current.delete(setId)
   }, [])
+  // Lets a set row hand focus to its sibling field (weight -> reps on Enter)
+  // without the ref maps leaking out of the parent.
+  const focusSetField = useCallback((setId: string, field: "reps" | "weight") => {
+    const node =
+      field === "weight" ? weightInputRefs.current.get(setId) : repsInputRefs.current.get(setId)
+    if (!node) return
+    try {
+      node.focus()
+      node.select()
+    } catch {
+      // ignore focus errors
+    }
+  }, [])
   const openExercisePage = useCallback(
     (name: string) => {
       router.push(`/exercise/${encodeURIComponent(name)}?from=session`)
@@ -3100,15 +3344,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               </motion.div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    if (!isResting || !restState) return
-                    const next = restRemainingSeconds + 30
-                    void setRestStateAndPersist({ ...restState, remainingSeconds: next })
-                    scheduleRestNotification(next)
-                    recordRestExtension(session?.id ?? "unknown")
-                    setRestExtensionTrend(getRestExtensionTrend())
-                  }}
-                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px" }}
+                  onClick={() => adjustRest(-30)}
+                  disabled={restRemainingSeconds <= 5}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", opacity: restRemainingSeconds <= 5 ? 0.35 : 1, touchAction: "manipulation" }}
+                  type="button"
+                >
+                  <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>−30s</span>
+                </button>
+                <button
+                  onClick={() => adjustRest(30)}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", touchAction: "manipulation" }}
                   type="button"
                 >
                   <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
@@ -3270,6 +3515,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       if (set.id) handleSetFieldBlur(set.id, "weight")
                       setFocusedInput(null)
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return
+                      e.preventDefault()
+                      if (set.id) focusSetField(set.id, "reps")
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="next"
                     placeholder="—"
                     disabled={!lsCanEdit}
                     className="w-full"
@@ -3308,6 +3560,22 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       if (set.id) handleSetFieldBlur(set.id, "reps")
                       setFocusedInput(null)
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return
+                      e.preventDefault()
+                      e.currentTarget.blur()
+                      if (!lsCanEdit || set.completed) return
+                      if (isSetIncomplete(set) || repCapError) {
+                        setValidationTrigger(Date.now())
+                        return
+                      }
+                      void completeSet(setIndex, {
+                        exerciseIndex: uiExerciseIndex,
+                        startRest: isCurrentSet && uiExerciseIndex === currentExerciseIndex,
+                      })
+                    }}
+                    inputMode="numeric"
+                    enterKeyHint="done"
                     placeholder="—"
                     disabled={!lsCanEdit}
                     className="w-full"
@@ -3403,7 +3671,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             <motion.div
               key="rest-dock"
               ref={restDockRef}
-              className="fixed z-[70] flex items-center justify-between gap-3 border"
+              className="fixed z-[70] flex flex-col border"
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{
@@ -3423,6 +3691,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 pointerEvents: "auto",
               }}
             >
+              <div className="flex items-center justify-between gap-3">
               <motion.div
                 className="flex items-end gap-3"
                 animate={{
@@ -3482,28 +3751,40 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    if (!isResting || !restState) return
-                    const next = restRemainingSeconds + 30
-                    void setRestStateAndPersist({
-                      ...restState,
-                      remainingSeconds: next,
-                    })
-                    scheduleRestNotification(next)
-                    recordRestExtension(session?.id ?? "unknown")
-                    setRestExtensionTrend(getRestExtensionTrend())
-                  }}
+                  onClick={() => adjustRest(-30)}
+                  disabled={restRemainingSeconds <= 5}
                   className="transition-colors duration-150"
                   style={{
                     background: "var(--ink-02)",
                     border: "1px solid var(--ink-08)",
                     borderRadius: "var(--radius-flat)",
-                    padding: "6px 12px",
+                    padding: "6px 10px",
                     fontFamily: "var(--font-label)",
                     fontSize: "9.5px",
                     fontWeight: 600,
                     letterSpacing: "0.08em",
                     color: "var(--ink-70)",
+                    opacity: restRemainingSeconds <= 5 ? 0.35 : 1,
+                    touchAction: "manipulation",
+                  }}
+                  type="button"
+                >
+                  −30S
+                </button>
+                <button
+                  onClick={() => adjustRest(30)}
+                  className="transition-colors duration-150"
+                  style={{
+                    background: "var(--ink-02)",
+                    border: "1px solid var(--ink-08)",
+                    borderRadius: "var(--radius-flat)",
+                    padding: "6px 10px",
+                    fontFamily: "var(--font-label)",
+                    fontSize: "9.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    color: "var(--ink-70)",
+                    touchAction: "manipulation",
                   }}
                   type="button"
                 >
@@ -3516,18 +3797,96 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     background: "var(--ink-06)",
                     border: "1px solid var(--ink-12)",
                     borderRadius: "var(--radius-flat)",
-                    padding: "6px 12px",
+                    padding: "6px 10px",
                     fontFamily: "var(--font-label)",
                     fontSize: "9.5px",
                     fontWeight: 600,
                     letterSpacing: "0.1em",
                     color: "var(--ink-95)",
+                    touchAction: "manipulation",
                   }}
                   type="button"
                 >
                   SKIP
                 </button>
               </div>
+              </div>
+
+              {restNextSet && (
+                <div
+                  className="flex items-center justify-between gap-3"
+                  style={{
+                    marginTop: "10px",
+                    paddingTop: "10px",
+                    borderTop: "1px solid var(--ink-06)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-label)",
+                        fontSize: "8px",
+                        fontWeight: 600,
+                        letterSpacing: "0.18em",
+                        color: "var(--ink-30)",
+                      }}
+                    >
+                      UP NEXT · SET {String(restNextSet.setIndex + 1).padStart(2, "0")}
+                    </div>
+                    <div
+                      className="truncate"
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        letterSpacing: "-0.01em",
+                        color: "var(--ink-70)",
+                        fontVariantNumeric: "tabular-nums",
+                        marginTop: "3px",
+                      }}
+                    >
+                      {restNextSet.exerciseName}
+                      {" · "}
+                      {restNextSet.weight ?? "—"} × {restNextSet.reps ?? "—"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Deliberately tappable when the set is not loggable yet:
+                      // the dock covers the row, so a dead disabled button would
+                      // leave no way to find out which field is empty. This
+                      // flags the missing one behind the dock instead.
+                      if (!restNextSet.ready) {
+                        setValidationTrigger(Date.now())
+                        return
+                      }
+                      void completeSet(restNextSet.setIndex, {
+                        exerciseIndex: currentExerciseIndex,
+                        startRest: true,
+                      })
+                    }}
+                    className="flex items-center justify-center gap-1.5 transition-colors duration-150"
+                    style={{
+                      flexShrink: 0,
+                      minHeight: "36px",
+                      background: "var(--ink-06)",
+                      border: "1px solid var(--ink-12)",
+                      borderRadius: "var(--radius-flat)",
+                      padding: "6px 14px",
+                      fontFamily: "var(--font-label)",
+                      fontSize: "9.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      color: "var(--ink-95)",
+                      opacity: restNextSet.ready ? 1 : 0.35,
+                      touchAction: "manipulation",
+                    }}
+                    type="button"
+                  >
+                    <Check size={13} strokeWidth={2} />
+                    LOG SET
+                  </button>
+                </div>
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -3694,6 +4053,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               onOpenExercise={openExercisePage}
               registerWeightRef={registerWeightRef}
               registerRepsRef={registerRepsRef}
+              focusSetField={focusSetField}
               isResting={isResting}
               restDockHeight={restDockHeight}
             />
