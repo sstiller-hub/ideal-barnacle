@@ -108,6 +108,48 @@ test.describe("Rest dock", () => {
     const after = (await clock.textContent()) || ""
     expect(toSeconds(after)).toBeLessThan(toSeconds(before))
   })
+
+  test("SKIP keeps the dock up so the next set can still be logged in one tap", async ({ page }) => {
+    await startSession(page)
+
+    await weightOf(page).fill("100")
+    await repsOf(page).fill("8")
+    await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
+
+    await page.getByRole("button", { name: "SKIP" }).click()
+
+    // Rest is over, but the one-tap affordance is exactly what is needed now.
+    await expect(page.getByText(/^READY$/)).toBeVisible()
+    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
+
+    await weightOf(page, 1).fill("100")
+    await page.getByRole("button", { name: /LOG SET/i }).click()
+
+    await expect(page.getByText("Incline Dumbbell Bench").first()).toBeVisible()
+  })
+
+  test("the dock survives the countdown running out", async ({ page }) => {
+    await startSession(page)
+
+    await weightOf(page).fill("100")
+    await repsOf(page).fill("8")
+    await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
+
+    // Wind the 5-minute rest down to its 5s floor rather than waiting it out.
+    const shorten = page.getByRole("button", { name: "−30S" })
+    for (let i = 0; i < 11; i++) {
+      if (await shorten.isDisabled()) break
+      await shorten.click()
+    }
+
+    await expect(page.getByText(/^READY$/)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
+    await expect(page.getByRole("button", { name: /LOG SET/i })).toBeVisible()
+
+    // HIDE is the way out of the ready phase.
+    await page.getByRole("button", { name: "HIDE" }).click()
+    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0)
+  })
 })
 
 test.describe("Auto-advance", () => {
