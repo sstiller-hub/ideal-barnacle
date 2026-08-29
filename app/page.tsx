@@ -1446,7 +1446,7 @@ export default function Home() {
       <main
         className="relative flex flex-col overflow-hidden"
         style={{
-          height: "100dvh",
+          height: "var(--app-vh)",
           paddingTop: "max(env(safe-area-inset-top, 0px), 8px)",
           paddingBottom: "env(safe-area-inset-bottom, 100px)",
           background: "#0D0D0F",
