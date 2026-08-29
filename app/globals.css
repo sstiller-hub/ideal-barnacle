@@ -257,6 +257,17 @@
   }
 }
 
+/* Full-screen height. Normally the visual viewport; inside PortraitLock's
+   rotated container it is overridden to the rotated box's height (100vw), so
+   full-screen layouts still fill the screen when the phone is in landscape. */
+:root {
+  --app-vh: 100dvh;
+}
+
+.portrait-lock-rotated .min-h-screen {
+  min-height: var(--app-vh);
+}
+
 .dark body {
 }
 

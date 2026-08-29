@@ -1273,7 +1273,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       }
       isOrientationChangingRef.current = true
       hasInitialScrollRef.current = false
-      setIsLandscapeMobile(query.matches)
+      // The app is orientation-locked in software: PortraitLock rotates the
+      // portrait layout to fill a landscape screen, so the session screen never
+      // switches to its landscape layout. This effect still runs on rotation to
+      // reset the carousel scroll refs below, which the relayout depends on.
+      setIsLandscapeMobile(false)
       // Safety reset: if the matchMedia value doesn't change (e.g.
       // orientationchange fires without flipping landscape/portrait), the
       // scroll effect's deps stay equal and its RAF — which normally clears
@@ -3051,7 +3055,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       <div
         className="flex flex-col"
         style={{
-          height: "100dvh",
+          height: "var(--app-vh)",
           background: "#0D0D0F",
           paddingLeft: "env(safe-area-inset-left, 0px)",
           paddingRight: "env(safe-area-inset-right, 0px)",
@@ -3389,7 +3393,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     <div
       className="flex flex-col relative overflow-hidden"
       style={{
-        height: "100dvh",
+        height: "var(--app-vh)",
         background: "#0D0D0F",
       }}
     >
