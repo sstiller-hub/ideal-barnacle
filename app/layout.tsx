@@ -8,6 +8,8 @@ import SonnerProvider from "@/components/sonner-provider"
 import MobilePreviewWrapper from "@/components/mobile-preview-wrapper"
 import { ThemeProvider } from "@/components/theme-provider"
 import PortraitLock from "@/components/portrait-lock"
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
@@ -68,6 +70,8 @@ export default function RootLayout({
             <SonnerProvider />
             <UpdateAvailableBanner />
           </PortraitLock>
+          <Analytics />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
