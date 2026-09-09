@@ -109,26 +109,23 @@ test.describe("Rest dock", () => {
     expect(toSeconds(after)).toBeLessThan(toSeconds(before))
   })
 
-  test("SKIP keeps the dock up so the next set can still be logged in one tap", async ({ page }) => {
+  test("SKIP dismisses the dock outright in one tap", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
+    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
     await page.getByRole("button", { name: "SKIP" }).click()
 
-    // Rest is over, but the one-tap affordance is exactly what is needed now.
-    await expect(page.getByText(/^READY$/)).toBeVisible()
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
-
-    await weightOf(page, 1).fill("100")
-    await page.getByRole("button", { name: /LOG SET/i }).click()
-
-    await expect(page.getByText("Incline Dumbbell Bench").first()).toBeVisible()
+    // One tap and the dock is gone — no count-up, no second dismissal.
+    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
   })
 
-  test("the dock survives the countdown running out", async ({ page }) => {
+  test("the dock leaves on its own when the countdown runs out", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
@@ -142,13 +139,8 @@ test.describe("Rest dock", () => {
       await shorten.click()
     }
 
-    await expect(page.getByText(/^READY$/)).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
-    await expect(page.getByRole("button", { name: /LOG SET/i })).toBeVisible()
-
-    // HIDE is the way out of the ready phase.
-    await page.getByRole("button", { name: "HIDE" }).click()
-    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0)
+    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
   })
 })
 
