@@ -19,21 +19,25 @@ export type RoutineExercise = {
   notes?: string
 }
 
-import { REAL_WORKOUTS } from "@/lib/real-routines"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { runGrowthV2TemplateMigration } from "@/lib/growth-v2-template-migration"
 import { formatExerciseName } from "@/lib/format-exercise-name"
 
 const ROUTINES_KEY = "workout_routines_v2"
 
+// With nothing stored yet, the current program is the routine library. The
+// old REAL_WORKOUTS fallback listed the pre-Growth-V2 templates, so on a fresh
+// install (or after storage was cleared) the home picker offered the legacy
+// routines with their old exercise lists while the schedule itself resolved to
+// Growth V2 through a separate hard-coded fallback.
 export function getRoutines(): WorkoutRoutine[] {
-  if (typeof window === "undefined") return REAL_WORKOUTS
+  if (typeof window === "undefined") return GROWTH_V2_ROUTINES
   // Runs on the read path rather than only at app start, so a deep link
   // straight into a session gets the current template too. Self-guarded by a
   // localStorage key, so it costs one getItem after the first run.
   runGrowthV2TemplateMigration()
   const stored = localStorage.getItem(ROUTINES_KEY)
-  if (!stored) return REAL_WORKOUTS
+  if (!stored) return GROWTH_V2_ROUTINES
   try {
     const routines = JSON.parse(stored) as WorkoutRoutine[]
     return routines.map((routine) => ({
@@ -44,7 +48,7 @@ export function getRoutines(): WorkoutRoutine[] {
       })),
     }))
   } catch {
-    return REAL_WORKOUTS
+    return GROWTH_V2_ROUTINES
   }
 }
 
