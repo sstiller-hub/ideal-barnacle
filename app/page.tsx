@@ -720,13 +720,18 @@ export default function Home() {
     setTodayPRs(sortedPRs)
   }, [workoutHistory, prExcludedNames, normalizeExerciseName])
 
+  // Mirrors resolveRoutineEntry in loadDataForDate: an override can point at a
+  // Growth V2 routine that the stored pool doesn't carry (fresh install, other
+  // device), so the plan is the last resort here too.
   const resolveRoutine = useCallback((entry: ScheduledWorkout | null | undefined): WorkoutRoutine | null => {
     if (!entry) return null
-    const byId = routinePool.find((routine) => routine.id === entry.routineId)
-    if (byId) return byId
-    const byName = routinePool.find((routine) => routine.name === entry.routineName)
-    if (byName) return byName
-    return null
+    return (
+      routinePool.find((routine) => routine.id === entry.routineId) ||
+      GROWTH_V2_ROUTINES.find((routine) => routine.id === entry.routineId) ||
+      routinePool.find((routine) => routine.name === entry.routineName) ||
+      GROWTH_V2_ROUTINES.find((routine) => routine.name === entry.routineName) ||
+      null
+    )
   }, [routinePool])
 
   const loadDataForDate = useCallback((date: Date) => {
@@ -814,54 +819,51 @@ export default function Home() {
     setPendingRoutineId(null)
   }
 
+  // Picking from the header caret. Signed in, the override state is the single
+  // source of truth for what the day shows (scheduledRoutine is derived from it
+  // by effect), so the pick is applied to that state first and the write to
+  // Supabase follows; a failed write rolls the day back to what it showed
+  // before. Setting scheduledRoutine directly here used to race the derive
+  // effect, which could snap the list back to the previously scheduled routine
+  // while the request was in flight.
   const handleSelectWorkoutType = async (routineId: string | null) => {
     if (isPastDay) return
+    setShowWorkoutPicker(false)
+
     const baseRoutineId = baseScheduledRoutine?.id ?? null
-    const baseRestDay = baseIsRestDay
-    const resolvedRoutine = routineId ? routinePool.find((routine) => routine.id === routineId) ?? null : null
-
-    if ((routineId === null && baseRestDay) || (routineId && routineId === baseRoutineId)) {
-      if (userId) {
-        const cleared = await clearScheduleOverride(selectedDate)
-        if (cleared) {
-          setScheduleOverrideState(undefined)
-        }
-      } else {
-        removeScheduledWorkout(selectedDate)
-        loadDataForDate(selectedDate)
-        window.dispatchEvent(new Event("schedule:updated"))
-      }
-      loadDataForDate(selectedDate)
-      setShowWorkoutPicker(false)
-      return
-    }
-
     const routineName = routineId ? routineNameById.get(routineId) ?? null : null
     const workout = routineId && routineName ? { routineId, routineName } : null
-    setBaseScheduledRoutine(resolvedRoutine)
-    setBaseIsRestDay(routineId === null)
-    setScheduledRoutine(resolvedRoutine)
+    const matchesBaseSchedule =
+      (routineId === null && baseIsRestDay) || (routineId !== null && routineId === baseRoutineId)
+
     if (userId) {
-      const updated = await setScheduleOverride(selectedDate, workout)
-      if (updated) {
-        setScheduleOverrideState({
-          workout,
-          isOverride: true,
-          workoutType: deriveWorkoutType(routineName),
-        })
-        loadDataForDate(selectedDate)
-        window.dispatchEvent(new Event("schedule:updated"))
-      }
-    } else {
-      if (workout) {
-        setScheduledWorkout(selectedDate, workout)
-      } else {
-        setRestDay(selectedDate)
+      const previousOverride = scheduleOverride
+      setScheduleOverrideState(
+        matchesBaseSchedule
+          ? undefined
+          : { workout, isOverride: true, workoutType: deriveWorkoutType(routineName) }
+      )
+      const persisted = matchesBaseSchedule
+        ? await clearScheduleOverride(selectedDate)
+        : await setScheduleOverride(selectedDate, workout)
+      if (!persisted) {
+        setScheduleOverrideState(previousOverride)
+        return
       }
       loadDataForDate(selectedDate)
       window.dispatchEvent(new Event("schedule:updated"))
+      return
     }
-    setShowWorkoutPicker(false)
+
+    if (matchesBaseSchedule) {
+      removeScheduledWorkout(selectedDate)
+    } else if (workout) {
+      setScheduledWorkout(selectedDate, workout)
+    } else {
+      setRestDay(selectedDate)
+    }
+    loadDataForDate(selectedDate)
+    window.dispatchEvent(new Event("schedule:updated"))
   }
 
   const goToPreviousDay = () => {
@@ -993,7 +995,24 @@ export default function Home() {
     return name
   }
 
-  const selectedTitle = actualState === "activeSession" ? activeWorkoutType : scheduledWorkoutType
+  // A completed day is titled by what was actually trained, not by what the
+  // schedule said. Doing Lower on an Upper day used to leave the header on
+  // "UPPER" while every stat below it described the Lower session.
+  const completedWorkoutType = workoutForDate ? deriveWorkoutType(workoutForDate.name) : null
+  const selectedTitle =
+    actualState === "completed" && completedWorkoutType
+      ? completedWorkoutType
+      : actualState === "activeSession"
+        ? activeWorkoutType
+        : scheduledWorkoutType
+  // The caret picker highlights the same reality: the routine that was trained
+  // on a completed day (matched by name), otherwise the scheduled one.
+  const completedRoutineId =
+    actualState === "completed" && workoutForDate
+      ? routinePool.find((routine) => routine.name === workoutForDate.name)?.id ?? null
+      : null
+  const pickerRoutineId = actualState === "completed" ? completedRoutineId : scheduledRoutine?.id ?? null
+  const pickerRestSelected = actualState !== "completed" && effectiveRestDay
   const displayExercises =
     actualState === "activeSession" && session?.exercises
       ? session.exercises
@@ -1645,20 +1664,20 @@ export default function Home() {
                 onClick={() => handleSelectWorkoutType(null)}
                 className="flex-shrink-0 transition-all duration-base"
                 style={{
-                  background: effectiveRestDay ? "var(--ink-04)" : "var(--ink-02)",
-                  border: effectiveRestDay ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
+                  background: pickerRestSelected ? "var(--ink-04)" : "var(--ink-02)",
+                  border: pickerRestSelected ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
                   borderRadius: "var(--radius-flat)",
                   padding: "12px 18px",
                   minWidth: "100px",
                 }}
                 onMouseEnter={(e) => {
-                  if (!effectiveRestDay) {
+                  if (!pickerRestSelected) {
                     e.currentTarget.style.background = "var(--ink-04)"
                     e.currentTarget.style.borderColor = "var(--ink-12)"
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!effectiveRestDay) {
+                  if (!pickerRestSelected) {
                     e.currentTarget.style.background = "var(--ink-02)"
                     e.currentTarget.style.borderColor = "var(--ink-08)"
                   }
@@ -1666,14 +1685,14 @@ export default function Home() {
                 type="button"
               >
                 <div
-                  className={effectiveRestDay ? "text-ink-95" : "text-ink-70"}
+                  className={pickerRestSelected ? "text-ink-95" : "text-ink-70"}
                   style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
                 >
                   Rest
                 </div>
               </button>
               {workoutOptions.map((routine, index) => {
-                const isSelected = scheduledRoutine?.id === routine.id
+                const isSelected = pickerRoutineId === routine.id
                 return (
                   <button
                     key={routine.id}
