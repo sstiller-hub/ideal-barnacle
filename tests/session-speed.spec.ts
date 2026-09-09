@@ -124,3 +124,47 @@ test.describe("Auto-advance", () => {
     await expect(page.getByText(/EXERCISE 2 OF 2/)).toBeVisible()
   })
 })
+
+test.describe("iOS haptic fallback", () => {
+  // iOS has no Vibration API, so tap cues route through a hidden switch input
+  // instead. The haptic itself is unobservable; that the toggle happens at all
+  // is the part that can regress silently.
+  async function withoutVibration(page: import("@playwright/test").Page) {
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, "vibrate", {
+        value: undefined,
+        configurable: true,
+      })
+    })
+  }
+
+  const switchState = (page: import("@playwright/test").Page) =>
+    page.evaluate(
+      () => document.head.querySelector<HTMLInputElement>('input[switch]')?.checked ?? null,
+    )
+
+  test("stepper taps toggle the switch when vibration is unavailable", async ({ page }) => {
+    await withoutVibration(page)
+    await startSession(page)
+
+    expect(await switchState(page)).toBeNull()
+
+    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    const first = await switchState(page)
+    expect(first).not.toBeNull()
+
+    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    expect(await switchState(page)).toBe(!first)
+  })
+
+  test("the switch is built once and stays out of the accessibility tree", async ({ page }) => {
+    await withoutVibration(page)
+    await startSession(page)
+
+    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    await page.getByRole("button", { name: "Decrease REPS by 1" }).click()
+
+    expect(await page.locator('input[switch]').count()).toBe(1)
+    await expect(page.getByRole("checkbox")).toHaveCount(0)
+  })
+})
