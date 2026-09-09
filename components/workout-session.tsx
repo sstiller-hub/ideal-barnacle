@@ -1324,9 +1324,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [restState, setRestState] = useState<WorkoutSession["restTimer"]>(undefined)
-  // When rest ended (timer ran out or was skipped) and the set it was resting
-  // for still has not been logged. The dock stays up through this phase.
-  const [restDoneAt, setRestDoneAt] = useState<number | null>(null)
   const [restExtensionTrend, setRestExtensionTrend] = useState<RestExtensionTrend | null>(null)
   const [validationTrigger, setValidationTrigger] = useState(0)
   const [focusedInput, setFocusedInput] = useState<string | null>(null)
@@ -1808,7 +1805,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         setSession(newSession)
         setExercises(newExercises)
         setRestState(undefined)
-        setRestDoneAt(null)
         restStartAtRef.current = null
         await saveSession(newSession)
         setIsHydrated(true)
@@ -1922,13 +1918,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   })()
 
-  // The dock outlives the countdown. LOG SET is most useful in the seconds
-  // *after* rest ends — that is when the set gets performed — so ending rest
-  // hands the dock to a "ready" phase instead of unmounting it. It leaves on a
-  // logged set, on HIDE, or when there is no next set to log.
-  const isRestDone = restDoneAt !== null
-  const hasRestNextSet = Boolean(restNextSet)
-  const showRestDock = isResting || (isRestDone && hasRestNextSet)
+  // The dock is the countdown and nothing else: it appears when rest starts and
+  // is gone the moment rest ends, whether that is SKIP or the timer running
+  // out. No count-up, no second tap to dismiss.
+  const showRestDock = isResting
 
   const adjustRest = (deltaSeconds: number) => {
     if (!isResting || !restState) return
@@ -1955,7 +1948,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     measure()
     window.addEventListener("resize", measure)
     return () => window.removeEventListener("resize", measure)
-  }, [showRestDock, isResting, hasRestNextSet])
+  }, [showRestDock, Boolean(restNextSet)])
 
   const totalVolume = exercises.reduce((sum: number, exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
@@ -2057,8 +2050,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return Math.max(0, restState.remainingSeconds - elapsed)
   })()
 
-  const restOverSeconds = restDoneAt === null ? 0 : Math.max(0, Math.floor((uiNow - restDoneAt) / 1000))
-
   const setRestStateAndPersist = async (
     nextState: WorkoutSession["restTimer"] | null,
     latestExercises?: any[]
@@ -2073,7 +2064,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     restStartAtRef.current = nextWithStart?.startedAt
       ? new Date(nextWithStart.startedAt).getTime()
       : null
-    if (nextWithStart) setRestDoneAt(null)
     setRestState(nextWithStart || undefined)
     setUiNow(Date.now())
     if (!nextWithStart && restNotificationTimeoutRef.current) {
@@ -2100,8 +2090,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   }
 
   useEffect(() => {
-    if (!isResting && !isRestDone) return
-    if (isResting && !restStartAtRef.current) {
+    if (!isResting) return
+    if (!restStartAtRef.current) {
       restStartAtRef.current = restState?.startedAt
         ? new Date(restState.startedAt).getTime()
         : Date.now()
@@ -2110,7 +2100,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       setUiNow(Date.now())
     }, 1000)
     return () => clearInterval(interval)
-  }, [isResting, isRestDone])
+  }, [isResting])
 
   useEffect(() => {
     if (isResting) {
@@ -2126,7 +2116,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       haptic("restOver")
       playRestChime()
       void setRestStateAndPersist(null)
-      setRestDoneAt(Date.now())
       if (restNotificationTimeoutRef.current) {
         clearTimeout(restNotificationTimeoutRef.current)
         restNotificationTimeoutRef.current = null
@@ -3752,7 +3741,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 left: "calc(16px + env(safe-area-inset-left, 0px))",
                 right: "calc(16px + env(safe-area-inset-right, 0px))",
                 bottom: "calc(20px + env(safe-area-inset-bottom))",
-                borderColor: isResting && restRemainingSeconds <= 10 ? "var(--ink-35)" : "var(--ink-12)",
+                borderColor: restRemainingSeconds <= 10 ? "var(--ink-35)" : "var(--ink-12)",
                 background: "rgba(13, 13, 15, 0.92)",
                 borderRadius: "var(--radius-xs)",
                 padding: "10px 14px",
@@ -3763,10 +3752,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               <motion.div
                 className="flex items-end gap-3"
                 animate={{
-                  opacity: isResting && restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1,
+                  opacity: restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1,
                 }}
                 transition={
-                  isResting && restRemainingSeconds <= 10
+                  restRemainingSeconds <= 10
                     ? { duration: 1, repeat: Infinity, ease: "easeInOut" }
                     : { duration: 0.2, ease: "linear" }
                 }
@@ -3793,7 +3782,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         lineHeight: 1,
                       }}
                     >
-                      {isResting ? "REST" : "READY"}
+                      REST
                     </span>
                   </div>
                   {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
@@ -3810,16 +3799,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
                     fontFamily: "var(--font-display)",
-                    color: isResting ? "var(--ink-95)" : "var(--ink-70)",
+                    color: "var(--ink-95)",
                   }}
                 >
-                  {isResting ? formatSeconds(restRemainingSeconds) : `+${formatSeconds(restOverSeconds)}`}
+                  {formatSeconds(restRemainingSeconds)}
                 </div>
               </motion.div>
 
               <div className="flex items-center gap-2">
-                {isResting ? (
-                  <>
                 <button
                   onClick={() => adjustRest(-30)}
                   disabled={restRemainingSeconds <= 5}
@@ -3862,11 +3849,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 </button>
                 <button
                   onClick={() => {
-                    // Skipping ends the countdown, not the dock: the set it was
-                    // resting for is still the one about to be logged.
+                    // One tap, and rest is over: the countdown stops and the
+                    // dock unmounts. No second tap to get rid of it.
                     haptic("tap")
                     void setRestStateAndPersist(null)
-                    setRestDoneAt(Date.now())
                   }}
                   className="transition-colors duration-150"
                   style={{
@@ -3885,65 +3871,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 >
                   SKIP
                 </button>
-                  </>
-                ) : (
-                  <>
-                <button
-                  onClick={() => {
-                    // Rest already lapsed and the set still needs another
-                    // minute — restart a short countdown rather than making the
-                    // user re-log to get a timer back.
-                    haptic("tap")
-                    void setRestStateAndPersist({
-                      exerciseIndex: currentExerciseIndex,
-                      setIndex: restNextSet?.setIndex ?? currentSetIndex,
-                      remainingSeconds: 30,
-                    })
-                    scheduleRestNotification(30)
-                    recordRestExtension(session?.id ?? "unknown")
-                    setRestExtensionTrend(getRestExtensionTrend())
-                  }}
-                  className="transition-colors duration-150"
-                  style={{
-                    background: "var(--ink-02)",
-                    border: "1px solid var(--ink-08)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: "6px 10px",
-                    fontFamily: "var(--font-label)",
-                    fontSize: "9.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    color: "var(--ink-70)",
-                    touchAction: "manipulation",
-                  }}
-                  type="button"
-                >
-                  +30S
-                </button>
-                <button
-                  onClick={() => {
-                    haptic("tap")
-                    setRestDoneAt(null)
-                  }}
-                  className="transition-colors duration-150"
-                  style={{
-                    background: "var(--ink-06)",
-                    border: "1px solid var(--ink-12)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: "6px 10px",
-                    fontFamily: "var(--font-label)",
-                    fontSize: "9.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    color: "var(--ink-95)",
-                    touchAction: "manipulation",
-                  }}
-                  type="button"
-                >
-                  HIDE
-                </button>
-                  </>
-                )}
               </div>
               </div>
 
@@ -3994,7 +3921,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         setValidationTrigger(Date.now())
                         return
                       }
-                      setRestDoneAt(null)
                       void completeSet(restNextSet.setIndex, {
                         exerciseIndex: currentExerciseIndex,
                         startRest: true,
