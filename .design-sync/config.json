@@ -1,5 +1,6 @@
 {
   "pkg": "my-v0-project",
+  "projectId": "ff186c1b-1869-400a-afa3-a38b9d61c0c1",
   "globalName": "Ledger",
   "shape": "package",
   "entry": ".design-sync/entry.tsx",
