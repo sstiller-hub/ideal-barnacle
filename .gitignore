@@ -9,3 +9,9 @@ __pycache__/
 *.pyc
 .env
 # NOTE: state.json is intentionally tracked so the workflow can persist it.
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+types/

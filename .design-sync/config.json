@@ -1,0 +1,49 @@
+{
+  "pkg": "my-v0-project",
+  "projectId": "ff186c1b-1869-400a-afa3-a38b9d61c0c1",
+  "globalName": "Ledger",
+  "shape": "package",
+  "entry": ".design-sync/entry.tsx",
+  "srcDir": "components",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".ds-sync/tailwind.css",
+  "provider": { "component": "AppFrame" },
+  "readmeHeader": ".design-sync/conventions.md",
+  "buildCmd": "node .ds-sync/node_modules/@tailwindcss/cli/dist/index.mjs -i .ds-sync/tw-input.css -o .ds-sync/tailwind.css",
+  "overrides": {
+    "AlertDialog": { "cardMode": "single", "primaryStory": "Confirm", "viewport": "560x420" },
+    "AktProgramMessageLine": { "cardMode": "column" },
+    "Card": { "cardMode": "column" },
+    "Input": { "cardMode": "column" },
+    "BandHeader": { "cardMode": "column" },
+    "Sparkline": { "cardMode": "column" },
+    "SetRow": { "cardMode": "column" },
+    "TranscriptionHeader": { "cardMode": "column" }
+  },
+  "dtsPropsFor": {
+    "Badge": "tone?: \"good\" | \"warn\" | \"neutral\"; className?: string; children?: React.ReactNode; id?: string; style?: React.CSSProperties;",
+    "Input": "type?: string; value?: string | number; defaultValue?: string | number; placeholder?: string; disabled?: boolean; readOnly?: boolean; inputMode?: \"none\" | \"text\" | \"decimal\" | \"numeric\" | \"tel\" | \"search\" | \"email\" | \"url\"; onChange?: React.ChangeEventHandler<HTMLInputElement>; className?: string; id?: string; style?: React.CSSProperties;",
+    "Card": "className?: string; children?: React.ReactNode; id?: string; style?: React.CSSProperties;",
+    "AlertDialog": "open?: boolean; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void; children?: React.ReactNode;",
+    "ExerciseCardPreview": "",
+    "VolumeControls": "timeRange: \"4W\" | \"8W\" | \"3M\" | \"6M\" | \"1Y\" | \"All\"; aggregation: \"session\" | \"week\" | \"month\"; typeFilter: \"All\" | \"Upper\" | \"Lower\"; onTimeRangeChange: (r: \"4W\" | \"8W\" | \"3M\" | \"6M\" | \"1Y\" | \"All\") => void; onAggregationChange: (a: \"session\" | \"week\" | \"month\") => void; onTypeFilterChange: (f: \"All\" | \"Upper\" | \"Lower\") => void; showTypeFilter?: boolean;"
+  },
+  "componentSrcMap": {
+    "Button": "components/ui/button.tsx",
+    "Badge": "components/ui/badge.tsx",
+    "Input": "components/ui/input.tsx",
+    "Card": "components/ui/card.tsx",
+    "AlertDialog": "components/ui/alert-dialog.tsx",
+    "BandHeader": "components/ledger/band-header.tsx",
+    "DeltaChip": "components/ledger/delta-chip.tsx",
+    "SessionClock": "components/ledger/session-clock.tsx",
+    "Sparkline": "components/ledger/sparkline.tsx",
+    "StatUnit": "components/ledger/stat-unit.tsx",
+    "AktIndicatorChip": "components/akt-indicator-chip.tsx",
+    "AktProgramMessageLine": "components/akt-program-message-line.tsx",
+    "SetRow": "components/whoop/set-row.tsx",
+    "TranscriptionHeader": "components/whoop/transcription-header.tsx",
+    "ExerciseCardPreview": "components/exercise-card-preview.tsx",
+    "VolumeControls": "components/volume-controls.tsx"
+  }
+}
