@@ -80,8 +80,13 @@ editing `emit.mjs` — it's the app contract surface.
 ## Known render warns (triaged, expected)
 
 - **`[FONT_REMOTE]`** for `Geist`, `Geist Fallback`, `Geist Mono`,
-  `Geist Mono Fallback`, `Archivo Narrow` — correct. These are served by Google
-  Fonts via `@import` at runtime, by design. Not a `[FONT_MISSING]`.
+  `Geist Mono Fallback`, `Archivo Narrow`, `Bebas Neue`, `Impact` — correct.
+  Most are served by Google Fonts via `@import` at runtime, by design. Not a
+  `[FONT_MISSING]`. Two are easy to misread as new: **`Bebas Neue`** is imported
+  by `app/globals.css:1` (Google Fonts) and **`Impact`** is only ever a *system*
+  fallback inside the `--font-display` stack
+  (`"Bebas Neue", "Impact", sans-serif`) — it is never meant to ship. Neither
+  needs `extraFonts`.
 - **`[GRID_OVERFLOW]`** was resolved by `cardMode: "column"` on
   `AktProgramMessageLine`, `Card`, `Input`, `BandHeader`, `Sparkline`, `SetRow`,
   `TranscriptionHeader` (their previews use fixed-width wrappers to show realistic
@@ -112,3 +117,14 @@ editing `emit.mjs` — it's the app contract surface.
   synced scope if the design agent starts imitating those colours.
 - The bundle inlines **54 npm packages** (Radix, recharts, lucide). A major bump
   in any of them changes the bundle wholesale.
+- **Styling drifts when unrelated app code changes.** `tw-input.css`'s `@source`
+  directives scan all of `components/` and `app/`, so Tailwind's emitted utility
+  set is a function of the *whole app*, not just the 16 synced components. A
+  re-sync can therefore report `upload.styling: true` with
+  `components: []` — every component byte-identical, only the stylesheet moved.
+  That is expected, not a bug (seen 2026-09-12: a large `workout-session.tsx`
+  rewrite shifted the CSS while all 16 components stayed unchanged). The
+  `@source inline(...)` safelist is what stops this from *removing* documented
+  token classes — which is exactly why it must stay in sync with `globals.css`.
+  After any such delta, spot-check the token families with
+  `sh .ds-sync/checkclasses.sh <classes…>` before uploading.
