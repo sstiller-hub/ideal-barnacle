@@ -11,6 +11,7 @@ import {
   getLatestPerformance,
   getMostRecentCompletedSetPerformance,
   getWorkoutHistory,
+  normalizeExerciseName,
   saveWorkout,
 } from "@/lib/workout-storage"
 import { toast } from "sonner"
@@ -64,12 +65,6 @@ import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
-// Stepper granularity for the current set. 5 lb is the smallest jump most
-// racks and dumbbell sets actually offer; anything finer is faster to type
-// than to tap, so the keyboard stays the escape hatch for it.
-const WEIGHT_STEP = 5
-const REPS_STEP = 1
-
 type Exercise = {
   id: string
   name: string
@@ -110,10 +105,6 @@ function extractRestSeconds(notes?: string): number {
   if (minutes) return Number(minutes[1]) * 60
   if (seconds) return Number(seconds[1])
   return 90
-}
-
-function normalizeExerciseName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, " ")
 }
 
 // Headline volume in the ledger's k-vocabulary: "1.2K", "22.9K", "850".
@@ -303,83 +294,6 @@ function applyProgressiveOverload(
   return { reps: latest.reps, weight: latest.weight, mode: null }
 }
 
-// The unit label under an input, flanked by decrement/increment. Replaces the
-// static label on the active set so the row costs no extra vertical space than
-// the ~20px the taller touch targets need.
-function StepperUnit({
-  label,
-  focused,
-  step,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-}: {
-  label: string
-  focused: boolean
-  step: number
-  onDecrement: () => void
-  onIncrement: () => void
-  decrementDisabled: boolean
-  incrementDisabled: boolean
-}) {
-  const buttonStyle = (disabled: boolean): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "34px",
-    height: "28px",
-    flexShrink: 0,
-    background: "var(--ink-02)",
-    border: "1px solid var(--ink-08)",
-    borderRadius: "var(--radius-flat)",
-    color: "var(--ink-60)",
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1,
-    opacity: disabled ? 0.3 : 1,
-    // Repeated taps on a small target otherwise trigger double-tap-to-zoom.
-    touchAction: "manipulation",
-  })
-
-  return (
-    <div className="flex items-center justify-between" style={{ gap: "4px" }}>
-      <button
-        type="button"
-        onClick={onDecrement}
-        disabled={decrementDisabled}
-        aria-label={`Decrease ${label} by ${step}`}
-        className="transition-colors duration-150"
-        style={buttonStyle(decrementDisabled)}
-      >
-        −
-      </button>
-      <span
-        className="transition-colors duration-150"
-        style={{
-          fontFamily: "var(--font-label)",
-          fontSize: "7.5px",
-          fontWeight: 600,
-          letterSpacing: "0.14em",
-          color: focused ? "var(--ink-50)" : "var(--ink-25)",
-        }}
-      >
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        disabled={incrementDisabled}
-        aria-label={`Increase ${label} by ${step}`}
-        className="transition-colors duration-150"
-        style={buttonStyle(incrementDisabled)}
-      >
-        +
-      </button>
-    </div>
-  )
-}
-
 type ExercisePageProps = {
   exercise: any
   exerciseIndex: number
@@ -466,34 +380,6 @@ const ExercisePage = memo(function ExercisePage({
   const isCompactSets = exercise.sets.length >= 4
   const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
   const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
-
-  // Nudge a value without opening the keyboard. Sets arrive prefilled from the
-  // last session, so the overwhelmingly common edit is "one notch off what I
-  // did last time" — which used to cost a tap, a keyboard, a select-all and a
-  // dismiss.
-  const stepSetValue = (setIndex: number, field: "reps" | "weight", direction: 1 | -1) => {
-    if (!canEditExercise) return
-    const set = exercise.sets[setIndex]
-    if (!set || set.completed) return
-
-    if (field === "weight") {
-      const current = typeof set.weight === "number" ? set.weight : 0
-      const next = Math.max(0, current + direction * WEIGHT_STEP)
-      if (next === current) return
-      haptic("tap")
-      updateSetDataForExercise(exerciseIndex, setIndex, "weight", next)
-      return
-    }
-
-    const current = typeof set.reps === "number" ? set.reps : 0
-    const next = Math.min(REP_MAX, Math.max(REP_MIN, current + direction * REPS_STEP))
-    if (next === current) return
-    // Stepping can only ever land in range, so any standing cap error is stale.
-    const setKey = set.id ?? `${exercise.id}-${setIndex}`
-    setRepCapErrors((prev) => (prev[setKey] ? { ...prev, [setKey]: false } : prev))
-    haptic("tap")
-    updateSetDataForExercise(exerciseIndex, setIndex, "reps", next)
-  }
 
   const showProgressiveOverload =
     exerciseIndex === currentExerciseIndex &&
@@ -698,10 +584,6 @@ const ExercisePage = memo(function ExercisePage({
                 : isCurrentSet
                   ? "var(--ink-12)"
                   : "transparent"
-          // Steppers only on the set being performed: they are the only place a
-          // value is realistically adjusted, and showing them on every row would
-          // cost ~20px each on a screen that does not scroll.
-          const showSteppers = isCurrentSet && canEditExercise && !set.completed
           const weightBg = focusedWeight ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
           const repsBg = focusedReps ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
 
@@ -911,55 +793,30 @@ const ExercisePage = memo(function ExercisePage({
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 44px", gap: "12px", marginTop: "5px" }}>
-                {showSteppers ? (
-                  <>
-                    <StepperUnit
-                      label="LB"
-                      focused={focusedWeight}
-                      onDecrement={() => stepSetValue(setIndex, "weight", -1)}
-                      onIncrement={() => stepSetValue(setIndex, "weight", 1)}
-                      decrementDisabled={(set.weight ?? 0) <= 0}
-                      incrementDisabled={false}
-                      step={WEIGHT_STEP}
-                    />
-                    <StepperUnit
-                      label="REPS"
-                      focused={focusedReps}
-                      onDecrement={() => stepSetValue(setIndex, "reps", -1)}
-                      onIncrement={() => stepSetValue(setIndex, "reps", 1)}
-                      decrementDisabled={typeof set.reps === "number" && set.reps <= REP_MIN}
-                      incrementDisabled={typeof set.reps === "number" && set.reps >= REP_MAX}
-                      step={REPS_STEP}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="text-center transition-colors duration-150"
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "7.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.14em",
-                        color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
-                      }}
-                    >
-                      LB
-                    </div>
-                    <div
-                      className="text-center transition-colors duration-150"
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "7.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.14em",
-                        color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
-                      }}
-                    >
-                      REPS
-                    </div>
-                  </>
-                )}
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  LB
+                </div>
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  REPS
+                </div>
                 <div />
               </div>
 
@@ -1133,21 +990,38 @@ const ExercisePage = memo(function ExercisePage({
                   </div>
 
                   <div
+                    className="flex items-baseline flex-wrap"
                     style={{
+                      gap: "6px",
                       fontFamily: "var(--font-label)",
-                      fontSize: "8px",
-                      fontWeight: 500,
                       fontVariantNumeric: "tabular-nums",
-                      letterSpacing: "0.02em",
-                      color: "var(--ink-30)",
                     }}
                   >
-                    {plates.map((plate, plateIndex) => (
-                      <span key={plateIndex}>
-                        {plateIndex > 0 && " + "}
-                        {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
-                      </span>
-                    ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
+                    <span
+                      style={{
+                        fontSize: "17px",
+                        fontWeight: 600,
+                        letterSpacing: "-0.01em",
+                        color: "var(--ink-85)",
+                      }}
+                    >
+                      {plates.map((plate, plateIndex) => (
+                        <span key={plateIndex}>
+                          {plateIndex > 0 && " + "}
+                          {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
+                        </span>
+                      ))}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: 500,
+                        letterSpacing: "0.02em",
+                        color: "var(--ink-30)",
+                      }}
+                    >
+                      {plateDisplayMode === "per-side" ? "per side" : "total"}
+                    </span>
                   </div>
                 </div>
               )}

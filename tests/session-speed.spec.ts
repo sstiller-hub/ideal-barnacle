@@ -30,40 +30,6 @@ const weightOf = (page: import("@playwright/test").Page, n = 0) =>
 const repsOf = (page: import("@playwright/test").Page, n = 0) =>
   page.locator('input[type="number"]').nth(n * 2 + 1)
 
-test.describe("Steppers on the active set", () => {
-  test("increment and decrement adjust weight by 5 and reps by 1", async ({ page }) => {
-    await startSession(page)
-
-    await weightOf(page).fill("100")
-    await repsOf(page).fill("8")
-
-    await page.getByRole("button", { name: "Increase LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("105")
-    await page.getByRole("button", { name: "Decrease LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("100")
-
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
-    await expect(repsOf(page)).toHaveValue("9")
-    await page.getByRole("button", { name: "Decrease REPS by 1" }).click()
-    await expect(repsOf(page)).toHaveValue("8")
-  })
-
-  test("weight cannot be stepped below zero", async ({ page }) => {
-    await startSession(page)
-
-    await weightOf(page).fill("5")
-    await page.getByRole("button", { name: "Decrease LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("0")
-    await expect(page.getByRole("button", { name: "Decrease LB by 5" })).toBeDisabled()
-  })
-
-  test("steppers appear only on the set being performed", async ({ page }) => {
-    await startSession(page)
-    // Two sets on this exercise, one stepper pair — the active set's.
-    await expect(page.getByRole("button", { name: "Increase LB by 5" })).toHaveCount(1)
-  })
-})
-
 test.describe("Rest dock", () => {
   test("shows the upcoming set and logs it in one tap", async ({ page }) => {
     await startSession(page)
@@ -179,26 +145,35 @@ test.describe("iOS haptic fallback", () => {
       () => document.head.querySelector<HTMLInputElement>('input[switch]')?.checked ?? null,
     )
 
-  test("stepper taps toggle the switch when vibration is unavailable", async ({ page }) => {
+  async function startRest(page: import("@playwright/test").Page) {
+    await weightOf(page).fill("100")
+    await repsOf(page).fill("8")
+    await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
+    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
+  }
+
+  test("rest adjustments toggle the switch when vibration is unavailable", async ({ page }) => {
     await withoutVibration(page)
     await startSession(page)
 
     expect(await switchState(page)).toBeNull()
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    await startRest(page)
+    await page.getByRole("button", { name: "+30S" }).click()
     const first = await switchState(page)
     expect(first).not.toBeNull()
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    await page.getByRole("button", { name: "+30S" }).click()
     expect(await switchState(page)).toBe(!first)
   })
 
   test("the switch is built once and stays out of the accessibility tree", async ({ page }) => {
     await withoutVibration(page)
     await startSession(page)
+    await startRest(page)
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
-    await page.getByRole("button", { name: "Decrease REPS by 1" }).click()
+    await page.getByRole("button", { name: "+30S" }).click()
+    await page.getByRole("button", { name: "−30S" }).click()
 
     expect(await page.locator('input[switch]').count()).toBe(1)
     await expect(page.getByRole("checkbox")).toHaveCount(0)

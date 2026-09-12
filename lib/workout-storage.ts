@@ -331,8 +331,23 @@ export type PerformanceMetrics = {
   setCount: number
 }
 
+// Exercises that have been renamed, or that different plans spell differently
+// for the same machine, still have to read as one exercise: history, PRs and
+// progression all key off the normalized name. exercise-rename-migration.ts
+// rewrites stored data, but it runs once per device and cannot reach rows that
+// land afterwards — a Supabase pull, a Drive restore, an import, or a routine
+// still carrying the old spelling — so lookups resolve aliases as well. Keys
+// and values are already normalized: lowercase, trimmed, single-spaced.
+const EXERCISE_ALIASES: Record<string, string> = {
+  "incline machine chest press": "wide chest press machine",
+  "incline machine chest press (captioned)": "wide chest press machine",
+  "incline smith machine bench": "incline press machine",
+  "standing / machine calf raise": "machine calf raise",
+}
+
 export function normalizeExerciseName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, " ")
+  const normalized = name.toLowerCase().trim().replace(/\s+/g, " ")
+  return EXERCISE_ALIASES[normalized] ?? normalized
 }
 
 export function getMostRecentExercisePerformance(
