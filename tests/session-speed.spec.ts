@@ -31,29 +31,24 @@ const repsOf = (page: import("@playwright/test").Page, n = 0) =>
   page.locator('input[type="number"]').nth(n * 2 + 1)
 
 test.describe("Rest dock", () => {
-  test("shows the upcoming set and logs it in one tap", async ({ page }) => {
+  test("is the countdown and its controls, and nothing else", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/SET 02 · Overhand Row/)).toBeVisible()
-    // The dock names the set it can log and nothing more — no "UP NEXT" band.
+    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
+
+    // No up-next panel: the set it named, its weight and reps, and the button
+    // to log it are all already on the exercise screen behind the dock.
     await expect(page.getByText(/UP NEXT/i)).toHaveCount(0)
-    const logSet = page.getByRole("button", { name: /LOG SET/i })
-    await expect(logSet).toBeVisible()
+    await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0)
 
-    // Set 2 has no weight yet (no history to prefill from), so the dock must
-    // say which field is missing rather than silently doing nothing.
-    await logSet.click()
-    await expect(page.getByText("Enter weight")).toBeVisible()
-
-    await weightOf(page, 1).fill("100")
-    await logSet.click()
-
-    // Both sets of exercise 1 are now logged, so the session moves on.
-    await expect(page.getByText("Incline Dumbbell Bench").first()).toBeVisible()
+    // Just the countdown and its three controls.
+    await expect(page.getByRole("button", { name: "−30S" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
   })
 
   test("-30S shortens the running timer", async ({ page }) => {
@@ -84,13 +79,12 @@ test.describe("Rest dock", () => {
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/SET 02 · Overhand Row/)).toBeVisible()
+    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
     await page.getByRole("button", { name: "SKIP" }).click()
 
     // One tap and the dock is gone — no count-up, no second dismissal.
-    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
-    await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "+30S" })).toHaveCount(0)
   })
 
   test("the dock leaves on its own when the countdown runs out", async ({ page }) => {
@@ -107,8 +101,7 @@ test.describe("Rest dock", () => {
       await shorten.click()
     }
 
-    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0, { timeout: 15_000 })
-    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0, { timeout: 15_000 })
   })
 })
 

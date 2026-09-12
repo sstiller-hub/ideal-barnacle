@@ -1811,24 +1811,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
 
-  // The set the user is about to perform. During rest this is always the
-  // current exercise's first incomplete set, so the dock can both name it and
-  // log it — collapsing "wait, find the row, tap" into one tap. It is named
-  // plainly (SET 02 · exercise · load) with no "up next" heading: the dock only
-  // ever shows the one set it can log, so a heading adds nothing.
-  const restNextSet = (() => {
-    if (!currentExercise || firstIncompleteIndex === -1) return null
-    const set = currentExercise.sets?.[firstIncompleteIndex]
-    if (!set) return null
-    return {
-      exerciseName: getExerciseLabel(currentExercise.name),
-      setIndex: firstIncompleteIndex,
-      weight: set.weight as number | null,
-      reps: set.reps as number | null,
-      ready: !isSetIncomplete(set) && !set.validationFlags?.includes("reps_hard_invalid"),
-    }
-  })()
-
   // The dock is the countdown and nothing else: it appears when rest starts and
   // is gone the moment rest ends, whether that is SKIP or the timer running
   // out. No count-up, no second tap to dismiss.
@@ -1859,7 +1841,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     measure()
     window.addEventListener("resize", measure)
     return () => window.removeEventListener("resize", measure)
-  }, [showRestDock, Boolean(restNextSet)])
+  }, [showRestDock])
 
   const totalVolume = exercises.reduce((sum: number, exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
@@ -3871,81 +3853,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               </div>
               </div>
 
-              {restNextSet && (
-                <div
-                  className="flex items-center justify-between gap-3"
-                  style={{
-                    marginTop: "10px",
-                    paddingTop: "10px",
-                    borderTop: "1px solid var(--ink-06)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      className="truncate"
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        letterSpacing: "-0.01em",
-                        color: "var(--ink-70)",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: "var(--font-label)",
-                          fontSize: "8px",
-                          fontWeight: 600,
-                          letterSpacing: "0.18em",
-                          color: "var(--ink-30)",
-                        }}
-                      >
-                        SET {String(restNextSet.setIndex + 1).padStart(2, "0")}
-                      </span>
-                      {" · "}
-                      {restNextSet.exerciseName}
-                      {" · "}
-                      {restNextSet.weight ?? "—"} × {restNextSet.reps ?? "—"}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Deliberately tappable when the set is not loggable yet:
-                      // the dock covers the row, so a dead disabled button would
-                      // leave no way to find out which field is empty. This
-                      // flags the missing one behind the dock instead.
-                      if (!restNextSet.ready) {
-                        setValidationTrigger(Date.now())
-                        return
-                      }
-                      void completeSet(restNextSet.setIndex, {
-                        exerciseIndex: currentExerciseIndex,
-                        startRest: true,
-                      })
-                    }}
-                    className="flex items-center justify-center gap-1.5 transition-colors duration-150"
-                    style={{
-                      flexShrink: 0,
-                      minHeight: "36px",
-                      background: "var(--ink-06)",
-                      border: "1px solid var(--ink-12)",
-                      borderRadius: "var(--radius-flat)",
-                      padding: "6px 14px",
-                      fontFamily: "var(--font-label)",
-                      fontSize: "9.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.1em",
-                      color: "var(--ink-95)",
-                      opacity: restNextSet.ready ? 1 : 0.35,
-                      touchAction: "manipulation",
-                    }}
-                    type="button"
-                  >
-                    <Check size={13} strokeWidth={2} />
-                    LOG SET
-                  </button>
-                </div>
-              )}
             </motion.div>
           ) : null}
         </AnimatePresence>
