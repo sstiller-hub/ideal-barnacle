@@ -1226,7 +1226,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // While this is set, scroll events are relayout noise rather than the user
+  // choosing an exercise, so no index is written. Always released through
+  // holdIndexWrites' single timer — two timers racing is how a rotation used
+  // to slip an index write through mid-flip.
   const isOrientationChangingRef = useRef(false)
+  const indexWriteHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const indexWriteHoldUntilRef = useRef(0)
   // Last width the carousel was aligned against, so a relayout can be told
   // apart from a scroll.
   const pageWidthRef = useRef(0)
@@ -1305,15 +1311,39 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     exercisesRef.current = exercises
   }, [exercises])
 
+  // Stop reading scroll events as swipes for a while. Rotation, the keyboard
+  // and a return from the background all move the scroller on their own; every
+  // such move used to be able to land as "the user picked a different
+  // exercise".
+  const holdIndexWrites = useCallback((ms: number) => {
+    const until = Date.now() + ms
+    // Never shorten a hold already in flight: an alignment landing inside a
+    // rotation's window must not release the guard before the flip is over.
+    if (indexWriteHoldRef.current && until <= indexWriteHoldUntilRef.current) return
+    indexWriteHoldUntilRef.current = until
+    isOrientationChangingRef.current = true
+    if (indexWriteHoldRef.current) clearTimeout(indexWriteHoldRef.current)
+    indexWriteHoldRef.current = setTimeout(() => {
+      isOrientationChangingRef.current = false
+      indexWriteHoldRef.current = null
+      indexWriteHoldUntilRef.current = 0
+    }, ms)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (indexWriteHoldRef.current) clearTimeout(indexWriteHoldRef.current)
+    },
+    [],
+  )
+
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
-    let orientationResetTimeout: ReturnType<typeof setTimeout> | null = null
     const update = () => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
         scrollSettleTimeoutRef.current = null
       }
-      isOrientationChangingRef.current = true
       // The app is orientation-locked in software: PortraitLock rotates the
       // portrait layout to fill a landscape screen, so the session screen never
       // switches to its landscape layout. This effect still runs on rotation to
@@ -1321,15 +1351,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // carousel afterwards belongs to the resize observer below, which reacts
       // to the container actually changing width.
       setIsLandscapeMobile(false)
-      // Safety reset: if the matchMedia value doesn't change (e.g.
-      // orientationchange fires without flipping landscape/portrait), the
-      // scroll effect's deps stay equal and its RAF — which normally clears
-      // this flag — never runs. Without this fallback, handleScroll stays
-      // blocked forever and swipes can't advance the carousel.
-      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
-      orientationResetTimeout = setTimeout(() => {
-        isOrientationChangingRef.current = false
-      }, 300)
+      // Long enough to cover the whole flip. The rotation animation and the
+      // relayout that follows run well past a couple of frames, and the old
+      // 300ms release could expire mid-flip — leaving the tail of the relayout
+      // to be read as a swipe. holdIndexWrites owns the only release timer, so
+      // an alignment landing inside this window extends it rather than racing
+      // it.
+      holdIndexWrites(700)
     }
     update()
     query.addEventListener("change", update)
@@ -1337,9 +1365,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => {
       query.removeEventListener("change", update)
       window.removeEventListener("orientationchange", update)
-      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
     }
-  }, [])
+  }, [holdIndexWrites])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -2072,6 +2099,45 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     setRepCapErrors({})
   }, [currentExercise?.id, currentExercise?.sets?.length])
 
+  // The one definition of "put the carousel on page N". Returns false when the
+  // container has no width yet, so callers can retry on the next frame instead
+  // of scrolling to 0 × 0 and landing on the first exercise.
+  const alignCarousel = useCallback(
+    (index: number) => {
+      const container = scrollContainerRef.current
+      if (!container) return false
+      const width = container.offsetWidth
+      if (!width) return false
+      pageWidthRef.current = width
+      // Held across the scroll events our own scrollTo is about to emit. One
+      // frame is not enough: iOS can dispatch them a frame or two later.
+      holdIndexWrites(250)
+      container.scrollTo({ left: index * width, behavior: "instant" })
+      hasInitialScrollRef.current = true
+      return true
+    },
+    [holdIndexWrites],
+  )
+
+  // Align as soon as the container has a width, retrying across frames. Used
+  // wherever the carousel has to be put back after a relayout that may not have
+  // settled yet.
+  const alignCarouselWhenReady = useCallback(
+    (index: number) => {
+      let rafId = 0
+      let attempts = 0
+      const attempt = () => {
+        if (alignCarousel(index)) return
+        if (attempts >= 20) return
+        attempts += 1
+        rafId = requestAnimationFrame(attempt)
+      }
+      rafId = requestAnimationFrame(attempt)
+      return () => cancelAnimationFrame(rafId)
+    },
+    [alignCarousel],
+  )
+
   useEffect(() => {
     if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
@@ -2081,31 +2147,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // orientation change. Rotating back from landscape remounts this
       // container with scrollLeft 0, and the new portrait layout width is not
       // always ready on the first animation frame — reading offsetWidth too
-      // early resolves to 0 and scrolls to exercise 0. Retry across frames
-      // until the width is known, then scroll, and only re-enable handleScroll
-      // one frame later (via isOrientationChangingRef). That way the transient
-      // scrollLeft 0 the browser reports during the relayout — and the scroll
-      // event emitted by our own scrollTo — are never persisted as index 0.
-      let rafId = 0
-      let attempts = 0
-      const restore = () => {
-        const c = scrollContainerRef.current
-        if (!c) return
-        const width = c.offsetWidth
-        if (width === 0 && attempts < 20) {
-          attempts += 1
-          rafId = requestAnimationFrame(restore)
-          return
-        }
-        c.scrollTo({ left: currentExerciseIndex * width, behavior: "instant" })
-        pageWidthRef.current = width
-        hasInitialScrollRef.current = true
-        rafId = requestAnimationFrame(() => {
-          isOrientationChangingRef.current = false
-        })
-      }
-      rafId = requestAnimationFrame(restore)
-      return () => cancelAnimationFrame(rafId)
+      // early resolves to 0 and scrolls to exercise 0.
+      return alignCarouselWhenReady(currentExerciseIndex)
     }
 
     if (isScrollingProgrammatically.current) return
@@ -2117,48 +2160,67 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }, 400)
 
     return () => window.clearTimeout(timeout)
-  }, [currentExerciseIndex, isLandscapeMobile])
+  }, [alignCarouselWhenReady, currentExerciseIndex, isLandscapeMobile])
 
-  // Re-align the carousel whenever the page width changes under it.
+  // Re-align the carousel whenever the layout moves under it.
   //
   // Turning the phone re-lays out PortraitLock's rotated box, and the width the
   // carousel pages against can wobble for a few frames before it settles. The
   // scroll offset left over from the old width then divides into a different
   // exercise, and the first scroll event after the flip persists that as the
   // active one — so rotating the phone silently moved the workout to another
-  // exercise. Snapping back to the active exercise on every real width change
-  // fixes that, and also covers the on-screen keyboard and the URL bar
-  // collapsing. Index writes stay blocked until the snap has landed, and the
-  // snap leaves the offset exactly on the active page, so a scroll event that
-  // slips through afterwards resolves to the same index and writes nothing.
+  // exercise. Snapping back to the active exercise fixes that, and also covers
+  // the on-screen keyboard and the URL bar collapsing.
+  //
+  // A changed width is not the only way the offset goes wrong: the scroller can
+  // also be handed back sitting on the wrong page at the same width (a return
+  // from the background, a snap the browser redid across the resize). So the
+  // trigger is "the offset is no longer on the active page", not "the width
+  // changed" — the width-only check left exactly those cases unaligned.
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
     if (typeof ResizeObserver === "undefined") return
 
-    let rafId = 0
     const observer = new ResizeObserver(() => {
       const width = container.offsetWidth
       // Mid-relayout the container can report 0; there is nothing to align to.
       if (!width) return
-      if (width === pageWidthRef.current) return
-      pageWidthRef.current = width
-      isOrientationChangingRef.current = true
-      container.scrollTo({ left: currentExerciseIndexRef.current * width, behavior: "instant" })
-      hasInitialScrollRef.current = true
-      cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
-        isOrientationChangingRef.current = false
-      })
+      const target = currentExerciseIndexRef.current * width
+      if (width === pageWidthRef.current && Math.abs(container.scrollLeft - target) <= 1) return
+      alignCarousel(currentExerciseIndexRef.current)
     })
     observer.observe(container)
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(rafId)
-    }
+    return () => observer.disconnect()
     // The container only mounts post-hydration; without isHydrated the effect
     // runs once against a null ref and never attaches.
-  }, [isHydrated])
+  }, [alignCarousel, isHydrated])
+
+  // Coming back to the app is its own way of losing the carousel's place.
+  //
+  // Backgrounding a phone browser can hand the page back with the scroller
+  // reset or parked on a different page, at the very same width — so the
+  // resize observer never fires, nothing re-aligns, and the first scroll event
+  // after the return persists whatever page the offset now divides into. That
+  // is the "left the app and came back on the wrong exercise" case. Re-align on
+  // every return, and hold index writes while the layout settles.
+  useEffect(() => {
+    if (!isHydrated) return
+    let cancel: (() => void) | undefined
+    const realign = () => {
+      if (document.visibilityState !== "visible") return
+      holdIndexWrites(600)
+      cancel?.()
+      cancel = alignCarouselWhenReady(currentExerciseIndexRef.current)
+    }
+    document.addEventListener("visibilitychange", realign)
+    window.addEventListener("pageshow", realign)
+    return () => {
+      document.removeEventListener("visibilitychange", realign)
+      window.removeEventListener("pageshow", realign)
+      cancel?.()
+    }
+  }, [alignCarouselWhenReady, holdIndexWrites, isHydrated])
 
   // Commit the exercise index the moment the swipe settles, using the native
   // scrollend event where available. This replaces the fixed settle-debounce
@@ -2178,6 +2240,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       const pageWidth = container.offsetWidth
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
+      // A settled swipe always lands exactly on a snap point. An offset between
+      // pages means the layout is still moving, not that the user chose this
+      // exercise — the last guard before a relayout writes the wrong index.
+      if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
       if (nextIndex !== currentExerciseIndexRef.current) {
         void setExerciseIndex(nextIndex)
       }
@@ -2803,9 +2869,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
     if (isOrientationChangingRef.current) return
 
-    if (isScrollingProgrammatically.current) {
-      isScrollingProgrammatically.current = false
-    }
+    // A smooth scrollTo emits a stream of scroll events. Clearing the guard on
+    // the first of them left the rest — and the scrollend that follows — being
+    // read as a swipe. The guard is released by scrollend, or by the timeout in
+    // the effect that set it.
+    if (isScrollingProgrammatically.current) return
 
     if (scrollRafRef.current) return
     scrollRafRef.current = requestAnimationFrame(() => {
@@ -2829,6 +2897,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           clearTimeout(scrollSettleTimeoutRef.current)
         }
         scrollSettleTimeoutRef.current = setTimeout(() => {
+          if (isOrientationChangingRef.current) return
+          if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
           if (nextIndex !== currentExerciseIndexRef.current) {
             void setExerciseIndex(nextIndex)
           }
