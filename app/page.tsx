@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { getWorkoutHistory, normalizeExerciseName as normalizeStoredExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 import { getRoutines } from "@/lib/routine-storage"
 import {
   deleteSession,
@@ -24,7 +24,6 @@ import {
 import { clearActiveWorkoutRoute, getActiveWorkoutRoute } from "@/lib/active-workout-route"
 import { deleteWorkoutDraft } from "@/lib/workout-draft-storage"
 import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "@/lib/growth-v2-plan"
-import { formatExerciseName } from "@/lib/format-exercise-name"
 import {
   getScheduledWorkoutForDate,
   removeScheduledWorkout,
@@ -212,7 +211,7 @@ export default function Home() {
     setShowDeloadCompleteBanner(false)
   }
 
-  const normalizeExerciseName = useCallback((name: string) => formatExerciseName(name).toLowerCase(), [])
+  const normalizeExerciseName = useCallback((name: string) => normalizeStoredExerciseName(name), [])
   // The one volume formatter for this screen: "30.6K" at ≥1000, integer below.
   const formatK = (value: number) => {
     const abs = Math.abs(value)

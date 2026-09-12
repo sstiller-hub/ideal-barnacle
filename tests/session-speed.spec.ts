@@ -30,62 +30,25 @@ const weightOf = (page: import("@playwright/test").Page, n = 0) =>
 const repsOf = (page: import("@playwright/test").Page, n = 0) =>
   page.locator('input[type="number"]').nth(n * 2 + 1)
 
-test.describe("Steppers on the active set", () => {
-  test("increment and decrement adjust weight by 5 and reps by 1", async ({ page }) => {
-    await startSession(page)
-
-    await weightOf(page).fill("100")
-    await repsOf(page).fill("8")
-
-    await page.getByRole("button", { name: "Increase LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("105")
-    await page.getByRole("button", { name: "Decrease LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("100")
-
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
-    await expect(repsOf(page)).toHaveValue("9")
-    await page.getByRole("button", { name: "Decrease REPS by 1" }).click()
-    await expect(repsOf(page)).toHaveValue("8")
-  })
-
-  test("weight cannot be stepped below zero", async ({ page }) => {
-    await startSession(page)
-
-    await weightOf(page).fill("5")
-    await page.getByRole("button", { name: "Decrease LB by 5" }).click()
-    await expect(weightOf(page)).toHaveValue("0")
-    await expect(page.getByRole("button", { name: "Decrease LB by 5" })).toBeDisabled()
-  })
-
-  test("steppers appear only on the set being performed", async ({ page }) => {
-    await startSession(page)
-    // Two sets on this exercise, one stepper pair — the active set's.
-    await expect(page.getByRole("button", { name: "Increase LB by 5" })).toHaveCount(1)
-  })
-})
-
 test.describe("Rest dock", () => {
-  test("shows the upcoming set and logs it in one tap", async ({ page }) => {
+  test("is the countdown and its controls, and nothing else", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
-    const logSet = page.getByRole("button", { name: /LOG SET/i })
-    await expect(logSet).toBeVisible()
+    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
 
-    // Set 2 has no weight yet (no history to prefill from), so the dock must
-    // say which field is missing rather than silently doing nothing.
-    await logSet.click()
-    await expect(page.getByText("Enter weight")).toBeVisible()
+    // No up-next panel: the set it named, its weight and reps, and the button
+    // to log it are all already on the exercise screen behind the dock.
+    await expect(page.getByText(/UP NEXT/i)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0)
 
-    await weightOf(page, 1).fill("100")
-    await logSet.click()
-
-    // Both sets of exercise 1 are now logged, so the session moves on.
-    await expect(page.getByText("Incline Dumbbell Bench").first()).toBeVisible()
+    // Just the countdown and its three controls.
+    await expect(page.getByRole("button", { name: "−30S" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
   })
 
   test("-30S shortens the running timer", async ({ page }) => {
@@ -116,13 +79,12 @@ test.describe("Rest dock", () => {
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
+    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
     await page.getByRole("button", { name: "SKIP" }).click()
 
     // One tap and the dock is gone — no count-up, no second dismissal.
-    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
-    await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "+30S" })).toHaveCount(0)
   })
 
   test("the dock leaves on its own when the countdown runs out", async ({ page }) => {
@@ -139,8 +101,7 @@ test.describe("Rest dock", () => {
       await shorten.click()
     }
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0, { timeout: 15_000 })
-    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0, { timeout: 15_000 })
   })
 })
 
@@ -177,26 +138,35 @@ test.describe("iOS haptic fallback", () => {
       () => document.head.querySelector<HTMLInputElement>('input[switch]')?.checked ?? null,
     )
 
-  test("stepper taps toggle the switch when vibration is unavailable", async ({ page }) => {
+  async function startRest(page: import("@playwright/test").Page) {
+    await weightOf(page).fill("100")
+    await repsOf(page).fill("8")
+    await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
+    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
+  }
+
+  test("rest adjustments toggle the switch when vibration is unavailable", async ({ page }) => {
     await withoutVibration(page)
     await startSession(page)
 
     expect(await switchState(page)).toBeNull()
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    await startRest(page)
+    await page.getByRole("button", { name: "+30S" }).click()
     const first = await switchState(page)
     expect(first).not.toBeNull()
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
+    await page.getByRole("button", { name: "+30S" }).click()
     expect(await switchState(page)).toBe(!first)
   })
 
   test("the switch is built once and stays out of the accessibility tree", async ({ page }) => {
     await withoutVibration(page)
     await startSession(page)
+    await startRest(page)
 
-    await page.getByRole("button", { name: "Increase REPS by 1" }).click()
-    await page.getByRole("button", { name: "Decrease REPS by 1" }).click()
+    await page.getByRole("button", { name: "+30S" }).click()
+    await page.getByRole("button", { name: "−30S" }).click()
 
     expect(await page.locator('input[switch]').count()).toBe(1)
     await expect(page.getByRole("checkbox")).toHaveCount(0)

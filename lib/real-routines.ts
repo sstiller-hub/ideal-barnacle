@@ -280,7 +280,7 @@ export const REAL_WORKOUTS: WorkoutRoutine[] = [
         id: "sa-delts",
         name: "Technogym Delts Machine",
         type: "strength",
-        targetSets: 4,
+        targetSets: 3,
         targetReps: "12-20",
       },
       {

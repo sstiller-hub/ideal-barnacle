@@ -11,6 +11,7 @@ import {
   getLatestPerformance,
   getMostRecentCompletedSetPerformance,
   getWorkoutHistory,
+  normalizeExerciseName,
   saveWorkout,
 } from "@/lib/workout-storage"
 import { toast } from "sonner"
@@ -64,12 +65,6 @@ import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
-// Stepper granularity for the current set. 5 lb is the smallest jump most
-// racks and dumbbell sets actually offer; anything finer is faster to type
-// than to tap, so the keyboard stays the escape hatch for it.
-const WEIGHT_STEP = 5
-const REPS_STEP = 1
-
 type Exercise = {
   id: string
   name: string
@@ -110,10 +105,6 @@ function extractRestSeconds(notes?: string): number {
   if (minutes) return Number(minutes[1]) * 60
   if (seconds) return Number(seconds[1])
   return 90
-}
-
-function normalizeExerciseName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, " ")
 }
 
 // Headline volume in the ledger's k-vocabulary: "1.2K", "22.9K", "850".
@@ -303,83 +294,6 @@ function applyProgressiveOverload(
   return { reps: latest.reps, weight: latest.weight, mode: null }
 }
 
-// The unit label under an input, flanked by decrement/increment. Replaces the
-// static label on the active set so the row costs no extra vertical space than
-// the ~20px the taller touch targets need.
-function StepperUnit({
-  label,
-  focused,
-  step,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-}: {
-  label: string
-  focused: boolean
-  step: number
-  onDecrement: () => void
-  onIncrement: () => void
-  decrementDisabled: boolean
-  incrementDisabled: boolean
-}) {
-  const buttonStyle = (disabled: boolean): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "34px",
-    height: "28px",
-    flexShrink: 0,
-    background: "var(--ink-02)",
-    border: "1px solid var(--ink-08)",
-    borderRadius: "var(--radius-flat)",
-    color: "var(--ink-60)",
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1,
-    opacity: disabled ? 0.3 : 1,
-    // Repeated taps on a small target otherwise trigger double-tap-to-zoom.
-    touchAction: "manipulation",
-  })
-
-  return (
-    <div className="flex items-center justify-between" style={{ gap: "4px" }}>
-      <button
-        type="button"
-        onClick={onDecrement}
-        disabled={decrementDisabled}
-        aria-label={`Decrease ${label} by ${step}`}
-        className="transition-colors duration-150"
-        style={buttonStyle(decrementDisabled)}
-      >
-        −
-      </button>
-      <span
-        className="transition-colors duration-150"
-        style={{
-          fontFamily: "var(--font-label)",
-          fontSize: "7.5px",
-          fontWeight: 600,
-          letterSpacing: "0.14em",
-          color: focused ? "var(--ink-50)" : "var(--ink-25)",
-        }}
-      >
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        disabled={incrementDisabled}
-        aria-label={`Increase ${label} by ${step}`}
-        className="transition-colors duration-150"
-        style={buttonStyle(incrementDisabled)}
-      >
-        +
-      </button>
-    </div>
-  )
-}
-
 type ExercisePageProps = {
   exercise: any
   exerciseIndex: number
@@ -466,34 +380,6 @@ const ExercisePage = memo(function ExercisePage({
   const isCompactSets = exercise.sets.length >= 4
   const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
   const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
-
-  // Nudge a value without opening the keyboard. Sets arrive prefilled from the
-  // last session, so the overwhelmingly common edit is "one notch off what I
-  // did last time" — which used to cost a tap, a keyboard, a select-all and a
-  // dismiss.
-  const stepSetValue = (setIndex: number, field: "reps" | "weight", direction: 1 | -1) => {
-    if (!canEditExercise) return
-    const set = exercise.sets[setIndex]
-    if (!set || set.completed) return
-
-    if (field === "weight") {
-      const current = typeof set.weight === "number" ? set.weight : 0
-      const next = Math.max(0, current + direction * WEIGHT_STEP)
-      if (next === current) return
-      haptic("tap")
-      updateSetDataForExercise(exerciseIndex, setIndex, "weight", next)
-      return
-    }
-
-    const current = typeof set.reps === "number" ? set.reps : 0
-    const next = Math.min(REP_MAX, Math.max(REP_MIN, current + direction * REPS_STEP))
-    if (next === current) return
-    // Stepping can only ever land in range, so any standing cap error is stale.
-    const setKey = set.id ?? `${exercise.id}-${setIndex}`
-    setRepCapErrors((prev) => (prev[setKey] ? { ...prev, [setKey]: false } : prev))
-    haptic("tap")
-    updateSetDataForExercise(exerciseIndex, setIndex, "reps", next)
-  }
 
   const showProgressiveOverload =
     exerciseIndex === currentExerciseIndex &&
@@ -698,10 +584,6 @@ const ExercisePage = memo(function ExercisePage({
                 : isCurrentSet
                   ? "var(--ink-12)"
                   : "transparent"
-          // Steppers only on the set being performed: they are the only place a
-          // value is realistically adjusted, and showing them on every row would
-          // cost ~20px each on a screen that does not scroll.
-          const showSteppers = isCurrentSet && canEditExercise && !set.completed
           const weightBg = focusedWeight ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
           const repsBg = focusedReps ? "var(--ink-06)" : isCurrentSet ? "var(--ink-04)" : "var(--ink-02)"
 
@@ -911,55 +793,30 @@ const ExercisePage = memo(function ExercisePage({
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 44px", gap: "12px", marginTop: "5px" }}>
-                {showSteppers ? (
-                  <>
-                    <StepperUnit
-                      label="LB"
-                      focused={focusedWeight}
-                      onDecrement={() => stepSetValue(setIndex, "weight", -1)}
-                      onIncrement={() => stepSetValue(setIndex, "weight", 1)}
-                      decrementDisabled={(set.weight ?? 0) <= 0}
-                      incrementDisabled={false}
-                      step={WEIGHT_STEP}
-                    />
-                    <StepperUnit
-                      label="REPS"
-                      focused={focusedReps}
-                      onDecrement={() => stepSetValue(setIndex, "reps", -1)}
-                      onIncrement={() => stepSetValue(setIndex, "reps", 1)}
-                      decrementDisabled={typeof set.reps === "number" && set.reps <= REP_MIN}
-                      incrementDisabled={typeof set.reps === "number" && set.reps >= REP_MAX}
-                      step={REPS_STEP}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="text-center transition-colors duration-150"
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "7.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.14em",
-                        color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
-                      }}
-                    >
-                      LB
-                    </div>
-                    <div
-                      className="text-center transition-colors duration-150"
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "7.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.14em",
-                        color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
-                      }}
-                    >
-                      REPS
-                    </div>
-                  </>
-                )}
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  LB
+                </div>
+                <div
+                  className="text-center transition-colors duration-150"
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
+                  }}
+                >
+                  REPS
+                </div>
                 <div />
               </div>
 
@@ -1133,21 +990,38 @@ const ExercisePage = memo(function ExercisePage({
                   </div>
 
                   <div
+                    className="flex items-baseline flex-wrap"
                     style={{
+                      gap: "6px",
                       fontFamily: "var(--font-label)",
-                      fontSize: "8px",
-                      fontWeight: 500,
                       fontVariantNumeric: "tabular-nums",
-                      letterSpacing: "0.02em",
-                      color: "var(--ink-30)",
                     }}
                   >
-                    {plates.map((plate, plateIndex) => (
-                      <span key={plateIndex}>
-                        {plateIndex > 0 && " + "}
-                        {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
-                      </span>
-                    ))} {plateDisplayMode === "per-side" ? "per side" : "total"}
+                    <span
+                      style={{
+                        fontSize: "17px",
+                        fontWeight: 600,
+                        letterSpacing: "-0.01em",
+                        color: "var(--ink-85)",
+                      }}
+                    >
+                      {plates.map((plate, plateIndex) => (
+                        <span key={plateIndex}>
+                          {plateIndex > 0 && " + "}
+                          {plate.count > 1 ? `${plate.count}×` : ""}{plate.plate}
+                        </span>
+                      ))}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: 500,
+                        letterSpacing: "0.02em",
+                        color: "var(--ink-30)",
+                      }}
+                    >
+                      {plateDisplayMode === "per-side" ? "per side" : "total"}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1352,7 +1226,21 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const hasInitialScrollRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
   const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // While this is set, scroll events are relayout noise rather than the user
+  // choosing an exercise, so no index is written. Always released through
+  // holdIndexWrites' single timer — two timers racing is how a rotation used
+  // to slip an index write through mid-flip.
   const isOrientationChangingRef = useRef(false)
+  const indexWriteHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const indexWriteHoldUntilRef = useRef(0)
+  // Set by the input that starts a swipe, consumed when the scroll settles.
+  // Layout, the browser's own snapping and our own scrollTo all emit scroll
+  // events indistinguishable from a swipe's — and because the pager is
+  // scroll-behavior: smooth, a single stray scrollLeft write animates for the
+  // better part of a second and ends on a clean snap point, so neither a timer
+  // nor an "is it on a boundary" test can tell them apart. Whether the user
+  // actually touched the thing can.
+  const userDrivenScrollRef = useRef(false)
   // Last width the carousel was aligned against, so a relayout can be told
   // apart from a scroll.
   const pageWidthRef = useRef(0)
@@ -1431,15 +1319,39 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     exercisesRef.current = exercises
   }, [exercises])
 
+  // Stop reading scroll events as swipes for a while. Rotation, the keyboard
+  // and a return from the background all move the scroller on their own; every
+  // such move used to be able to land as "the user picked a different
+  // exercise".
+  const holdIndexWrites = useCallback((ms: number) => {
+    const until = Date.now() + ms
+    // Never shorten a hold already in flight: an alignment landing inside a
+    // rotation's window must not release the guard before the flip is over.
+    if (indexWriteHoldRef.current && until <= indexWriteHoldUntilRef.current) return
+    indexWriteHoldUntilRef.current = until
+    isOrientationChangingRef.current = true
+    if (indexWriteHoldRef.current) clearTimeout(indexWriteHoldRef.current)
+    indexWriteHoldRef.current = setTimeout(() => {
+      isOrientationChangingRef.current = false
+      indexWriteHoldRef.current = null
+      indexWriteHoldUntilRef.current = 0
+    }, ms)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (indexWriteHoldRef.current) clearTimeout(indexWriteHoldRef.current)
+    },
+    [],
+  )
+
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
-    let orientationResetTimeout: ReturnType<typeof setTimeout> | null = null
     const update = () => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
         scrollSettleTimeoutRef.current = null
       }
-      isOrientationChangingRef.current = true
       // The app is orientation-locked in software: PortraitLock rotates the
       // portrait layout to fill a landscape screen, so the session screen never
       // switches to its landscape layout. This effect still runs on rotation to
@@ -1447,15 +1359,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // carousel afterwards belongs to the resize observer below, which reacts
       // to the container actually changing width.
       setIsLandscapeMobile(false)
-      // Safety reset: if the matchMedia value doesn't change (e.g.
-      // orientationchange fires without flipping landscape/portrait), the
-      // scroll effect's deps stay equal and its RAF — which normally clears
-      // this flag — never runs. Without this fallback, handleScroll stays
-      // blocked forever and swipes can't advance the carousel.
-      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
-      orientationResetTimeout = setTimeout(() => {
-        isOrientationChangingRef.current = false
-      }, 300)
+      // Long enough to cover the whole flip. The rotation animation and the
+      // relayout that follows run well past a couple of frames, and the old
+      // 300ms release could expire mid-flip — leaving the tail of the relayout
+      // to be read as a swipe. holdIndexWrites owns the only release timer, so
+      // an alignment landing inside this window extends it rather than racing
+      // it.
+      holdIndexWrites(700)
     }
     update()
     query.addEventListener("change", update)
@@ -1463,9 +1373,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => {
       query.removeEventListener("change", update)
       window.removeEventListener("orientationchange", update)
-      if (orientationResetTimeout) clearTimeout(orientationResetTimeout)
     }
-  }, [])
+  }, [holdIndexWrites])
 
   const generateSetId = () => {
     const c: Crypto | undefined = typeof globalThis !== "undefined" ? globalThis.crypto : undefined
@@ -1902,22 +1811,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const isResting = Boolean(restState) && typeof restState?.remainingSeconds === "number"
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
 
-  // The set the user is about to perform. During rest this is always the
-  // current exercise's first incomplete set, so the dock can both show it and
-  // log it — collapsing "wait, find the row, tap" into one tap.
-  const restNextSet = (() => {
-    if (!currentExercise || firstIncompleteIndex === -1) return null
-    const set = currentExercise.sets?.[firstIncompleteIndex]
-    if (!set) return null
-    return {
-      exerciseName: getExerciseLabel(currentExercise.name),
-      setIndex: firstIncompleteIndex,
-      weight: set.weight as number | null,
-      reps: set.reps as number | null,
-      ready: !isSetIncomplete(set) && !set.validationFlags?.includes("reps_hard_invalid"),
-    }
-  })()
-
   // The dock is the countdown and nothing else: it appears when rest starts and
   // is gone the moment rest ends, whether that is SKIP or the timer running
   // out. No count-up, no second tap to dismiss.
@@ -1948,7 +1841,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     measure()
     window.addEventListener("resize", measure)
     return () => window.removeEventListener("resize", measure)
-  }, [showRestDock, Boolean(restNextSet)])
+  }, [showRestDock])
 
   const totalVolume = exercises.reduce((sum: number, exercise: any) => {
     const sets = Array.isArray(exercise?.sets) ? exercise.sets : []
@@ -2196,6 +2089,45 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     setRepCapErrors({})
   }, [currentExercise?.id, currentExercise?.sets?.length])
 
+  // The one definition of "put the carousel on page N". Returns false when the
+  // container has no width yet, so callers can retry on the next frame instead
+  // of scrolling to 0 × 0 and landing on the first exercise.
+  const alignCarousel = useCallback(
+    (index: number) => {
+      const container = scrollContainerRef.current
+      if (!container) return false
+      const width = container.offsetWidth
+      if (!width) return false
+      pageWidthRef.current = width
+      // Held across the scroll events our own scrollTo is about to emit. One
+      // frame is not enough: iOS can dispatch them a frame or two later.
+      holdIndexWrites(250)
+      container.scrollTo({ left: index * width, behavior: "instant" })
+      hasInitialScrollRef.current = true
+      return true
+    },
+    [holdIndexWrites],
+  )
+
+  // Align as soon as the container has a width, retrying across frames. Used
+  // wherever the carousel has to be put back after a relayout that may not have
+  // settled yet.
+  const alignCarouselWhenReady = useCallback(
+    (index: number) => {
+      let rafId = 0
+      let attempts = 0
+      const attempt = () => {
+        if (alignCarousel(index)) return
+        if (attempts >= 20) return
+        attempts += 1
+        rafId = requestAnimationFrame(attempt)
+      }
+      rafId = requestAnimationFrame(attempt)
+      return () => cancelAnimationFrame(rafId)
+    },
+    [alignCarousel],
+  )
+
   useEffect(() => {
     if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
@@ -2205,31 +2137,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // orientation change. Rotating back from landscape remounts this
       // container with scrollLeft 0, and the new portrait layout width is not
       // always ready on the first animation frame — reading offsetWidth too
-      // early resolves to 0 and scrolls to exercise 0. Retry across frames
-      // until the width is known, then scroll, and only re-enable handleScroll
-      // one frame later (via isOrientationChangingRef). That way the transient
-      // scrollLeft 0 the browser reports during the relayout — and the scroll
-      // event emitted by our own scrollTo — are never persisted as index 0.
-      let rafId = 0
-      let attempts = 0
-      const restore = () => {
-        const c = scrollContainerRef.current
-        if (!c) return
-        const width = c.offsetWidth
-        if (width === 0 && attempts < 20) {
-          attempts += 1
-          rafId = requestAnimationFrame(restore)
-          return
-        }
-        c.scrollTo({ left: currentExerciseIndex * width, behavior: "instant" })
-        pageWidthRef.current = width
-        hasInitialScrollRef.current = true
-        rafId = requestAnimationFrame(() => {
-          isOrientationChangingRef.current = false
-        })
-      }
-      rafId = requestAnimationFrame(restore)
-      return () => cancelAnimationFrame(rafId)
+      // early resolves to 0 and scrolls to exercise 0.
+      return alignCarouselWhenReady(currentExerciseIndex)
     }
 
     if (isScrollingProgrammatically.current) return
@@ -2241,47 +2150,86 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }, 400)
 
     return () => window.clearTimeout(timeout)
-  }, [currentExerciseIndex, isLandscapeMobile])
+  }, [alignCarouselWhenReady, currentExerciseIndex, isLandscapeMobile])
 
-  // Re-align the carousel whenever the page width changes under it.
+  // Re-align the carousel whenever the layout moves under it.
   //
   // Turning the phone re-lays out PortraitLock's rotated box, and the width the
   // carousel pages against can wobble for a few frames before it settles. The
   // scroll offset left over from the old width then divides into a different
   // exercise, and the first scroll event after the flip persists that as the
   // active one — so rotating the phone silently moved the workout to another
-  // exercise. Snapping back to the active exercise on every real width change
-  // fixes that, and also covers the on-screen keyboard and the URL bar
-  // collapsing. Index writes stay blocked until the snap has landed, and the
-  // snap leaves the offset exactly on the active page, so a scroll event that
-  // slips through afterwards resolves to the same index and writes nothing.
+  // exercise. Snapping back to the active exercise fixes that, and also covers
+  // the on-screen keyboard and the URL bar collapsing.
+  //
+  // A changed width is not the only way the offset goes wrong: the scroller can
+  // also be handed back sitting on the wrong page at the same width (a return
+  // from the background, a snap the browser redid across the resize). So the
+  // trigger is "the offset is no longer on the active page", not "the width
+  // changed" — the width-only check left exactly those cases unaligned.
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
     if (typeof ResizeObserver === "undefined") return
 
-    let rafId = 0
     const observer = new ResizeObserver(() => {
       const width = container.offsetWidth
       // Mid-relayout the container can report 0; there is nothing to align to.
       if (!width) return
-      if (width === pageWidthRef.current) return
-      pageWidthRef.current = width
-      isOrientationChangingRef.current = true
-      container.scrollTo({ left: currentExerciseIndexRef.current * width, behavior: "instant" })
-      hasInitialScrollRef.current = true
-      cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
-        isOrientationChangingRef.current = false
-      })
+      const target = currentExerciseIndexRef.current * width
+      if (width === pageWidthRef.current && Math.abs(container.scrollLeft - target) <= 1) return
+      alignCarousel(currentExerciseIndexRef.current)
     })
     observer.observe(container)
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(rafId)
-    }
+    return () => observer.disconnect()
     // The container only mounts post-hydration; without isHydrated the effect
     // runs once against a null ref and never attaches.
+  }, [alignCarousel, isHydrated])
+
+  // Coming back to the app is its own way of losing the carousel's place.
+  //
+  // Backgrounding a phone browser can hand the page back with the scroller
+  // reset or parked on a different page, at the very same width — so the
+  // resize observer never fires, nothing re-aligns, and the first scroll event
+  // after the return persists whatever page the offset now divides into. That
+  // is the "left the app and came back on the wrong exercise" case. Re-align on
+  // every return, and hold index writes while the layout settles.
+  useEffect(() => {
+    if (!isHydrated) return
+    let cancel: (() => void) | undefined
+    const realign = () => {
+      if (document.visibilityState !== "visible") return
+      holdIndexWrites(600)
+      cancel?.()
+      cancel = alignCarouselWhenReady(currentExerciseIndexRef.current)
+    }
+    document.addEventListener("visibilitychange", realign)
+    window.addEventListener("pageshow", realign)
+    return () => {
+      document.removeEventListener("visibilitychange", realign)
+      window.removeEventListener("pageshow", realign)
+      cancel?.()
+    }
+  }, [alignCarouselWhenReady, holdIndexWrites, isHydrated])
+
+  // Mark scrolling as the user's. Anything that reaches the pager as input is a
+  // swipe; everything else that moves it is not.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const mark = () => {
+      userDrivenScrollRef.current = true
+    }
+    container.addEventListener("pointerdown", mark, { passive: true })
+    container.addEventListener("touchstart", mark, { passive: true })
+    container.addEventListener("wheel", mark, { passive: true })
+    container.addEventListener("keydown", mark)
+    return () => {
+      container.removeEventListener("pointerdown", mark)
+      container.removeEventListener("touchstart", mark)
+      container.removeEventListener("wheel", mark)
+      container.removeEventListener("keydown", mark)
+    }
   }, [isHydrated])
 
   // Commit the exercise index the moment the swipe settles, using the native
@@ -2294,7 +2242,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (!container) return
     if (!("onscrollend" in window)) return
     const handleScrollEnd = () => {
-      if (isOrientationChangingRef.current) return
+      const wasUserDriven = userDrivenScrollRef.current
+      userDrivenScrollRef.current = false
+
       if (isScrollingProgrammatically.current) {
         isScrollingProgrammatically.current = false
         return
@@ -2302,6 +2252,21 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       const pageWidth = container.offsetWidth
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
+
+      // Nobody swiped, so whatever moved the pager — a rotation, the keyboard,
+      // the browser handing the page back after a spell in the background — has
+      // parked it on the wrong exercise. Put it back rather than recording where
+      // it drifted to. This is the whole bug: the pager used to keep the drift
+      // and write it down as the user's choice.
+      if (!wasUserDriven || isOrientationChangingRef.current) {
+        if (nextIndex !== currentExerciseIndexRef.current) {
+          alignCarousel(currentExerciseIndexRef.current)
+        }
+        return
+      }
+
+      // A settled swipe always lands exactly on a snap point.
+      if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
       if (nextIndex !== currentExerciseIndexRef.current) {
         void setExerciseIndex(nextIndex)
       }
@@ -2310,7 +2275,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => container.removeEventListener("scrollend", handleScrollEnd)
     // isHydrated is a dep because the scroll container only mounts post-hydration;
     // without it the effect runs once against a null ref and never re-attaches.
-  }, [isLandscapeMobile, isHydrated])
+  }, [alignCarousel, isLandscapeMobile, isHydrated])
 
 
   useEffect(() => {
@@ -2927,9 +2892,11 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
     if (isOrientationChangingRef.current) return
 
-    if (isScrollingProgrammatically.current) {
-      isScrollingProgrammatically.current = false
-    }
+    // A smooth scrollTo emits a stream of scroll events. Clearing the guard on
+    // the first of them left the rest — and the scrollend that follows — being
+    // read as a swipe. The guard is released by scrollend, or by the timeout in
+    // the effect that set it.
+    if (isScrollingProgrammatically.current) return
 
     if (scrollRafRef.current) return
     scrollRafRef.current = requestAnimationFrame(() => {
@@ -2941,7 +2908,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
       // Optimistic: highlight the rail segment while the swipe is still moving.
-      if (nextIndex !== uiExerciseIndex) {
+      // Only for a real swipe — a relayout dragging the offset across pages must
+      // not walk the header and rail through exercises the user never went to.
+      if (userDrivenScrollRef.current && nextIndex !== uiExerciseIndex) {
         setUiExerciseIndex(nextIndex)
       }
 
@@ -2953,6 +2922,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           clearTimeout(scrollSettleTimeoutRef.current)
         }
         scrollSettleTimeoutRef.current = setTimeout(() => {
+          const wasUserDriven = userDrivenScrollRef.current
+          userDrivenScrollRef.current = false
+          if (isOrientationChangingRef.current) return
+          if (!wasUserDriven) {
+            if (nextIndex !== currentExerciseIndexRef.current) {
+              alignCarousel(currentExerciseIndexRef.current)
+            }
+            return
+          }
+          if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
           if (nextIndex !== currentExerciseIndexRef.current) {
             void setExerciseIndex(nextIndex)
           }
@@ -3874,81 +3853,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               </div>
               </div>
 
-              {restNextSet && (
-                <div
-                  className="flex items-center justify-between gap-3"
-                  style={{
-                    marginTop: "10px",
-                    paddingTop: "10px",
-                    borderTop: "1px solid var(--ink-06)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "8px",
-                        fontWeight: 600,
-                        letterSpacing: "0.18em",
-                        color: "var(--ink-30)",
-                      }}
-                    >
-                      UP NEXT · SET {String(restNextSet.setIndex + 1).padStart(2, "0")}
-                    </div>
-                    <div
-                      className="truncate"
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        letterSpacing: "-0.01em",
-                        color: "var(--ink-70)",
-                        fontVariantNumeric: "tabular-nums",
-                        marginTop: "3px",
-                      }}
-                    >
-                      {restNextSet.exerciseName}
-                      {" · "}
-                      {restNextSet.weight ?? "—"} × {restNextSet.reps ?? "—"}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Deliberately tappable when the set is not loggable yet:
-                      // the dock covers the row, so a dead disabled button would
-                      // leave no way to find out which field is empty. This
-                      // flags the missing one behind the dock instead.
-                      if (!restNextSet.ready) {
-                        setValidationTrigger(Date.now())
-                        return
-                      }
-                      void completeSet(restNextSet.setIndex, {
-                        exerciseIndex: currentExerciseIndex,
-                        startRest: true,
-                      })
-                    }}
-                    className="flex items-center justify-center gap-1.5 transition-colors duration-150"
-                    style={{
-                      flexShrink: 0,
-                      minHeight: "36px",
-                      background: "var(--ink-06)",
-                      border: "1px solid var(--ink-12)",
-                      borderRadius: "var(--radius-flat)",
-                      padding: "6px 14px",
-                      fontFamily: "var(--font-label)",
-                      fontSize: "9.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.1em",
-                      color: "var(--ink-95)",
-                      opacity: restNextSet.ready ? 1 : 0.35,
-                      touchAction: "manipulation",
-                    }}
-                    type="button"
-                  >
-                    <Check size={13} strokeWidth={2} />
-                    LOG SET
-                  </button>
-                </div>
-              )}
             </motion.div>
           ) : null}
         </AnimatePresence>

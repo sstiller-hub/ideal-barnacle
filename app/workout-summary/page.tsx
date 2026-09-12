@@ -7,7 +7,7 @@ import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { getWorkoutHistory, normalizeExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
 import { copyWorkoutToClipboard } from "@/lib/workout-export"
@@ -75,10 +75,6 @@ function getMaxRepsAtWeight(sets: WorkoutSetRow[], weight: number) {
     ...sets.filter((s) => (s.weight ?? 0) === weight).map((s) => s.reps ?? 0),
     0,
   )
-}
-
-function normalizeExerciseName(name: string) {
-  return name.toLowerCase().trim().replace(/\s+/g, " ")
 }
 
 export default function WorkoutSummaryPage() {

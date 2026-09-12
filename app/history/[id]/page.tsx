@@ -7,14 +7,10 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect, useMemo } from "react"
-import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
+import { getWorkoutHistory, normalizeExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { copyWorkoutToClipboard } from "@/lib/workout-export"
 import { toast } from "sonner"
-
-function normalizeExerciseName(name: string) {
-  return name.toLowerCase().trim().replace(/\s+/g, " ")
-}
 
 function getWorkoutStats(workout: CompletedWorkout) {
   const exercises = workout.exercises ?? []
