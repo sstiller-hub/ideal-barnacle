@@ -1903,8 +1903,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const canFinishWorkout = exercises.every((exercise) => canExerciseBeFinished(exercise))
 
   // The set the user is about to perform. During rest this is always the
-  // current exercise's first incomplete set, so the dock can both show it and
-  // log it — collapsing "wait, find the row, tap" into one tap.
+  // current exercise's first incomplete set, so the dock can both name it and
+  // log it — collapsing "wait, find the row, tap" into one tap. It is named
+  // plainly (SET 02 · exercise · load) with no "up next" heading: the dock only
+  // ever shows the one set it can log, so a heading adds nothing.
   const restNextSet = (() => {
     if (!currentExercise || firstIncompleteIndex === -1) return null
     const set = currentExercise.sets?.[firstIncompleteIndex]
@@ -3885,17 +3887,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 >
                   <div style={{ minWidth: 0 }}>
                     <div
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "8px",
-                        fontWeight: 600,
-                        letterSpacing: "0.18em",
-                        color: "var(--ink-30)",
-                      }}
-                    >
-                      UP NEXT · SET {String(restNextSet.setIndex + 1).padStart(2, "0")}
-                    </div>
-                    <div
                       className="truncate"
                       style={{
                         fontSize: "13px",
@@ -3903,9 +3894,20 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                         letterSpacing: "-0.01em",
                         color: "var(--ink-70)",
                         fontVariantNumeric: "tabular-nums",
-                        marginTop: "3px",
                       }}
                     >
+                      <span
+                        style={{
+                          fontFamily: "var(--font-label)",
+                          fontSize: "8px",
+                          fontWeight: 600,
+                          letterSpacing: "0.18em",
+                          color: "var(--ink-30)",
+                        }}
+                      >
+                        SET {String(restNextSet.setIndex + 1).padStart(2, "0")}
+                      </span>
+                      {" · "}
                       {restNextSet.exerciseName}
                       {" · "}
                       {restNextSet.weight ?? "—"} × {restNextSet.reps ?? "—"}

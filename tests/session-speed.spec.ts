@@ -72,7 +72,9 @@ test.describe("Rest dock", () => {
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toBeVisible()
+    // The dock names the set it can log and nothing more — no "UP NEXT" band.
+    await expect(page.getByText(/UP NEXT/i)).toHaveCount(0)
     const logSet = page.getByRole("button", { name: /LOG SET/i })
     await expect(logSet).toBeVisible()
 
@@ -116,11 +118,11 @@ test.describe("Rest dock", () => {
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toBeVisible()
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toBeVisible()
     await page.getByRole("button", { name: "SKIP" }).click()
 
     // One tap and the dock is gone — no count-up, no second dismissal.
-    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0)
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
     await expect(page.getByRole("button", { name: /LOG SET/i })).toHaveCount(0)
   })
@@ -139,7 +141,7 @@ test.describe("Rest dock", () => {
       await shorten.click()
     }
 
-    await expect(page.getByText(/UP NEXT · SET 02/)).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0, { timeout: 15_000 })
     await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
   })
 })
