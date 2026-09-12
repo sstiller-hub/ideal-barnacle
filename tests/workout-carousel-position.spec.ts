@@ -12,7 +12,13 @@
 import { test, expect } from "@playwright/test"
 
 const PORTRAIT = { width: 390, height: 844 }
-const LANDSCAPE = { width: 844, height: 390 }
+// A real phone's landscape viewport is shorter than its portrait width: the
+// browser chrome eats into it. That matters here, because PortraitLock sizes
+// its rotated box to 100vh, so the carousel's page width is the portrait width
+// in portrait and the landscape viewport height in landscape. Making the two
+// equal (844x390 against 390x844) is the one geometry where rotating cannot
+// move the carousel at all, which is exactly the case worth not testing.
+const LANDSCAPE = { width: 844, height: 330 }
 
 test.use({ viewport: PORTRAIT, hasTouch: true, isMobile: true })
 
@@ -163,28 +169,78 @@ test.describe("Active workout: the carousel keeps its place", () => {
     expect(await storedIndex(page)).toBe(2)
   })
 
-  test("after browsing to another exercise then rotating", async ({ page }) => {
+  test("a relayout landing late in a rotation is not read as a swipe", async ({ page }) => {
     test.slow()
     await seed(page)
     await page.goto(`/workout/session?routineId=${routine.id}`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
-    // Swipe back to exercise 1 (index 0).
+    // setViewportSize resizes in one shot, so it cannot reproduce a real
+    // rotation's timing: the animation and the relayout that follows it run for
+    // several hundred milliseconds, and scroll events keep arriving the whole
+    // way. This drives that window directly — rotate, then let the layout move
+    // the scroller once the flip is already well underway.
+    await page.evaluate(() => window.dispatchEvent(new Event("orientationchange")))
+    await page.waitForTimeout(450)
     await page.evaluate(() => {
       const el = document.querySelector("[data-testid='exercise-pager']") as HTMLElement
-      el.scrollTo({ left: 0, behavior: "instant" as ScrollBehavior })
+      el.scrollLeft = 0
       el.dispatchEvent(new Event("scroll"))
       el.dispatchEvent(new Event("scrollend"))
     })
+    await page.waitForTimeout(600)
+
+    expect(await storedIndex(page)).toBe(2)
+    expect(await visiblePage(page)).toBe(2)
+  })
+
+  test("an offset between two pages is never persisted as an exercise", async ({ page }) => {
+    test.slow()
+    await seed(page)
+    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
+
+    // Nothing touched the pager, so this offset came from the layout. It must be
+    // undone, not recorded.
+    await page.evaluate(() => {
+      const el = document.querySelector("[data-testid='exercise-pager']") as HTMLElement
+      el.scrollLeft = Math.round(el.clientWidth * 0.35)
+      el.dispatchEvent(new Event("scroll"))
+      el.dispatchEvent(new Event("scrollend"))
+    })
+    await page.waitForTimeout(1200)
+
+    expect(await storedIndex(page)).toBe(2)
+    expect(await visiblePage(page)).toBe(2)
+  })
+
+  test("a real swipe still moves the exercise, and survives a rotation", async ({ page }) => {
+    test.slow()
+    await seed(page)
+    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await expect(page.getByText("Overhead Press").first()).toBeVisible()
+    await page.waitForTimeout(800)
+
+    // A genuine input gesture, not a synthetic scrollLeft write — the pager only
+    // treats scrolling as a choice when the user actually drove it, so this also
+    // guards against the fix swallowing real swipes.
+    const pager = page.locator("[data-testid='exercise-pager']")
+    await pager.hover()
+    await page.mouse.wheel(-2000, 0)
+    await page.waitForTimeout(1200)
+
     expect(await visiblePage(page)).toBe(0)
+    expect(await storedIndex(page)).toBe(0)
 
     await page.setViewportSize(LANDSCAPE)
     await page.waitForTimeout(800)
     await page.setViewportSize(PORTRAIT)
     await page.waitForTimeout(800)
 
+    // Rotation keeps the exercise the swipe landed on, not the one before it.
     expect(await visiblePage(page)).toBe(0)
+    expect(await storedIndex(page)).toBe(0)
   })
 })

@@ -1233,6 +1233,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
   const isOrientationChangingRef = useRef(false)
   const indexWriteHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const indexWriteHoldUntilRef = useRef(0)
+  // Set by the input that starts a swipe, consumed when the scroll settles.
+  // Layout, the browser's own snapping and our own scrollTo all emit scroll
+  // events indistinguishable from a swipe's — and because the pager is
+  // scroll-behavior: smooth, a single stray scrollLeft write animates for the
+  // better part of a second and ends on a clean snap point, so neither a timer
+  // nor an "is it on a boundary" test can tell them apart. Whether the user
+  // actually touched the thing can.
+  const userDrivenScrollRef = useRef(false)
   // Last width the carousel was aligned against, so a relayout can be told
   // apart from a scroll.
   const pageWidthRef = useRef(0)
@@ -2222,6 +2230,26 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     }
   }, [alignCarouselWhenReady, holdIndexWrites, isHydrated])
 
+  // Mark scrolling as the user's. Anything that reaches the pager as input is a
+  // swipe; everything else that moves it is not.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const mark = () => {
+      userDrivenScrollRef.current = true
+    }
+    container.addEventListener("pointerdown", mark, { passive: true })
+    container.addEventListener("touchstart", mark, { passive: true })
+    container.addEventListener("wheel", mark, { passive: true })
+    container.addEventListener("keydown", mark)
+    return () => {
+      container.removeEventListener("pointerdown", mark)
+      container.removeEventListener("touchstart", mark)
+      container.removeEventListener("wheel", mark)
+      container.removeEventListener("keydown", mark)
+    }
+  }, [isHydrated])
+
   // Commit the exercise index the moment the swipe settles, using the native
   // scrollend event where available. This replaces the fixed settle-debounce
   // (the "wakes up late" feel); the debounce in handleScroll remains only as the
@@ -2232,7 +2260,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     if (!container) return
     if (!("onscrollend" in window)) return
     const handleScrollEnd = () => {
-      if (isOrientationChangingRef.current) return
+      const wasUserDriven = userDrivenScrollRef.current
+      userDrivenScrollRef.current = false
+
       if (isScrollingProgrammatically.current) {
         isScrollingProgrammatically.current = false
         return
@@ -2240,9 +2270,20 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       const pageWidth = container.offsetWidth
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
-      // A settled swipe always lands exactly on a snap point. An offset between
-      // pages means the layout is still moving, not that the user chose this
-      // exercise — the last guard before a relayout writes the wrong index.
+
+      // Nobody swiped, so whatever moved the pager — a rotation, the keyboard,
+      // the browser handing the page back after a spell in the background — has
+      // parked it on the wrong exercise. Put it back rather than recording where
+      // it drifted to. This is the whole bug: the pager used to keep the drift
+      // and write it down as the user's choice.
+      if (!wasUserDriven || isOrientationChangingRef.current) {
+        if (nextIndex !== currentExerciseIndexRef.current) {
+          alignCarousel(currentExerciseIndexRef.current)
+        }
+        return
+      }
+
+      // A settled swipe always lands exactly on a snap point.
       if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
       if (nextIndex !== currentExerciseIndexRef.current) {
         void setExerciseIndex(nextIndex)
@@ -2252,7 +2293,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     return () => container.removeEventListener("scrollend", handleScrollEnd)
     // isHydrated is a dep because the scroll container only mounts post-hydration;
     // without it the effect runs once against a null ref and never re-attaches.
-  }, [isLandscapeMobile, isHydrated])
+  }, [alignCarousel, isLandscapeMobile, isHydrated])
 
 
   useEffect(() => {
@@ -2885,7 +2926,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       if (!pageWidth) return
       const nextIndex = Math.round(container.scrollLeft / pageWidth)
       // Optimistic: highlight the rail segment while the swipe is still moving.
-      if (nextIndex !== uiExerciseIndex) {
+      // Only for a real swipe — a relayout dragging the offset across pages must
+      // not walk the header and rail through exercises the user never went to.
+      if (userDrivenScrollRef.current && nextIndex !== uiExerciseIndex) {
         setUiExerciseIndex(nextIndex)
       }
 
@@ -2897,7 +2940,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           clearTimeout(scrollSettleTimeoutRef.current)
         }
         scrollSettleTimeoutRef.current = setTimeout(() => {
+          const wasUserDriven = userDrivenScrollRef.current
+          userDrivenScrollRef.current = false
           if (isOrientationChangingRef.current) return
+          if (!wasUserDriven) {
+            if (nextIndex !== currentExerciseIndexRef.current) {
+              alignCarousel(currentExerciseIndexRef.current)
+            }
+            return
+          }
           if (Math.abs(container.scrollLeft - nextIndex * pageWidth) > 2) return
           if (nextIndex !== currentExerciseIndexRef.current) {
             void setExerciseIndex(nextIndex)
