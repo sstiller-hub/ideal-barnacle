@@ -23,6 +23,7 @@ import {
 } from "@/lib/autosave-workout-storage"
 import { clearActiveWorkoutRoute, getActiveWorkoutRoute } from "@/lib/active-workout-route"
 import { deleteWorkoutDraft } from "@/lib/workout-draft-storage"
+import { abandonActiveSessions } from "@/lib/supabase-session-sync"
 import { GROWTH_V2_ROUTINES, GROWTH_V2_WEEKLY } from "@/lib/growth-v2-plan"
 import {
   getScheduledWorkoutForDate,
@@ -358,6 +359,7 @@ export default function Home() {
     if (workoutId) {
       await deleteWorkoutDraft(workoutId)
     }
+    await abandonActiveSessions()
     setSession(null)
     loadDataForDate(selectedDate)
   }
@@ -2170,7 +2172,11 @@ export default function Home() {
         </div>
       )}
 
-      {session && !isSessionDay && (
+      {/* The dock is the only way back to a live session from a day that isn't
+          rendering it. A completed workout on the session's own day outranks
+          "activeSession" in actualState, so keying off isSessionDay alone left
+          the session with no reachable controls at all. */}
+      {session && actualState !== "activeSession" && (
         <div
           className="fixed left-0 right-0 z-[70] px-5"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
@@ -2206,13 +2212,23 @@ export default function Home() {
                 {session.routineName || "Workout"}
               </div>
             </div>
+            {!isSessionDay && (
+              <button
+                onClick={goToSessionDay}
+                className="flex-shrink-0 transition-colors duration-base"
+                style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+                type="button"
+              >
+                View day
+              </button>
+            )}
             <button
-              onClick={goToSessionDay}
+              onClick={handleDiscardActiveWorkout}
               className="flex-shrink-0 transition-colors duration-base"
               style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
               type="button"
             >
-              View day
+              Discard
             </button>
             <button
               onClick={handleResumeExisting}

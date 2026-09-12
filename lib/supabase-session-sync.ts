@@ -52,6 +52,25 @@ export async function resolveMultipleActiveSessions(userId: string): Promise<Wor
   return keep
 }
 
+// Discarding a workout only cleared local storage, so the server row stayed
+// 'active' forever and the next workout silently adopted it via
+// getOrCreateActiveSession. Ending a session has to close that row too.
+export async function abandonActiveSessions(): Promise<void> {
+  const userId = await requireUserId()
+  if (!userId || !supabase) return
+
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from("workout_sessions")
+    .update({ status: "abandoned", ended_at: now, updated_at: now })
+    .eq("user_id", userId)
+    .eq("status", "active")
+
+  if (error) {
+    console.warn("abandonActiveSessions failed", error)
+  }
+}
+
 export async function getOrCreateActiveSession(): Promise<WorkoutSessionRow | null> {
   const userId = await requireUserId()
   if (!userId) return null
