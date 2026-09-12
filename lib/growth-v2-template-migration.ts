@@ -16,7 +16,7 @@
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import type { RoutineExercise, WorkoutRoutine } from "@/lib/routine-storage"
 
-const MIGRATION_KEY = "growth_v2_template_migration_v1"
+const MIGRATION_KEY = "growth_v2_template_migration_v2"
 const ROUTINES_KEY = "workout_routines_v2"
 
 type TemplateOp =
@@ -26,8 +26,21 @@ type TemplateOp =
   | { kind: "remove"; removeId: string }
   /** Insert a slot directly after another one (appended if the anchor is gone). */
   | { kind: "insertAfter"; afterId: string; addId: string }
+  /** Pull an existing slot's set/rep targets back in line with the plan. */
+  | { kind: "resync"; id: string }
 
 const OPS: Array<{ routineId: string; routineName: string; ops: TemplateOp[] }> = [
+  {
+    routineId: "growth-v2-upper-1",
+    routineName: "Upper 1 – Chest + Lats",
+    // Delts machine drops its fourth set.
+    ops: [{ kind: "resync", id: "upper1-delts" }],
+  },
+  {
+    routineId: "growth-v2-shoulders-arms",
+    routineName: "Shoulders & Arms – Joint-Smart",
+    ops: [{ kind: "resync", id: "sa-delts" }],
+  },
   {
     routineId: "growth-v2-legs-2",
     routineName: "Legs 2 – Glutes + Hamstrings",
@@ -65,6 +78,29 @@ function applyOp(
   if (op.kind === "remove") {
     const next = exercises.filter((exercise) => exercise.id !== op.removeId)
     return { exercises: next, changed: next.length !== exercises.length }
+  }
+
+  if (op.kind === "resync") {
+    const index = exercises.findIndex((exercise) => exercise.id === op.id)
+    if (index === -1) return { exercises, changed: false }
+    const definition = findPlanExercise(routineId, op.id)
+    if (!definition) return { exercises, changed: false }
+    const current = exercises[index]
+    if (
+      current.targetSets === definition.targetSets &&
+      current.targetReps === definition.targetReps
+    ) {
+      return { exercises, changed: false }
+    }
+    // Only the targets: the slot keeps its position, its name and anything the
+    // user set on it.
+    const next = [...exercises]
+    next.splice(index, 1, {
+      ...current,
+      targetSets: definition.targetSets,
+      targetReps: definition.targetReps,
+    })
+    return { exercises: next, changed: true }
   }
 
   // Already applied (or hand-added by the user) — never insert a duplicate.

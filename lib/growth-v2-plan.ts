@@ -84,7 +84,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "10-12",
       }),
-      ex({ id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 4, targetReps: "12-20" }),
+      ex({ id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" }),
       ex({ id: "upper1-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12" }),
       ex({ id: "upper1-hanging-leg-raise", name: "Hanging Leg Raise", type: "other", targetSets: 3, targetReps: "12" }),
     ],
@@ -202,7 +202,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "12-15",
       }),
-      ex({ id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 4, targetReps: "12-20" }),
+      ex({ id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" }),
       ex({
         id: "sa-tri-machine",
         name: "Technogym Triceps Extension Machine",

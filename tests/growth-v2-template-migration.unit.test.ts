@@ -42,6 +42,34 @@ function storedRoutines(): WorkoutRoutine[] {
       ],
     },
     {
+      id: "growth-v2-upper-1",
+      name: "Upper 1 – Chest + Lats",
+      description: "Chest and lats day.",
+      estimatedTime: "50 min",
+      category: "Growth v2",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      exercises: [
+        { id: "upper1-chest-press", name: "Machine Chest Press", type: "strength", targetSets: 3, targetReps: "8-10" },
+        // Snapshotted when the delts machine still ran four sets.
+        { id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 4, targetReps: "12-20" },
+        { id: "upper1-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12" },
+      ],
+    },
+    {
+      id: "growth-v2-shoulders-arms",
+      name: "Shoulders & Arms – Joint-Smart",
+      description: "Shoulders and arms day.",
+      estimatedTime: "45 min",
+      category: "Growth v2",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      exercises: [
+        { id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 4, targetReps: "12-20" },
+        { id: "sa-tri-machine", name: "Technogym Triceps Extension Machine", type: "strength", targetSets: 3, targetReps: "10-12" },
+      ],
+    },
+    {
       id: "my-custom-day",
       name: "Custom Day",
       description: "User created.",
@@ -151,4 +179,34 @@ test("user reordering inside a built-in routine is preserved", () => {
     "upper2-incline-db",
     "upper2-side-crunch",
   ])
+})
+
+const slot = (routines: WorkoutRoutine[], routineId: string, exerciseId: string) =>
+  routines.find((routine) => routine.id === routineId)!.exercises.find((exercise) => exercise.id === exerciseId)!
+
+test("the delts machine drops its fourth set on both days it appears on", () => {
+  const { routines } = applyGrowthV2TemplateOps(storedRoutines())
+  assert.equal(slot(routines, "growth-v2-upper-1", "upper1-delts").targetSets, 3)
+  assert.equal(slot(routines, "growth-v2-shoulders-arms", "sa-delts").targetSets, 3)
+})
+
+test("dropping the set leaves the rest of the slot and the day alone", () => {
+  const { routines } = applyGrowthV2TemplateOps(storedRoutines())
+  const delts = slot(routines, "growth-v2-upper-1", "upper1-delts")
+  assert.equal(delts.name, "Technogym Delts Machine")
+  assert.equal(delts.targetReps, "12-20")
+  // Same slot, same position, and nothing else on the day moved.
+  assert.deepEqual(ids(routines, "growth-v2-upper-1"), [
+    "upper1-chest-press",
+    "upper1-delts",
+    "upper1-cable-crunch",
+  ])
+  assert.equal(slot(routines, "growth-v2-shoulders-arms", "sa-tri-machine").targetSets, 3)
+})
+
+test("re-running does not touch the delts slot again", () => {
+  const first = applyGrowthV2TemplateOps(storedRoutines())
+  const second = applyGrowthV2TemplateOps(first.routines)
+  assert.equal(second.changed, false)
+  assert.equal(slot(second.routines, "growth-v2-upper-1", "upper1-delts").targetSets, 3)
 })
