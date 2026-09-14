@@ -932,9 +932,21 @@ const ExercisePage = memo(function ExercisePage({
                     {plates.map((plate, plateIndex) => (
                       <div key={plateIndex} className="flex items-center gap-1">
                         {Array.from({ length: plate.count }).map((_, countIndex) => {
-                          // Plate size is carried by height alone. Colour-coding
-                          // them put the app's only hues on something that isn't
-                          // an earned value, so the bar goes monochrome.
+                          // The plate stack is one of the few places in the app
+                          // that earns colour: the hue is the plate's identity in
+                          // the gym, so it reads at a glance mid-set. Competition
+                          // coding for the big three (45 blue, 35 yellow, 25
+                          // green); the small change plates stay neutral so they
+                          // never compete with them.
+                          const getPlateColor = () => {
+                            if (plate.plate === 45) return "#2F6FE4"
+                            if (plate.plate === 35) return "#E8B92B"
+                            if (plate.plate === 25) return "#28A76A"
+                            if (plate.plate === 10) return "#E8E8E8"
+                            if (plate.plate === 5) return "#9A9A9A"
+                            return "#6A6A6A"
+                          }
+
                           const getPlateHeight = () => {
                             if (plate.plate === 45) return 40
                             if (plate.plate === 35) return 34
@@ -950,7 +962,7 @@ const ExercisePage = memo(function ExercisePage({
                               style={{
                                 width: "7px",
                                 height: `${getPlateHeight()}px`,
-                                background: "var(--ink-70)",
+                                background: getPlateColor(),
                                 borderRadius: "2px",
                               }}
                             />
