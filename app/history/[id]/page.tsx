@@ -2,8 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { plural } from "@/lib/utils"
-import { ChevronLeft } from "lucide-react"
+import { Share } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import { IosNavPage } from "@/components/ios/nav-bar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect, useMemo } from "react"
@@ -134,37 +135,18 @@ export default function WorkoutDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div
-        className="sticky top-0 z-10"
-        style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
-      >
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
+    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+      <IosNavPage
+        backLabel="History"
+        onBack={() => router.push("/history")}
+        title={workout.name}
+        longTitle
+        subtitle={headerDateLabel}
+        action={
           <button
             type="button"
-            onClick={() => router.push("/history")}
-            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
-            style={{ background: "transparent", border: "none", padding: "0", cursor: "pointer" }}
-            aria-label="Back to workout history"
-          >
-            <ChevronLeft size={16} strokeWidth={2} />
-            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>Back</span>
-          </button>
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">Workout Summary</p>
-            <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
-            <p className="text-xs text-muted-foreground">{headerDateLabel}</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/workout-summary/transcribe?workoutId=${workout.id}`)}
-          >
-            Whoop
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+            className="ios-navbar__action"
+            aria-label="Copy workout"
             onClick={async () => {
               try {
                 await copyWorkoutToClipboard(workout)
@@ -174,12 +156,11 @@ export default function WorkoutDetailPage() {
               }
             }}
           >
-            Copy
-          </Button>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+            <Share size={22} strokeWidth={1.8} />
+          </button>
+        }
+      >
+      <div className="max-w-2xl mx-auto px-4 space-y-6">
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -332,6 +313,7 @@ export default function WorkoutDetailPage() {
           })}
         </div>
       </div>
+      </IosNavPage>
     </div>
   )
 }

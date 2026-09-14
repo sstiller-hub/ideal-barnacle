@@ -395,3 +395,376 @@
     opacity: 0;
   }
 }
+
+/* ==========================================================================
+   iOS native pass — chrome primitives
+   --------------------------------------------------------------------------
+   Everything below styles navigation, lists, filter controls and the floating
+   glass surfaces only. The ledger visual language (Bebas numerals, band
+   headers, receipt rows) is untouched.
+
+   The handoff's ink ladder (95 90 70 55 45 38 30 22 14 10 06 04) is mapped
+   onto the app's existing scale rather than extended:
+     55 → ink-50   45 → ink-40   38 → ink-35
+     22 → ink-20   14 → ink-15   10 → ink-08
+   ========================================================================== */
+
+:root {
+  /* Floating glass — shared by the tab bar and the rest capsule */
+  --ios-glass-bg: rgba(60, 60, 60, 0.55);
+  --ios-glass-blur: blur(28px) saturate(1.4);
+  --ios-glass-ring: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+  --ios-glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+
+  /* Grouped surfaces */
+  --ios-grouped-bg: #101010;
+  --ios-menu-bg: rgba(36, 36, 38, 0.94);
+  --ios-hairline: var(--ink-15);
+
+  /* The tab bar floats 36pt above the bottom inset and is 54pt tall; scroll
+     containers reserve this much so content always clears it. */
+  --ios-tabbar-clearance: 120px;
+}
+
+/* --- Large-title navigation ---------------------------------------------- */
+
+.ios-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.ios-navbar[data-scrolled="true"] {
+  box-shadow: 0 0.5px 0 var(--ios-hairline);
+}
+
+.ios-navbar__back,
+.ios-navbar__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 8px 0 4px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.ios-navbar__action {
+  gap: 6px;
+  padding: 0 10px;
+  font-weight: 600;
+}
+
+/* Inline title that takes over once the large title scrolls out of view */
+.ios-navbar__inline-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 56%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-theatre);
+  pointer-events: none;
+}
+
+.ios-navbar__inline-title[data-visible="true"] {
+  opacity: 1;
+}
+
+.ios-large-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+  color: #fff;
+  padding: 2px 20px 8px;
+}
+
+.ios-large-title[data-long="true"] {
+  font-size: 28px;
+}
+
+.ios-ltsub {
+  font-size: 15px;
+  color: var(--ink-40);
+  padding: 0 20px 12px;
+}
+
+/* --- Grouped sections ----------------------------------------------------- */
+
+.ios-ghd {
+  font-size: 13px;
+  color: var(--ink-40);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 26px 32px 7px;
+}
+
+.ios-gft {
+  font-size: 13px;
+  color: var(--ink-40);
+  line-height: 1.4;
+  padding: 7px 32px 0;
+}
+
+.ios-card {
+  background: var(--ios-grouped-bg);
+  border-radius: 10px;
+  margin: 0 16px;
+  padding: 18px;
+  border: none;
+}
+
+.ios-grp {
+  background: var(--ios-grouped-bg);
+  border-radius: 10px;
+  margin: 0 16px;
+  overflow: hidden;
+}
+
+.ios-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Hairlines inset to the text (16pt), or past the icon tile (57pt). */
+.ios-row + .ios-row::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 0;
+  top: 0;
+  height: 0.5px;
+  background: var(--ios-hairline);
+}
+
+.ios-grp[data-icons="true"] .ios-row + .ios-row::before {
+  left: 57px;
+}
+
+.ios-row__value {
+  margin-left: auto;
+  font-size: 17px;
+  color: var(--ink-40);
+  white-space: nowrap;
+}
+
+.ios-row__chevron {
+  color: var(--ink-30);
+  flex-shrink: 0;
+}
+
+/* Monochrome 29pt icon tile used by the Settings root */
+.ios-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: var(--ink-15);
+  color: #fff;
+}
+
+/* --- Segmented control ---------------------------------------------------- */
+
+.ios-segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--ink-08);
+  border-radius: 9px;
+  padding: 2px;
+}
+
+.ios-segmented__seg {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-70);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.ios-segmented__seg[data-selected="true"] {
+  background: var(--ink-20);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Pull-down chip + menu ------------------------------------------------ */
+
+.ios-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink-08);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.ios-chip[data-open="true"] {
+  background: var(--ink-20);
+}
+
+.ios-menu {
+  position: absolute;
+  z-index: 80;
+  width: 250px;
+  border-radius: 13px;
+  background: var(--ios-menu-bg);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  transform-origin: top left;
+  animation: ios-menu-in var(--duration-base) ease-out forwards;
+}
+
+@keyframes ios-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ios-menu__header {
+  font-size: 12px;
+  color: var(--ink-40);
+  padding: 10px 16px 7px;
+  box-shadow: inset 0 -0.5px 0 var(--ios-hairline);
+}
+
+.ios-menu__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ios-menu__item + .ios-menu__item::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 0;
+  top: 0;
+  height: 0.5px;
+  background: var(--ios-hairline);
+}
+
+/* --- Native switch -------------------------------------------------------- */
+
+.ios-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 51px;
+  height: 31px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink-15);
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-theatre);
+}
+
+.ios-switch[data-on="true"] {
+  background: var(--good);
+}
+
+.ios-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  transition: transform var(--duration-base) var(--ease-theatre);
+}
+
+.ios-switch[data-on="true"]::after {
+  transform: translateX(20px);
+}
+
+.ios-switch:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Floating glass (tab bar + rest capsule) ------------------------------ */
+
+.ios-glass {
+  background: var(--ios-glass-bg);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  box-shadow: var(--ios-glass-ring), var(--ios-glass-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ios-menu {
+    animation: none;
+  }
+
+  .ios-switch,
+  .ios-switch::after {
+    transition: none;
+  }
+}

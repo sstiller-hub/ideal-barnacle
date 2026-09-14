@@ -42,6 +42,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // viewport-fit=cover lets env(safe-area-inset-*) report real values so the
+  // chrome can clear the Dynamic Island and the home indicator.
+  viewportFit: "cover",
   themeColor: "#000000",
 }
 

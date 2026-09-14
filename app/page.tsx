@@ -44,7 +44,8 @@ import { computeWeekOverWeek, computeWeeklyPace } from "@/lib/workout-analytics"
 import { supabase } from "@/lib/supabase"
 import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
 import { getPrExcludedExercises } from "@/lib/pr-exclusions"
-import { Settings, ChevronRight } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
+import { IosTabBar } from "@/components/ios/tab-bar"
 import { BandHeader } from "@/components/ledger/band-header"
 import { DeltaChip } from "@/components/ledger/delta-chip"
 import { Sparkline } from "@/components/ledger/sparkline"
@@ -988,6 +989,34 @@ export default function Home() {
 
   const workoutOptions = routinePool.map((routine) => ({ id: routine.id, name: routine.name }))
 
+  // Rows in the routine pull-down carry "when you last did it · how much you
+  // moved", so picking today's plan is a decision made against the record
+  // rather than against a bare name.
+  const routineMenuOptions = useMemo(() => {
+    const latestByName = new Map<string, { date: string; volume: number }>()
+    for (const workout of workoutHistory) {
+      const existing = latestByName.get(workout.name)
+      if (existing && new Date(existing.date) >= new Date(workout.date)) continue
+      latestByName.set(workout.name, {
+        date: workout.date,
+        volume: workout.stats?.totalVolume ?? 0,
+      })
+    }
+    return [
+      { value: "rest", label: "Rest", detail: undefined as string | undefined },
+      ...workoutOptions.map((routine) => {
+        const last = latestByName.get(routine.name)
+        return {
+          value: routine.id,
+          label: routine.name,
+          detail: last
+            ? `${new Date(last.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${formatK(last.volume)}`
+            : "Not trained yet",
+        }
+      }),
+    ]
+  }, [workoutHistory, workoutOptions])
+
   const getExerciseLabel = (name: string) => {
     const lower = name.trim().toLowerCase()
     if (lower === "leg extension (light)") {
@@ -1445,30 +1474,15 @@ export default function Home() {
 
   return (
     <>
-      <button
-        onClick={() => router.push("/settings")}
-        className="fixed z-[60] text-ink-25 hover:text-ink-50 transition-colors duration-base"
-        style={{
-          top: "calc(env(safe-area-inset-top, 0px) + 10px)",
-          right: "calc(18px + env(safe-area-inset-right, 0px))",
-          background: "transparent",
-          border: "none",
-          padding: "8px",
-          cursor: "pointer",
-          pointerEvents: "auto",
-        }}
-        aria-label="Open settings"
-        type="button"
-      >
-        <Settings size={16} strokeWidth={1.5} />
-      </button>
+      {/* Settings is a tab now (see IosTabBar below), so the header carries no
+          gear — only the alert dot, which is state, not navigation. */}
       {workoutAlerts.length > 0 && (
         <button
           onClick={() => setShowAlertsSheet(true)}
           className="fixed z-[60]"
           style={{
             top: "calc(env(safe-area-inset-top, 0px) + 14px)",
-            right: "calc(50px + env(safe-area-inset-right, 0px))",
+            right: "calc(20px + env(safe-area-inset-right, 0px))",
             background: "transparent",
             border: "none",
             padding: "8px",
@@ -1501,7 +1515,8 @@ export default function Home() {
         style={{
           height: "var(--app-vh)",
           paddingTop: "max(env(safe-area-inset-top, 0px), 8px)",
-          paddingBottom: "env(safe-area-inset-bottom, 100px)",
+          // Clears the floating tab bar, which sits 36pt above the bottom inset.
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
           background: "#0D0D0F",
           boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
         }}
@@ -1595,12 +1610,12 @@ export default function Home() {
                 {selectedTitle}
               </h1>
               {!isPastDay && (
-                <ChevronRight
+                <ChevronDown
                   size={20}
                   strokeWidth={1.5}
                   className="text-ink-30 mt-2 transition-transform duration-base"
                   style={{
-                    transform: showWorkoutPicker ? "rotate(90deg)" : "rotate(0deg)",
+                    transform: showWorkoutPicker ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 />
               )}
@@ -1650,88 +1665,56 @@ export default function Home() {
         </div>
 
         {showWorkoutPicker && !isPastDay && (
-          <div className="mt-6 -mx-5">
-            <div className="fixed inset-0 z-40" onClick={() => setShowWorkoutPicker(false)} style={{ background: "transparent" }} />
+          <>
+            {/* A UIMenu dims what it covers rather than sliding a tray in. */}
             <div
-              className="relative z-50 flex gap-3 overflow-x-auto px-5 pb-1"
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                WebkitOverflowScrolling: "touch",
-                animation: "slideInDown var(--duration-slow) var(--ease-theatre) forwards",
-              }}
+              className="fixed inset-0 z-[70]"
+              onClick={() => setShowWorkoutPicker(false)}
+              style={{ background: "rgba(0, 0, 0, 0.35)" }}
+            />
+            <div
+              role="menu"
+              className="ios-menu"
+              style={{ top: "100%", left: "20px", width: "290px", marginTop: "8px" }}
             >
-              <button
-                onClick={() => handleSelectWorkoutType(null)}
-                className="flex-shrink-0 transition-all duration-base"
-                style={{
-                  background: pickerRestSelected ? "var(--ink-04)" : "var(--ink-02)",
-                  border: pickerRestSelected ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
-                  borderRadius: "var(--radius-flat)",
-                  padding: "12px 18px",
-                  minWidth: "100px",
-                }}
-                onMouseEnter={(e) => {
-                  if (!pickerRestSelected) {
-                    e.currentTarget.style.background = "var(--ink-04)"
-                    e.currentTarget.style.borderColor = "var(--ink-12)"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!pickerRestSelected) {
-                    e.currentTarget.style.background = "var(--ink-02)"
-                    e.currentTarget.style.borderColor = "var(--ink-08)"
-                  }
-                }}
-                type="button"
-              >
-                <div
-                  className={pickerRestSelected ? "text-ink-95" : "text-ink-70"}
-                  style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
-                >
-                  Rest
-                </div>
-              </button>
-              {workoutOptions.map((routine, index) => {
-                const isSelected = pickerRoutineId === routine.id
+              <div className="ios-menu__header">Today&apos;s routine</div>
+              {routineMenuOptions.map((option) => {
+                const isSelected =
+                  option.value === "rest" ? pickerRestSelected : pickerRoutineId === option.value
                 return (
                   <button
-                    key={routine.id}
-                    onClick={() => handleSelectWorkoutType(routine.id)}
-                    className="flex-shrink-0 transition-all duration-base"
-                    style={{
-                      background: isSelected ? "var(--ink-04)" : "var(--ink-02)",
-                      border: isSelected ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
-                      borderRadius: "var(--radius-flat)",
-                      padding: "12px 18px",
-                      minWidth: "100px",
-                      animation: `slideInItem var(--duration-entry) var(--ease-theatre) ${index * 0.03}s backwards`,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = "var(--ink-04)"
-                        e.currentTarget.style.borderColor = "var(--ink-12)"
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = "var(--ink-02)"
-                        e.currentTarget.style.borderColor = "var(--ink-08)"
-                      }
-                    }}
+                    key={option.value}
                     type="button"
+                    role="menuitemradio"
+                    aria-checked={isSelected}
+                    className="ios-menu__item"
+                    style={{ minHeight: "56px" }}
+                    onClick={() => {
+                      setShowWorkoutPicker(false)
+                      void handleSelectWorkoutType(option.value === "rest" ? null : option.value)
+                    }}
                   >
-                    <div
-                      className={isSelected ? "text-ink-95" : "text-ink-70"}
-                      style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", fontFamily: "var(--font-label)" }}
-                    >
-                      {routine.name}
-                    </div>
+                    <span style={{ minWidth: 0, flex: "1 1 auto" }}>
+                      <span style={{ display: "block" }}>{option.label}</span>
+                      {option.detail ? (
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "13px",
+                            color: "var(--ink-40)",
+                            marginTop: "2px",
+                          }}
+                        >
+                          {option.detail}
+                        </span>
+                      ) : null}
+                    </span>
+                    {isSelected ? <Check size={18} strokeWidth={2.4} /> : null}
                   </button>
                 )
               })}
             </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -1855,7 +1838,8 @@ export default function Home() {
                 style={{
                   background: "var(--ink-02)",
                   border: "1px solid var(--ink-08)",
-                  borderRadius: "var(--radius-flat)",
+                  borderRadius: "6px",
+                  minHeight: "56px",
                   padding: isCompactExerciseList ? "9px" : "11px",
                   color: "var(--ink-70)",
                 }}
@@ -2017,24 +2001,16 @@ export default function Home() {
                 })}
               </div>
 
+              {/* The page's one filled primary: white fill, black label. Every
+                  other action on Home stays a ghost so this reads as the act. */}
               <button
-                className="w-full transition-all duration-base"
+                className="w-full flex items-center justify-center transition-opacity duration-base"
                 style={{
-                  background: actualState === "activeSession" ? "var(--ink-04)" : "var(--ink-02)",
-                  border: actualState === "activeSession" ? "1px solid var(--ink-12)" : "1px solid var(--ink-08)",
-                  borderRadius: "var(--radius-flat)",
-                  padding: "14px",
-                  color: actualState === "activeSession" ? "var(--ink-95)" : "var(--ink-70)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--ink-06)"
-                  e.currentTarget.style.borderColor = "var(--ink-12)"
-                  e.currentTarget.style.color = "var(--ink-95)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = actualState === "activeSession" ? "var(--ink-04)" : "var(--ink-02)"
-                  e.currentTarget.style.borderColor = actualState === "activeSession" ? "var(--ink-12)" : "var(--ink-08)"
-                  e.currentTarget.style.color = actualState === "activeSession" ? "var(--ink-95)" : "var(--ink-70)"
+                  height: "50px",
+                  background: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  color: "#000",
                 }}
                 onClick={() => {
                   if (actualState === "activeSession") {
@@ -2046,7 +2022,7 @@ export default function Home() {
                   }
                 }}
               >
-                <span style={{ fontSize: "13px", fontWeight: 400, letterSpacing: "0.02em", color: "inherit" }}>
+                <span style={{ fontSize: "17px", fontWeight: 600, letterSpacing: "-0.01em", color: "inherit" }}>
                   {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
                 </span>
               </button>
@@ -2179,7 +2155,8 @@ export default function Home() {
       {session && actualState !== "activeSession" && (
         <div
           className="fixed left-0 right-0 z-[70] px-5"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+          // Sits above the floating tab bar rather than under it.
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))" }}
         >
           <div
             className="flex items-center gap-3"
@@ -2381,6 +2358,7 @@ export default function Home() {
         }
         `}</style>
       </main>
+      <IosTabBar active="home" />
     </>
   )
 }

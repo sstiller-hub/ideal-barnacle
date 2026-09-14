@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import type { TimeRange, Aggregation, WorkoutTypeFilter } from "@/lib/volume-analytics"
+import { IosPullDownChip, IosSegmentedControl } from "@/components/ios/controls"
 
 type Props = {
   timeRange: TimeRange
@@ -12,40 +14,27 @@ type Props = {
   showTypeFilter?: boolean
 }
 
-const pillContainerStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "2px",
-  background: "rgba(255, 255, 255, 0.04)",
-  borderRadius: "8px",
-  padding: "3px",
-}
-
-function pillStyle(active: boolean): React.CSSProperties {
-  return {
-    flex: 1,
-    padding: "4px 0",
-    borderRadius: "6px",
-    border: "none",
-    cursor: "pointer",
-    background: active ? "rgba(255, 255, 255, 0.10)" : "transparent",
-    color: active ? "rgba(255, 255, 255, 0.70)" : "rgba(255, 255, 255, 0.30)",
-    fontSize: "10px",
-    fontWeight: 500,
-    fontFamily: "var(--font-label)",
-    letterSpacing: "0.06em",
-    textAlign: "center" as const,
-    transition: "background 0.15s, color 0.15s",
-  }
-}
-
 const TIME_RANGES: TimeRange[] = ["4W", "8W", "3M", "6M", "1Y", "All"]
 const AGGREGATIONS: { value: Aggregation; label: string }[] = [
   { value: "session", label: "Session" },
   { value: "week", label: "Week" },
   { value: "month", label: "Month" },
 ]
-const TYPE_FILTERS: WorkoutTypeFilter[] = ["All", "Upper", "Lower"]
+const TYPE_FILTERS: { value: WorkoutTypeFilter; label: string }[] = [
+  { value: "All", label: "All" },
+  { value: "Upper", label: "Upper / Full Body" },
+  { value: "Lower", label: "Lower" },
+]
 
+/**
+ * Analytics filters, iOS-style.
+ *
+ * These used to be three stacked full-width segment rows — an Android pattern
+ * that spent a third of the screen before any data appeared. Now the range (the
+ * one you actually sweep through) keeps a segmented control, and the two
+ * categorical dimensions collapse into pull-down chips that show their current
+ * value inline.
+ */
 export function VolumeControls({
   timeRange,
   aggregation,
@@ -55,33 +44,43 @@ export function VolumeControls({
   onTypeFilterChange,
   showTypeFilter = true,
 }: Props) {
+  const [openMenu, setOpenMenu] = useState<null | "bucket" | "group">(null)
+
+  const bucketLabel = AGGREGATIONS.find((a) => a.value === aggregation)?.label ?? "Session"
+  const groupLabel = TYPE_FILTERS.find((f) => f.value === typeFilter)?.label ?? "All"
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <div style={pillContainerStyle}>
-        {TIME_RANGES.map((r) => (
-          <button key={r} style={pillStyle(timeRange === r)} onClick={() => onTimeRangeChange(r)}>
-            {r}
-          </button>
-        ))}
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <IosSegmentedControl
+        ariaLabel="Time range"
+        options={TIME_RANGES}
+        value={timeRange}
+        onChange={onTimeRangeChange}
+      />
 
-      <div style={pillContainerStyle}>
-        {AGGREGATIONS.map(({ value, label }) => (
-          <button key={value} style={pillStyle(aggregation === value)} onClick={() => onAggregationChange(value)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <IosPullDownChip
+          label={bucketLabel}
+          header="Bucket"
+          open={openMenu === "bucket"}
+          onOpenChange={(open) => setOpenMenu(open ? "bucket" : null)}
+          options={AGGREGATIONS}
+          value={aggregation}
+          onSelect={onAggregationChange}
+        />
 
-      {showTypeFilter && (
-        <div style={pillContainerStyle}>
-          {TYPE_FILTERS.map((f) => (
-            <button key={f} style={pillStyle(typeFilter === f)} onClick={() => onTypeFilterChange(f)}>
-              {f === "Upper" ? "Upper / Full Body" : f}
-            </button>
-          ))}
-        </div>
-      )}
+        {showTypeFilter && (
+          <IosPullDownChip
+            label={groupLabel}
+            header="Exercise group"
+            open={openMenu === "group"}
+            onOpenChange={(open) => setOpenMenu(open ? "group" : null)}
+            options={TYPE_FILTERS}
+            value={typeFilter}
+            onSelect={onTypeFilterChange}
+          />
+        )}
+      </div>
     </div>
   )
 }
