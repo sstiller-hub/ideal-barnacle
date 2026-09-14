@@ -1614,12 +1614,20 @@ export default function Home() {
         onClose={() => setShowAlertsSheet(false)}
       />
       <main
-        className="relative flex flex-col overflow-hidden"
+        className="relative flex flex-col"
         style={{
-          height: "var(--app-vh)",
-          paddingTop: "max(env(safe-area-inset-top, 0px), 8px)",
-          // Clears the floating tab bar, which sits 36pt above the bottom inset.
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
+          // Home scrolls as one surface now. It used to be a fixed-height column
+          // with overflow hidden, which was fine for the old compact header but
+          // clipped the day panel outright once the calendar was above it — the
+          // page simply ended mid-content with no way to scroll. Growing past
+          // the viewport lets the document scroll, so the grid scrolls away with
+          // the panel the way the handoff describes.
+          minHeight: "var(--app-vh)",
+          // The calendar carries the top safe-area inset itself, so adding it
+          // here as well left a dead band above the month header.
+          paddingBottom: pinnedAction
+            ? "calc(env(safe-area-inset-bottom, 0px) + 196px)"
+            : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
           background: "#0D0D0F",
           boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
         }}
@@ -1845,7 +1853,7 @@ export default function Home() {
         )}
       </div>
 
-      <div className="overflow-hidden" style={{ paddingBottom: "0px" }}>
+      <div style={{ paddingBottom: "0px" }}>
         {/* Program-message slot — one line hosts every program state (active
             deload, deload complete, and future states) via AktProgramMessageLine.
             The slot reserves its space in all states so nothing reflows. */}
@@ -2466,9 +2474,15 @@ export default function Home() {
         <div
           className="fixed z-[80]"
           style={{
-            left: "20px",
-            right: "20px",
+            left: 0,
+            right: 0,
             bottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)",
+            padding: "0 20px",
+            // The page scrolls underneath, so the action needs its own ground —
+            // a transparent button let ledger rows read straight through it.
+            background: "linear-gradient(to bottom, rgba(13,13,15,0) 0%, #0D0D0F 22%, #0D0D0F 100%)",
+            paddingTop: "24px",
+            paddingBottom: "12px",
           }}
         >
           <button
@@ -2479,7 +2493,7 @@ export default function Home() {
             style={{
               height: "56px",
               borderRadius: "6px",
-              background: pinnedAction.filled ? "#fff" : "transparent",
+              background: pinnedAction.filled ? "#fff" : "#0D0D0F",
               border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
               color: pinnedAction.filled ? "#000" : "var(--ink-90)",
               fontFamily: "var(--font-label)",
