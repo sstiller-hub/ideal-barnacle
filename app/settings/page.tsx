@@ -10,12 +10,6 @@ import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
 import { importWorkouts, type ImportResult } from "@/lib/import-workouts"
-import {
-  backupToGoogleDrive,
-  restoreFromGoogleDrive,
-  downloadBackupFile,
-  restoreFromFile,
-} from "@/lib/google-drive-backup"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -27,16 +21,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Upload, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft, ChevronUp } from "lucide-react"
-import { signInWithGoogle } from "@/lib/auth"
+import {
+  Upload,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  CalendarDays,
+  ChevronRight,
+  Database,
+  Dumbbell,
+  Palette,
+  Smartphone,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 import { useTheme } from "next-themes"
 import { resetScheduleToGrowthV2FixedDays } from "@/lib/schedule-storage"
 import { clearInProgressWorkout } from "@/lib/autosave-workout-storage"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
-import { runManualSync, type ManualSyncReport } from "@/lib/workout-manual-sync"
 import { getPrExcludedExercises, setPrExcludedExercises } from "@/lib/pr-exclusions"
+import { IosTabBar } from "@/components/ios/tab-bar"
+import { IosLargeTitleHeader } from "@/components/ios/nav-bar"
+import { IosGroup, IosRow } from "@/components/ios/grouped"
 import { isRestSoundEnabled, playRestChime, setRestSoundEnabled } from "@/lib/session-feedback"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 
@@ -44,10 +50,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const [workouts, setWorkouts] = useState<CompletedWorkout[]>([])
   const [user, setUser] = useState<User | null>(null)
-  const [syncStatus, setSyncStatus] = useState<string>("")
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [backupStatus, setBackupStatus] = useState<string>("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
   const csvFileInputRef = useRef<HTMLInputElement>(null)
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
@@ -57,23 +60,7 @@ export default function SettingsPage() {
   const [isThemeReady, setIsThemeReady] = useState(false)
   const [progressiveAutofillEnabled, setProgressiveAutofillEnabled] = useState(true)
   const [restSoundEnabled, setRestSoundEnabledState] = useState(true)
-  const [expandedSections, setExpandedSections] = useState<string[]>(["account"])
-  const [manualSyncRunning, setManualSyncRunning] = useState(false)
-  const [manualSyncReport, setManualSyncReport] = useState<ManualSyncReport | null>(null)
-  const [manualSyncConfirmOpen, setManualSyncConfirmOpen] = useState(false)
-  const [manualSyncIncludeSynced, setManualSyncIncludeSynced] = useState(false)
-  const [manualSyncForceOverwrite, setManualSyncForceOverwrite] = useState(false)
-  const [manualSyncRetryFailedOnly, setManualSyncRetryFailedOnly] = useState(false)
-  const [manualSyncCandidateCount, setManualSyncCandidateCount] = useState<number | null>(null)
-  const [manualSyncProgress, setManualSyncProgress] = useState<{
-    current: number
-    total: number
-    currentWorkoutId?: string
-    synced: number
-    skipped: number
-    conflicts: number
-    errors: number
-  } | null>(null)
+  const [expandedSections, setExpandedSections] = useState<string[]>([])
   const [prExclusionInput, setPrExclusionInput] = useState("")
   const [prExclusionSaved, setPrExclusionSaved] = useState(false)
   const { isDeload, deloadEndsAt, startDeload, cancelDeload } = useDeloadWeek()
@@ -81,6 +68,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setWorkouts(getWorkoutHistory())
+    setLastSyncedAt(localStorage.getItem("last_synced_at"))
   }, [])
 
   useEffect(() => {
@@ -205,413 +193,79 @@ export default function SettingsPage() {
   }
 
 
-  const handleBackupToGoogleDrive = async () => {
-    setBackupStatus("Connecting to Google Drive...")
-    const result = await backupToGoogleDrive()
-    setBackupStatus("")
-    alert(result.message)
-  }
-
-  const handleRestoreFromGoogleDrive = async () => {
-    const confirmed = confirm("This will replace all current data with the backup. Continue?")
-    if (!confirmed) return
-
-    setBackupStatus("Connecting to Google Drive...")
-    const result = await restoreFromGoogleDrive()
-    setBackupStatus("")
-    if (result.success) {
-      setWorkouts(getWorkoutHistory())
-      window.location.reload()
-    }
-    alert(result.message)
-  }
-
-  const handleDownloadBackup = () => {
-    downloadBackupFile()
-    alert("Backup file downloaded successfully!")
-  }
-
-  const handleRestoreFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const confirmed = confirm("This will replace all current data with the backup. Continue?")
-    if (!confirmed) {
-      e.target.value = ""
-      return
-    }
-
-    const result = await restoreFromFile(file)
-    if (result.success) {
-      setWorkouts(getWorkoutHistory())
-      window.location.reload()
-    }
-    alert(result.message)
-    e.target.value = ""
-  }
-
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) =>
       prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
     )
   }
 
-  useEffect(() => {
-    if (!expandedSections.includes("account")) return
-    let active = true
-    const loadCount = async () => {
-      const { listAllWorkouts } = await import("@/lib/workout-draft-storage")
-      const drafts = await listAllWorkouts()
-      const ids = new Set<string>()
-      drafts.forEach((draft) => {
-        if (draft.sets.length === 0) return
-        if (manualSyncRetryFailedOnly && draft.sync_state !== "error" && draft.sync_state !== "pending") return
-        if (!manualSyncIncludeSynced && draft.sync_state === "synced") return
-        ids.add(draft.workout_id)
-      })
-      getWorkoutHistory().forEach((workout) => {
-        ids.add(workout.id)
-      })
-      if (active) {
-        setManualSyncCandidateCount(ids.size)
-      }
-    }
-    void loadCount()
-    return () => {
-      active = false
-    }
-  }, [expandedSections, manualSyncIncludeSynced, manualSyncRetryFailedOnly, workouts.length])
-
-  const handleManualSync = async (dryRun: boolean, retryFailedOnlyOverride?: boolean) => {
-    if (!user) {
-      alert("Please sign in to sync.")
-      return
-    }
-    setManualSyncRunning(true)
-    setManualSyncReport(null)
-    setManualSyncProgress(null)
-    setManualSyncConfirmOpen(false)
-    try {
-      const report = await runManualSync({
-        dryRun,
-        includeSynced: manualSyncIncludeSynced,
-        forceOverwrite: manualSyncForceOverwrite,
-        retryFailedOnly: retryFailedOnlyOverride ?? manualSyncRetryFailedOnly,
-        onProgress: (payload) => setManualSyncProgress(payload),
-      })
-      setManualSyncReport(report)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Manual sync failed"
-      setManualSyncReport({
-        startedAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        dryRun,
-        total: 0,
-        attempted: 0,
-        synced: 0,
-        skipped: 0,
-        conflicts: 0,
-        errors: 1,
-        results: [
-          {
-            workout_id: "unknown",
-            started_at: null,
-            completed_at: null,
-            status: "error",
-            error: message,
-          },
-        ],
-      })
-    } finally {
-      setManualSyncRunning(false)
-    }
-  }
+  // The account cell shows who you are and when the record last left the
+  // device — the two facts worth surfacing before you tap into Account & Sync.
+  const accountEmail = user?.email ?? null
+  const accountName =
+    (user?.user_metadata?.full_name as string | undefined) || accountEmail?.split("@")[0] || "Not signed in"
+  const accountInitials =
+    accountName
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "—"
+  const accountDetail = accountEmail
+    ? `${accountEmail} · Synced ${
+        lastSyncedAt
+          ? new Date(lastSyncedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+          : "never"
+      }`
+    : "Sign in to sync across devices"
 
   return (
     <div
       className="flex flex-col"
       style={{
         minHeight: "100%",
-        paddingBottom: "40px",
-        background: "#0D0D0F",
-        boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
+        background: "#000",
       }}
     >
-      <div className="px-4 pt-4">
-        <div className="relative flex items-center justify-between mb-8 flex-shrink-0">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "0",
-              cursor: "pointer",
-            }}
-            aria-label="Back to home"
-            type="button"
-          >
-            <ChevronLeft size={16} strokeWidth={2} />
-            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
-              Back
+      {/* Settings is a tab root now: large title, no back button. */}
+      <IosLargeTitleHeader title="Settings" />
+
+      {/* Account cell — the one 80pt row, pushing to Account & Sync. */}
+      <IosGroup>
+        <IosRow
+          style={{ minHeight: "80px" }}
+          icon={
+            <span
+              className="flex items-center justify-center"
+              style={{
+                width: "60px",
+                height: "60px",
+                borderRadius: "999px",
+                background: "var(--ink-15)",
+                fontSize: "22px",
+                fontWeight: 600,
+                color: "#fff",
+              }}
+            >
+              {accountInitials}
             </span>
-          </button>
-          <h1
-            className="text-ink-95 absolute left-1/2 transform -translate-x-1/2"
-            style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.01em" }}
-          >
-            Settings
-          </h1>
-        </div>
+          }
+          label={<span style={{ fontSize: "19px" }}>{accountName}</span>}
+          detail={accountDetail}
+          chevron
+          onClick={() => router.push("/settings/account")}
+        />
+      </IosGroup>
 
-        <div className="space-y-4">
-          <SettingsSection
-            title="ACCOUNT & SYNC"
-            isExpanded={expandedSections.includes("account")}
-            onToggle={() => toggleSection("account")}
-          >
-            <SettingItem label="Sign in" />
-            <SettingItem label="Cloud Sync" />
-            <SettingItem label="Manual Sync" />
-            <SettingItem label="Google Drive Backup" />
-            <SettingItem label="Local Backup" />
-            <div className="mt-3 space-y-4">
-              {user ? (
-                <div>
-                  <h2 className="font-bold text-base mb-2">Signed in</h2>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                  <Button
-                    className="mt-3"
-                    variant="outline"
-                    onClick={async () => {
-                      await supabase?.auth.signOut()
-                    }}
-                  >
-                    Sign out
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <h2 className="font-bold text-base mb-3">Sign in</h2>
-                  <div className="flex flex-col gap-3">
-                    <Button onClick={() => signInWithGoogle()}>Sign in with Google</Button>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Cloud Sync</h2>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Push local workouts to Supabase and pull down changes from other devices.
-                </p>
-
-                {syncStatus && <p className="text-xs text-muted-foreground mb-2">{syncStatus}</p>}
-
-                <Button
-                  className="w-full"
-                  disabled={!user || isSyncing}
-                  onClick={async () => {
-                    setIsSyncing(true)
-                    setSyncStatus("Syncing...")
-                    try {
-                      const { syncNow, getOutboxCount } = await import("@/lib/supabase-sync")
-                      const res = await syncNow({
-                        onProgress: ({ synced, failed, total, pending }) => {
-                          setSyncStatus(`Syncing ${synced + failed}/${total}... (${pending} left)`)
-                        },
-                      })
-                      const pending = getOutboxCount()
-                      const message = `${res.push.message}. ${res.pull.message}. Pending: ${pending}`
-                      setSyncStatus(message)
-                      alert(message)
-                      setWorkouts(getWorkoutHistory())
-                    } catch (e) {
-                      const message = (e as Error).message || "Sync failed"
-                      setSyncStatus(message)
-                      alert(message)
-                      console.error("Sync failed", e)
-                    } finally {
-                      setIsSyncing(false)
-                    }
-                  }}
-                >
-                  {isSyncing ? "Syncing..." : user ? "Sync now" : "Sign in to sync"}
-                </Button>
-
-                <div className="mt-4 text-xs text-muted-foreground">
-                  Local workouts loaded: {Array.isArray(workouts) ? workouts.length : 0}
-                </div>
-              </div>
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Send all workouts to cloud</h2>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Upload all workouts from this device to the cloud.
-                </p>
-
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <Button
-                    onClick={() => handleManualSync(true)}
-                    variant="outline"
-                    disabled={!user || manualSyncRunning}
-                  >
-                    Dry run
-                  </Button>
-                  <Button
-                    onClick={() => setManualSyncConfirmOpen(true)}
-                    disabled={!user || manualSyncRunning}
-                  >
-                    {manualSyncRunning ? "Sending..." : "Send now"}
-                  </Button>
-                </div>
-
-                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-3">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={manualSyncIncludeSynced}
-                      onChange={(e) => setManualSyncIncludeSynced(e.target.checked)}
-                    />
-                    Include already synced
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={manualSyncRetryFailedOnly}
-                      onChange={(e) => setManualSyncRetryFailedOnly(e.target.checked)}
-                    />
-                    Retry failed only
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={manualSyncForceOverwrite}
-                      onChange={(e) => setManualSyncForceOverwrite(e.target.checked)}
-                    />
-                    Force overwrite
-                  </label>
-                </div>
-
-                <div className="text-xs text-muted-foreground mb-3">
-                  Local workouts queued: {manualSyncCandidateCount ?? 0}
-                </div>
-
-                {manualSyncProgress && manualSyncRunning && (
-                  <div className="text-xs text-muted-foreground mb-2">
-                    Sending {manualSyncProgress.current}/{manualSyncProgress.total} • Synced: {manualSyncProgress.synced} •
-                    Skipped: {manualSyncProgress.skipped} • Conflicts: {manualSyncProgress.conflicts} • Errors:{" "}
-                    {manualSyncProgress.errors}
-                  </div>
-                )}
-
-                {manualSyncReport && (
-                  <div className="rounded-md border border-ink-08 p-3 text-xs text-muted-foreground space-y-2">
-                    <div>
-                      Summary: {manualSyncReport.synced} synced, {manualSyncReport.skipped} skipped,{" "}
-                      {manualSyncReport.conflicts} conflicts, {manualSyncReport.errors} errors.
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {manualSyncReport.errors > 0 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleManualSync(false, true)}
-                          disabled={manualSyncRunning}
-                        >
-                          Retry failed only
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (typeof navigator === "undefined" || !navigator.clipboard) return
-                          navigator.clipboard.writeText(JSON.stringify(manualSyncReport, null, 2))
-                        }}
-                      >
-                        Copy report
-                      </Button>
-                    </div>
-                    <details>
-                      <summary className="cursor-pointer">Details</summary>
-                      <div className="mt-2 space-y-2">
-                        {manualSyncReport.results.map((result) => (
-                          <div key={result.workout_id} className="border-t border-ink-04 pt-2">
-                            <div>
-                              {result.workout_id} • {result.status}
-                            </div>
-                            {result.message && <div>{result.message}</div>}
-                            {result.error && <div>{result.error}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  </div>
-                )}
-              </div>
-
-              {hasGoogleDriveConfig ? (
-                <div>
-                  <h2 className="font-bold text-base mb-2">Google Drive Backup</h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Backup and restore your workout data to Google Drive for safekeeping.
-                  </p>
-                  {backupStatus && <p className="text-xs text-muted-foreground mb-2">{backupStatus}</p>}
-                  <div className="space-y-2">
-                    <Button onClick={handleBackupToGoogleDrive} className="w-full" disabled={!!backupStatus}>
-                      Backup to Google Drive
-                    </Button>
-                    <Button
-                      onClick={handleRestoreFromGoogleDrive}
-                      className="w-full"
-                      variant="outline"
-                      disabled={!!backupStatus}
-                    >
-                      Restore from Google Drive
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <h2 className="font-bold text-base mb-2">Google Drive Backup</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Google Drive integration requires configuration. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in your
-                    environment variables to enable this feature.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Local Backup</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Download a backup file to your device or restore from a previous backup.
-                </p>
-                <div className="space-y-2">
-                  <Button onClick={handleDownloadBackup} className="w-full" variant="outline">
-                    Download Backup File
-                  </Button>
-                  <Button onClick={() => fileInputRef.current?.click()} className="w-full" variant="outline">
-                    Restore from File
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={handleRestoreFromFile}
-                  />
-                </div>
-              </div>
-            </div>
-          </SettingsSection>
-
+      {/* Group 1 — how training itself behaves. */}
+      <IosGroup hasIcons style={{ marginTop: "20px" }}>
         <SettingsSection
+          icon={<Palette size={17} strokeWidth={1.8} />}
           title="APPEARANCE & DEFAULTS"
           isExpanded={expandedSections.includes("appearance")}
           onToggle={() => toggleSection("appearance")}
         >
-          <SettingItem label="Appearance" />
-          <SettingItem label="Workout Defaults" />
           <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Appearance</h2>
@@ -698,12 +352,11 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          icon={<CalendarDays size={17} strokeWidth={1.8} />}
           title="SCHEDULE & PROGRAMS"
           isExpanded={expandedSections.includes("schedule")}
           onToggle={() => toggleSection("schedule")}
         >
-          <SettingItem label="Workout Schedule" />
-          <SettingItem label="Reset Program" />
           <div className="mt-3 space-y-4">
               <WorkoutScheduleEditor />
 
@@ -721,13 +374,77 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          icon={<Dumbbell size={17} strokeWidth={1.8} />}
+          title="TRAINING"
+          isExpanded={expandedSections.includes("training")}
+          onToggle={() => toggleSection("training")}
+        >
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Deload week reduces your training volume and intensity for 7 days to promote recovery. Sets are halved
+                and weights are pre-filled at ~72% of your working weights — you can still edit everything manually.
+              </p>
+
+              {isDeload ? (
+                <div
+                  style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "var(--radius-xs)",
+                    padding: "12px 14px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "rgba(255, 255, 255, 0.55)",
+                      marginBottom: "8px",
+                      fontFamily: "var(--font-label)",
+                    }}
+                  >
+                    Deload active — ends{" "}
+                    {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  </p>
+                  <button
+                    onClick={async () => {
+                      await cancelDeload()
+                      toast("Deload cancelled", { duration: 2000 })
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      fontSize: "11px",
+                      color: "rgba(255, 255, 255, 0.28)",
+                      fontFamily: "var(--font-label)",
+                      letterSpacing: "0.06em",
+                      textDecoration: "underline",
+                    }}
+                    type="button"
+                  >
+                    Cancel deload
+                  </button>
+                </div>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={() => setDeloadConfirmOpen(true)}>
+                  Start Deload Week
+                </Button>
+              )}
+            </div>
+          </div>
+        </SettingsSection>
+      </IosGroup>
+
+      {/* Group 2 — what the app holds and what it runs on. */}
+      <IosGroup hasIcons style={{ marginTop: "20px" }}>
+        <SettingsSection
+          icon={<Database size={17} strokeWidth={1.8} />}
           title="DATA & INTEGRATIONS"
           isExpanded={expandedSections.includes("data")}
           onToggle={() => toggleSection("data")}
         >
-          <SettingItem label="Import Historical Data" />
-          <SettingItem label="Apple Health Integration" />
-          <SettingItem label="Clear All Data" />
           <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Import Historical Data</h2>
@@ -840,77 +557,11 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
-          title="TRAINING"
-          isExpanded={expandedSections.includes("training")}
-          onToggle={() => toggleSection("training")}
-        >
-          <SettingItem label="Deload Week" />
-          <div className="mt-3 space-y-4">
-            <div>
-              <h2 className="font-bold text-base mb-2">Deload Week</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Reduces your training volume and intensity for 7 days to promote recovery. Sets are halved and weights
-                are pre-filled at ~72% of your working weights — you can still edit everything manually.
-              </p>
-
-              {isDeload ? (
-                <div
-                  style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "var(--radius-xs)",
-                    padding: "12px 14px",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "rgba(255, 255, 255, 0.55)",
-                      marginBottom: "8px",
-                      fontFamily: "var(--font-label)",
-                    }}
-                  >
-                    Deload active — ends{" "}
-                    {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  </p>
-                  <button
-                    onClick={async () => {
-                    await cancelDeload()
-                    toast("Deload cancelled", { duration: 2000 })
-                  }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      fontSize: "11px",
-                      color: "rgba(255, 255, 255, 0.28)",
-                      fontFamily: "var(--font-label)",
-                      letterSpacing: "0.06em",
-                      textDecoration: "underline",
-                    }}
-                    type="button"
-                  >
-                    Cancel deload
-                  </button>
-                </div>
-              ) : (
-                <Button variant="outline" className="w-full" onClick={() => setDeloadConfirmOpen(true)}>
-                  Start Deload Week
-                </Button>
-              )}
-            </div>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection
+          icon={<Smartphone size={17} strokeWidth={1.8} />}
           title="ABOUT & DEVICE"
           isExpanded={expandedSections.includes("about")}
           onToggle={() => toggleSection("about")}
         >
-          <SettingItem label="Install as App" />
-          <SettingItem label="Data Storage" />
-          <SettingItem label="Version" />
           <div className="mt-3 space-y-4">
               <div>
                 <h2 className="font-bold text-base mb-2">Install as App</h2>
@@ -943,7 +594,20 @@ export default function SettingsPage() {
               </div>
           </div>
         </SettingsSection>
-        </div>
+      </IosGroup>
+
+      <div
+        style={{
+          padding: "26px 32px 0",
+          fontSize: "13px",
+          color: "var(--ink-40)",
+          textAlign: "center",
+        }}
+      >
+        Akt {process.env.NEXT_PUBLIC_APP_VERSION || "2.4"} ({workouts.length})
+      </div>
+
+      <IosTabBar active="settings" />
 
         <AlertDialog open={deloadConfirmOpen} onOpenChange={setDeloadConfirmOpen}>
           <AlertDialogContent>
@@ -970,109 +634,55 @@ export default function SettingsPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={manualSyncConfirmOpen} onOpenChange={setManualSyncConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Send workouts to cloud</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will attempt to upload {manualSyncCandidateCount ?? 0} {plural(manualSyncCandidateCount ?? 0, "workout", "workouts")} from this device. If you have multiple
-                devices, conflicts can happen.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={manualSyncRunning}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleManualSync(false)} disabled={manualSyncRunning}>
-                Send now
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-      </div>
     </div>
   )
 }
 
+/**
+ * One section of the Settings root, rendered as a grouped-list row.
+ *
+ * The section still expands in place — its body drops in underneath the row,
+ * inside the same group — but the row itself now reads as an iOS cell: 29pt
+ * monochrome icon tile, 17pt white label, disclosure chevron that turns when
+ * the section is open.
+ */
 function SettingsSection({
+  icon,
   title,
   children,
   isExpanded,
   onToggle,
 }: {
+  icon: React.ReactNode
   title: string
   children: React.ReactNode
   isExpanded: boolean
   onToggle: () => void
 }) {
+  // "APPEARANCE & DEFAULTS" → "Appearance & Defaults": iOS cells are sentence
+  // case, not the tracked label-font caps the old accordion used.
+  const label = title
+    .toLowerCase()
+    .replace(/(^|\s|&\s)([a-z])/g, (match, prefix, letter: string) => `${prefix}${letter.toUpperCase()}`)
+
   return (
-    <div
-      style={{
-        background: "rgba(255, 255, 255, 0.02)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
-        borderRadius: "2px",
-      }}
-    >
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 transition-colors duration-base hover:bg-white/[0.01]"
-        style={{
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-        }}
-        type="button"
-      >
-        <span
-          className="text-ink-50"
-          style={{
-            fontSize: "11px",
-            fontWeight: 500,
-            letterSpacing: "0.08em",
-            fontFamily: "var(--font-label)",
-          }}
-        >
-          {title}
-        </span>
-        <div className="text-ink-30">
-          {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
-        </div>
+    <>
+      <button type="button" className="ios-row" onClick={onToggle} aria-expanded={isExpanded}>
+        <span className="ios-tile">{icon}</span>
+        <span style={{ flex: "1 1 auto", minWidth: 0 }}>{label}</span>
+        <ChevronRight
+          size={18}
+          strokeWidth={2}
+          className="ios-row__chevron transition-transform duration-base"
+          style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+        />
       </button>
 
       {isExpanded && (
-        <div
-          className="px-4 pb-2"
-          style={{
-            borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-          }}
-        >
+        <div style={{ padding: "4px 16px 18px 16px" }}>
           {children}
         </div>
       )}
-    </div>
-  )
-}
-
-function SettingItem({ label }: { label: string }) {
-  return (
-    <button
-      className="w-full text-left py-2.5 px-0 transition-colors duration-base hover:text-ink-70"
-      style={{
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-      }}
-      type="button"
-    >
-      <span
-        className="text-ink-50"
-        style={{
-          fontSize: "12px",
-          fontWeight: 400,
-          letterSpacing: "0.005em",
-        }}
-      >
-        {label}
-      </span>
-    </button>
+    </>
   )
 }

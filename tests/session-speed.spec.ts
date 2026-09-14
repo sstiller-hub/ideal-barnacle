@@ -38,7 +38,7 @@ test.describe("Rest dock", () => {
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Skip rest" })).toBeVisible()
 
     // No up-next panel: the set it named, its weight and reps, and the button
     // to log it are all already on the exercise screen behind the dock.
@@ -47,11 +47,11 @@ test.describe("Rest dock", () => {
     await expect(page.getByText(/SET 02 · Overhand Row/)).toHaveCount(0)
 
     // Just the countdown and its three controls.
-    await expect(page.getByRole("button", { name: "−30S" })).toBeVisible()
-    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "−30" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "+30" })).toBeVisible()
   })
 
-  test("-30S shortens the running timer", async ({ page }) => {
+  test("-30 shortens the running timer", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
@@ -61,7 +61,7 @@ test.describe("Rest dock", () => {
     const clock = page.locator("text=/^\\d+:\\d{2}$/").first()
     await expect(clock).toBeVisible()
     const before = (await clock.textContent()) || ""
-    await page.getByRole("button", { name: "−30S" }).click()
+    await page.getByRole("button", { name: "−30" }).click()
     await expect(clock).not.toHaveText(before)
 
     const toSeconds = (value: string) => {
@@ -72,19 +72,19 @@ test.describe("Rest dock", () => {
     expect(toSeconds(after)).toBeLessThan(toSeconds(before))
   })
 
-  test("SKIP dismisses the dock outright in one tap", async ({ page }) => {
+  test("Skip dismisses the dock outright in one tap", async ({ page }) => {
     await startSession(page)
 
     await weightOf(page).fill("100")
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
-    await expect(page.getByRole("button", { name: "SKIP" })).toBeVisible()
-    await page.getByRole("button", { name: "SKIP" }).click()
+    await expect(page.getByRole("button", { name: "Skip rest" })).toBeVisible()
+    await page.getByRole("button", { name: "Skip rest" }).click()
 
     // One tap and the dock is gone — no count-up, no second dismissal.
-    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0)
-    await expect(page.getByRole("button", { name: "+30S" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Skip rest" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "+30" })).toHaveCount(0)
   })
 
   test("the dock leaves on its own when the countdown runs out", async ({ page }) => {
@@ -95,13 +95,13 @@ test.describe("Rest dock", () => {
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
 
     // Wind the 5-minute rest down to its 5s floor rather than waiting it out.
-    const shorten = page.getByRole("button", { name: "−30S" })
+    const shorten = page.getByRole("button", { name: "−30" })
     for (let i = 0; i < 11; i++) {
       if (await shorten.isDisabled()) break
       await shorten.click()
     }
 
-    await expect(page.getByRole("button", { name: "SKIP" })).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByRole("button", { name: "Skip rest" })).toHaveCount(0, { timeout: 15_000 })
   })
 })
 
@@ -142,7 +142,7 @@ test.describe("iOS haptic fallback", () => {
     await weightOf(page).fill("100")
     await repsOf(page).fill("8")
     await page.locator('button[aria-label="Complete Set"]:not([disabled])').first().click()
-    await expect(page.getByRole("button", { name: "+30S" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "+30" })).toBeVisible()
   }
 
   test("rest adjustments toggle the switch when vibration is unavailable", async ({ page }) => {
@@ -152,11 +152,11 @@ test.describe("iOS haptic fallback", () => {
     expect(await switchState(page)).toBeNull()
 
     await startRest(page)
-    await page.getByRole("button", { name: "+30S" }).click()
+    await page.getByRole("button", { name: "+30" }).click()
     const first = await switchState(page)
     expect(first).not.toBeNull()
 
-    await page.getByRole("button", { name: "+30S" }).click()
+    await page.getByRole("button", { name: "+30" }).click()
     expect(await switchState(page)).toBe(!first)
   })
 
@@ -165,8 +165,8 @@ test.describe("iOS haptic fallback", () => {
     await startSession(page)
     await startRest(page)
 
-    await page.getByRole("button", { name: "+30S" }).click()
-    await page.getByRole("button", { name: "−30S" }).click()
+    await page.getByRole("button", { name: "+30" }).click()
+    await page.getByRole("button", { name: "−30" }).click()
 
     expect(await page.locator('input[switch]').count()).toBe(1)
     await expect(page.getByRole("checkbox")).toHaveCount(0)

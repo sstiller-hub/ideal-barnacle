@@ -51,7 +51,7 @@ test.describe("Workout summary – time and duration", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     // Duration label and formatted value
     await expect(page.getByText("Duration")).toBeVisible()
@@ -74,7 +74,7 @@ test.describe("Workout summary – time and duration", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     await expect(page.getByText("Duration")).toBeVisible()
     await expect(page.getByText("30 min")).toBeVisible()
@@ -98,7 +98,7 @@ test.describe("Workout summary – time and duration", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     // Time range like "10:00 AM – 10:45 AM"
     await expect(page.locator("text=/\\d+:\\d{2}\\s*(AM|PM)\\s*–\\s*\\d+:\\d{2}\\s*(AM|PM)/")).toBeVisible()
@@ -116,7 +116,7 @@ test.describe("Workout summary – time and duration", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     // Should NOT show Duration label
     await expect(page.getByText("Duration")).not.toBeVisible()
@@ -137,7 +137,7 @@ test.describe("Workout summary – time and duration", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     await expect(page.getByText("Duration")).toBeVisible()
     await expect(page.getByText("1h 30m")).toBeVisible()
@@ -371,7 +371,7 @@ test.describe("Migration — backfill startedAt for old workouts", () => {
     await seedWorkouts(page, [workout])
 
     await page.goto(`/workout-summary?workoutId=${workout.id}`)
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     await expect(page.getByText("Duration")).toBeVisible()
     await expect(page.getByText("30 min")).toBeVisible()
@@ -480,7 +480,7 @@ test.describe("Session completion — timing saved correctly", () => {
 
     // Should navigate to workout summary
     await expect(page).toHaveURL(/workout-summary/, { timeout: 15000 })
-    await expect(page.getByText("Workout Complete")).toBeVisible()
+    await expect(page.locator(".ios-large-title")).toBeVisible()
 
     // Duration should be shown (0 min is acceptable — session had no prior startedAt
     // so both startedAt and endedAt are set to completion time → 0 min duration)

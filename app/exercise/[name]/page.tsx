@@ -79,6 +79,8 @@ import { isSetEligibleForStats } from "@/lib/set-validation"
 import { getVolumeSeriesForExercise } from "@/lib/volume-analytics"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
 import { VolumeControls } from "@/components/volume-controls"
+import { IosNavPage } from "@/components/ios/nav-bar"
+import { IosCard, IosGroup, IosSectionFooter, IosSectionHeader } from "@/components/ios/grouped"
 
 function areEquivalentSets(a: { reps: number | null; weight: number | null; completed: boolean }, b: { reps: number | null; weight: number | null; completed: boolean }): boolean {
   return (
@@ -258,43 +260,15 @@ export default function ExerciseHistoryPage() {
   const historyForDrilldown = history
 
   return (
-    <div
-      className="min-h-screen pb-20"
-      style={{ background: "#0D0D0F", boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)" }}
-    >
-      <div
-        className="sticky top-0 z-10"
-        style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+      <IosNavPage
+        backLabel={fromSession ? "Session" : "Volume"}
+        onBack={() => (fromSession ? router.push("/workout/session") : router.back())}
+        title={exerciseName}
+        longTitle
+        subtitle={`${history.length} ${plural(history.length, "workout", "workouts")} logged`}
       >
-        <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fromSession ? router.push("/workout/session") : router.back()}
-              style={{ color: "rgba(255, 255, 255, 0.7)" }}
-            >
-              ‹
-            </Button>
-            <div>
-              <div
-                className="text-ink-25 tracking-widest"
-                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-              >
-                EXERCISE HISTORY
-              </div>
-              <h1 className="text-ink-95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
-                {exerciseName}
-              </h1>
-              <p className="text-ink-35" style={{ fontSize: "11px" }}>
-                {history.length} {plural(history.length, "workout", "workouts")} logged
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-2xl mx-auto px-4 space-y-3">
         {/* Controls */}
         <VolumeControls
           timeRange={timeRange}
@@ -590,28 +564,12 @@ export default function ExerciseHistoryPage() {
           </div>
         )}
 
-        {/* Felt ratings trend */}
+        {/* Felt ratings trend — collapsed under a section header that already
+            carries the headline number, so the card itself can lose its own. */}
         {ratingTrend.ratedCount > 0 && (
-          <div
-            style={{
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "var(--radius-2xl)",
-              padding: "14px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "7px",
-                fontWeight: 500,
-                letterSpacing: "0.18em",
-                fontFamily: "var(--font-label)",
-                color: "rgba(255,255,255,0.25)",
-                marginBottom: "10px",
-              }}
-            >
-              FELT RATINGS
-            </div>
+          <div className="-mx-4">
+            <IosSectionHeader>Felt ratings · {ratingTrend.pctGood}% good</IosSectionHeader>
+            <IosCard>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: "16px", marginBottom: "12px" }}>
               <div>
@@ -671,88 +629,52 @@ export default function ExerciseHistoryPage() {
                   : `Good sessions averaged ${ratingTrend.weightInsight.goodAvgWeight} ${plural(ratingTrend.weightInsight.goodAvgWeight, "lb", "lbs")} vs ${ratingTrend.weightInsight.roughAvgWeight} ${plural(ratingTrend.weightInsight.roughAvgWeight, "lb", "lbs")} when it felt rough`}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Workout history list */}
-        {history.map((workout) => {
-          const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))!
-          const date = new Date(workout.date)
-          const formattedDate = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          const volume = exercise.sets
-            .filter((set) => isSetEligibleForStats(set))
-            .reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
-
-          return (
-            <div
-              key={workout.id}
-              className="p-4"
-              style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "var(--radius-2xl)",
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-ink-90" style={{ fontSize: "13px", fontWeight: 500 }}>
-                      {formattedDate}
-                    </div>
-                    {exercise.rating && (
-                      <span
-                        style={{
-                          fontSize: "8px",
-                          fontWeight: 500,
-                          letterSpacing: "0.08em",
-                          padding: "2px 6px",
-                          borderRadius: "6px",
-                          background: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.1)" : "rgba(251, 191, 36, 0.1)",
-                          color: exercise.rating === "thumbs_up" ? "rgba(52, 211, 153, 0.7)" : "rgba(251, 191, 36, 0.7)",
-                          fontFamily: "var(--font-label)",
-                        }}
-                      >
-                        {exercise.rating === "thumbs_up" ? "GOOD" : "ROUGH"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-ink-35" style={{ fontSize: "10px" }}>
-                    {workout.name}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-ink-70" style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
-                    VOLUME
-                  </div>
-                  <div className="text-ink-90" style={{ fontSize: "12px", fontWeight: 600 }}>
-                    {Math.round(volume).toLocaleString()} {plural(Math.round(volume), "lb", "lbs")}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {exercise.sets
-                  .filter((s) => s.completed)
-                  .map((set, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-ink-35" style={{ fontSize: "11px" }}>
-                        Set {idx + 1}
-                      </span>
-                      <span className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
-                        {set.weight} {plural(set.weight, "lb", "lbs")} × {set.reps} {plural(set.reps, "rep", "reps")}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )
-        })}
-
-        {history.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-ink-40">No history for this exercise yet</p>
+            </IosCard>
           </div>
         )}
       </div>
+
+      {/* Per-session history — each session is its own grouped section, headed
+          by its date, so the set rows read as a list rather than a card body. */}
+      {history.map((workout) => {
+        const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))!
+        const date = new Date(workout.date)
+        const formattedDate = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        const volume = exercise.sets
+          .filter((set) => isSetEligibleForStats(set))
+          .reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+
+        return (
+          <div key={workout.id}>
+            <IosSectionHeader>
+              {formattedDate} · {workout.name}
+              {exercise.rating ? (exercise.rating === "thumbs_up" ? " · Felt good" : " · Felt rough") : ""}
+            </IosSectionHeader>
+            <IosGroup>
+              {exercise.sets
+                .filter((s) => s.completed)
+                .map((set, idx) => (
+                  <div key={idx} className="ios-row" style={{ cursor: "default" }}>
+                    <span style={{ color: "var(--ink-40)", flex: "1 1 auto" }}>Set {idx + 1}</span>
+                    <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                      {set.weight} × {set.reps}
+                    </span>
+                  </div>
+                ))}
+            </IosGroup>
+            <IosSectionFooter>
+              {Math.round(volume).toLocaleString()} {plural(Math.round(volume), "lb", "lbs")} total
+            </IosSectionFooter>
+          </div>
+        )
+      })}
+
+      {history.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-ink-40">No history for this exercise yet</p>
+        </div>
+      )}
+      </IosNavPage>
     </div>
   )
 }

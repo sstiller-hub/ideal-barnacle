@@ -55,7 +55,17 @@ import { computeAverageSecondsPerSet, classifyPace } from "@/lib/workout-analyti
 import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-storage"
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
 import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
-import { ArrowLeft, AlertCircle, Check, ThumbsUp, ThumbsDown, ListOrdered } from "lucide-react"
+import {
+  ArrowLeft,
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ListOrdered,
+  SkipForward,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react"
 import { ReorderExercisesSheet } from "@/components/reorder-exercises-sheet"
 import { StatUnit } from "@/components/ledger/stat-unit"
 import { SessionClock } from "@/components/ledger/session-clock"
@@ -419,43 +429,31 @@ const ExercisePage = memo(function ExercisePage({
                 pattern="[0-9]*"
                 value={exercise.machineSettings?.seat ?? ""}
                 onChange={(e) => void updateExerciseMachineSetting(exerciseIndex, "seat", e.target.value)}
-                placeholder="SEAT"
-                className="transition-colors duration-150"
+                placeholder="Seat"
+                aria-label="Seat setting"
+                className="ios-chip transition-colors duration-150"
                 style={{
-                  background: "var(--ink-02)",
-                  border: "1px solid var(--ink-08)",
-                  borderRadius: "var(--radius-flat)",
-                  padding: "4px 9px",
-                  fontFamily: "var(--font-label)",
-                  fontSize: "8px",
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  color: "var(--ink-70)",
-                  width: "52px",
+                  padding: "5px 10px",
+                  fontSize: "13px",
+                  width: "62px",
                   textAlign: "center",
                 }}
               />
             )}
+            {/* Plates is a chip, not a bordered label button — it toggles a
+                panel, which is exactly what an iOS filter chip does. */}
             <button
               onClick={() => {
                 if (exerciseIndex !== currentExerciseIndex) return
                 handleTogglePlateCalc()
               }}
-              className="transition-colors duration-150"
-              style={{
-                background: showPlateCalc ? "var(--ink-06)" : "var(--ink-02)",
-                border: `1px solid ${showPlateCalc ? "var(--ink-12)" : "var(--ink-08)"}`,
-                borderRadius: "var(--radius-flat)",
-                padding: "4px 9px",
-                fontFamily: "var(--font-label)",
-                fontSize: "8px",
-                fontWeight: 600,
-                letterSpacing: "0.1em",
-                color: showPlateCalc ? "var(--ink-85)" : "var(--ink-35)",
-              }}
+              className="ios-chip transition-colors duration-150"
+              data-open={showPlateCalc}
+              aria-pressed={showPlateCalc}
+              style={{ padding: "5px 10px", fontSize: "13px" }}
               type="button"
             >
-              PLATES
+              Plates
             </button>
           </div>
         </div>
@@ -560,9 +558,11 @@ const ExercisePage = memo(function ExercisePage({
             plates.length > 0 &&
             (isCurrentSet || focusedWeight || focusedReps)
 
-          // Fixed geometry — density varies per exercise (set count), never per set state.
-          const inputPadding = isCompactSets ? "12px 8px" : "15px 8px"
-          const inputFontSize = isCompactSets ? "22px" : "26px"
+          // Fixed geometry — density varies per exercise (set count), never per
+          // set state. The 58pt / 33pt pairing is the handoff's full-density
+          // target; crowded exercises step down rather than overflow.
+          const inputHeight = isCompactSets ? "50px" : "58px"
+          const inputFontSize = isCompactSets ? "27px" : "33px"
           const valueColor = set.completed
             ? "var(--ink-40)"
             : isCurrentSet
@@ -677,8 +677,9 @@ const ExercisePage = memo(function ExercisePage({
                     width: "100%",
                     background: weightBg,
                     border: `1px solid ${weightBorder}`,
-                    borderRadius: "var(--radius-flat)",
-                    padding: inputPadding,
+                    borderRadius: "8px",
+                    height: inputHeight,
+                    padding: "0 8px",
                     fontSize: inputFontSize,
                     fontWeight: 600,
                     letterSpacing: "-0.02em",
@@ -742,8 +743,9 @@ const ExercisePage = memo(function ExercisePage({
                     width: "100%",
                     background: repsBg,
                     border: `1px solid ${repsBorder}`,
-                    borderRadius: "var(--radius-flat)",
-                    padding: inputPadding,
+                    borderRadius: "8px",
+                    height: inputHeight,
+                    padding: "0 8px",
                     fontSize: inputFontSize,
                     fontWeight: 600,
                     letterSpacing: "-0.02em",
@@ -766,29 +768,21 @@ const ExercisePage = memo(function ExercisePage({
                   disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
                   className="flex items-center justify-center transition-colors duration-150"
                   style={{
-                    width: "100%",
-                    height: "100%",
-                    background: set.completed ? "var(--ink-06)" : "var(--ink-02)",
-                    border: `1px solid ${set.completed ? "transparent" : "var(--ink-08)"}`,
-                    borderRadius: "var(--radius-flat)",
+                    justifySelf: "center",
+                    alignSelf: "center",
+                    // A 28pt circle that fills white when the set is banked —
+                    // the iOS completion mark, not a square checkbox.
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "999px",
+                    background: set.completed ? "#fff" : "transparent",
+                    border: set.completed ? "none" : "1.5px solid var(--ink-30)",
                     opacity: !canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
                   }}
                   type="button"
                   aria-label={set.completed ? "Mark Set Incomplete" : "Complete Set"}
                 >
-                  {set.completed ? (
-                    <Check size={16} strokeWidth={2} style={{ color: "var(--ink-85)" }} />
-                  ) : (
-                    <div
-                      style={{
-                        width: "12px",
-                        height: "12px",
-                        borderRadius: "var(--radius-flat)",
-                        border: "1px solid var(--ink-35)",
-                        background: "transparent",
-                      }}
-                    />
-                  )}
+                  {set.completed ? <Check size={16} strokeWidth={2.6} style={{ color: "#000" }} /> : null}
                 </button>
               </div>
 
@@ -872,18 +866,8 @@ const ExercisePage = memo(function ExercisePage({
                 <div style={{ marginTop: isCompactSets ? "8px" : "12px" }}>
                   <div className={`flex items-center gap-2 ${isCompactSets ? "mb-2" : "mb-3"}`}>
                     <button
-                      className="transition-colors duration-150"
-                      style={{
-                        background: "var(--ink-02)",
-                        border: "1px solid var(--ink-08)",
-                        borderRadius: "var(--radius-flat)",
-                        padding: "4px 9px",
-                        fontFamily: "var(--font-label)",
-                        fontSize: "8px",
-                        fontWeight: 600,
-                        letterSpacing: "0.1em",
-                        color: "var(--ink-70)",
-                      }}
+                      className="ios-chip transition-colors duration-150"
+                      style={{ padding: "5px 10px", fontSize: "13px" }}
                       onClick={() => {
                         const nextMode = plateDisplayMode === "per-side" ? "total" : "per-side"
                         setPlateDisplayMode(nextMode)
@@ -896,7 +880,8 @@ const ExercisePage = memo(function ExercisePage({
                       }}
                       type="button"
                     >
-                      {plateDisplayMode === "per-side" ? "PER SIDE" : "TOTAL"}
+                      {plateDisplayMode === "per-side" ? "Per side" : "Total"}
+                      <ChevronDown size={14} strokeWidth={2} />
                     </button>
                     <span
                       style={{
@@ -924,18 +909,21 @@ const ExercisePage = memo(function ExercisePage({
                         }
                       }}
                       onFocus={handleInputAutoSelect}
+                      aria-label="Bar weight"
                       className="transition-colors duration-150"
                       style={{
-                        width: "52px",
-                        background: "var(--ink-02)",
-                        border: "1px solid var(--ink-08)",
-                        borderRadius: "var(--radius-flat)",
-                        padding: "4px 8px",
-                        fontSize: "13px",
-                        color: "var(--ink-70)",
+                        width: "76px",
+                        height: "40px",
+                        background: "var(--ink-06)",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "0 8px",
+                        fontSize: "17px",
+                        color: "#fff",
                         fontVariantNumeric: "tabular-nums",
                         fontWeight: 600,
                         textAlign: "center",
+                        outline: "none",
                       }}
                     />
                   </div>
@@ -944,15 +932,9 @@ const ExercisePage = memo(function ExercisePage({
                     {plates.map((plate, plateIndex) => (
                       <div key={plateIndex} className="flex items-center gap-1">
                         {Array.from({ length: plate.count }).map((_, countIndex) => {
-                          const getPlateColor = () => {
-                            if (plate.plate === 45) return "rgba(180, 60, 60, 0.6)"
-                            if (plate.plate === 35) return "rgba(60, 100, 180, 0.6)"
-                            if (plate.plate === 25) return "rgba(60, 160, 100, 0.6)"
-                            if (plate.plate === 10) return "rgba(200, 160, 70, 0.6)"
-                            if (plate.plate === 5) return "rgba(200, 200, 200, 0.6)"
-                            return "rgba(100, 100, 100, 0.6)"
-                          }
-
+                          // Plate size is carried by height alone. Colour-coding
+                          // them put the app's only hues on something that isn't
+                          // an earned value, so the bar goes monochrome.
                           const getPlateHeight = () => {
                             if (plate.plate === 45) return 40
                             if (plate.plate === 35) return 34
@@ -968,9 +950,8 @@ const ExercisePage = memo(function ExercisePage({
                               style={{
                                 width: "7px",
                                 height: `${getPlateHeight()}px`,
-                                background: getPlateColor(),
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: "var(--radius-flat)",
+                                background: "var(--ink-70)",
+                                borderRadius: "2px",
                               }}
                             />
                           )
@@ -999,10 +980,12 @@ const ExercisePage = memo(function ExercisePage({
                   >
                     <span
                       style={{
-                        fontSize: "17px",
-                        fontWeight: 600,
+                        fontFamily: "var(--font-display)",
+                        fontSize: "26px",
+                        fontWeight: 400,
+                        lineHeight: 1,
                         letterSpacing: "-0.01em",
-                        color: "var(--ink-85)",
+                        color: "#fff",
                       }}
                     >
                       {plates.map((plate, plateIndex) => (
@@ -1012,14 +995,7 @@ const ExercisePage = memo(function ExercisePage({
                         </span>
                       ))}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "9px",
-                        fontWeight: 500,
-                        letterSpacing: "0.02em",
-                        color: "var(--ink-30)",
-                      }}
-                    >
+                    <span style={{ fontSize: "13px", fontWeight: 400, color: "var(--ink-40)" }}>
                       {plateDisplayMode === "per-side" ? "per side" : "total"}
                     </span>
                   </div>
@@ -3707,29 +3683,30 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             <motion.div
               key="rest-dock"
               ref={restDockRef}
-              className="fixed z-[70] flex flex-col border"
-              initial={{ opacity: 0, y: -8 }}
+              className="ios-glass fixed z-[70] flex items-center justify-between"
+              // Slides up from below rather than dropping in: it occupies the
+              // tab bar's slot, and it never blocks the set inputs behind it.
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{
                 opacity: 0,
-                y: 8,
-                transition: { duration: 0.2, ease: "easeOut" },
+                y: 24,
+                transition: { duration: 0.3, ease: "easeOut" },
               }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               style={{
                 left: "calc(16px + env(safe-area-inset-left, 0px))",
                 right: "calc(16px + env(safe-area-inset-right, 0px))",
-                bottom: "calc(20px + env(safe-area-inset-bottom))",
-                borderColor: restRemainingSeconds <= 10 ? "var(--ink-35)" : "var(--ink-12)",
-                background: "rgba(13, 13, 15, 0.92)",
-                borderRadius: "var(--radius-xs)",
-                padding: "10px 14px",
+                bottom: "calc(36px + env(safe-area-inset-bottom, 0px))",
+                height: "66px",
+                borderRadius: "999px",
+                padding: "0 8px 0 22px",
                 pointerEvents: "auto",
               }}
             >
-              <div className="flex items-center justify-between gap-3">
               <motion.div
-                className="flex items-end gap-3"
+                className="flex items-baseline"
+                style={{ gap: "10px", minWidth: 0 }}
                 animate={{
                   opacity: restRemainingSeconds <= 10 ? [0.8, 1, 0.8] : 1,
                 }}
@@ -3739,38 +3716,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     : { duration: 0.2, ease: "linear" }
                 }
               >
-                <div className="flex flex-col items-start" style={{ paddingBottom: "5px" }}>
-                  <div className="flex items-center" style={{ gap: "5px" }}>
-                    <span
-                      className="rest-shimmer"
-                      style={{
-                        width: "4px",
-                        height: "4px",
-                        borderRadius: "50%",
-                        background: "radial-gradient(circle at 35% 30%, #fff, rgba(255,255,255,0.9) 45%, rgba(255,255,255,0.72))",
-                        display: "inline-block",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontFamily: "var(--font-label)",
-                        fontSize: "8px",
-                        fontWeight: 600,
-                        letterSpacing: "0.18em",
-                        color: "var(--ink-35)",
-                        lineHeight: 1,
-                      }}
-                    >
-                      REST
-                    </span>
-                  </div>
-                  {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
-                    <div style={{ fontFamily: "var(--font-label)", fontSize: "7.5px", fontWeight: 500, letterSpacing: "0.04em", color: "var(--ink-25)", lineHeight: 1, marginTop: "3px" }}>
-                      {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
-                    </div>
-                  )}
-                </div>
-                <div
+                <span
+                  style={{
+                    fontFamily: "var(--font-label)",
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    letterSpacing: "0.19em",
+                    color: "var(--ink-40)",
+                    lineHeight: 1,
+                  }}
+                >
+                  REST
+                </span>
+                <span
                   className="leading-none"
                   style={{
                     fontSize: "38px",
@@ -3778,81 +3736,44 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
                     fontFamily: "var(--font-display)",
-                    color: "var(--ink-95)",
+                    color: "#fff",
                   }}
                 >
                   {formatSeconds(restRemainingSeconds)}
-                </div>
+                </span>
               </motion.div>
 
-              <div className="flex items-center gap-2">
-                <button
+              <div className="flex items-center" style={{ gap: "6px", flexShrink: 0 }}>
+                <RestCapsuleButton
+                  label="−30"
                   onClick={() => adjustRest(-30)}
                   disabled={restRemainingSeconds <= 5}
-                  className="transition-colors duration-150"
-                  style={{
-                    background: "var(--ink-02)",
-                    border: "1px solid var(--ink-08)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: "6px 10px",
-                    fontFamily: "var(--font-label)",
-                    fontSize: "9.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    color: "var(--ink-70)",
-                    opacity: restRemainingSeconds <= 5 ? 0.35 : 1,
-                    touchAction: "manipulation",
-                  }}
-                  type="button"
-                >
-                  −30S
-                </button>
-                <button
-                  onClick={() => adjustRest(30)}
-                  className="transition-colors duration-150"
-                  style={{
-                    background: "var(--ink-02)",
-                    border: "1px solid var(--ink-08)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: "6px 10px",
-                    fontFamily: "var(--font-label)",
-                    fontSize: "9.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    color: "var(--ink-70)",
-                    touchAction: "manipulation",
-                  }}
-                  type="button"
-                >
-                  +30S
-                </button>
+                />
+                <RestCapsuleButton label="+30" onClick={() => adjustRest(30)} />
                 <button
                   onClick={() => {
                     // One tap, and rest is over: the countdown stops and the
-                    // dock unmounts. No second tap to get rid of it.
+                    // capsule unmounts. No second tap to get rid of it.
                     haptic("tap")
                     void setRestStateAndPersist(null)
                   }}
-                  className="transition-colors duration-150"
+                  className="flex items-center justify-center"
+                  aria-label="Skip rest"
                   style={{
-                    background: "var(--ink-06)",
-                    border: "1px solid var(--ink-12)",
-                    borderRadius: "var(--radius-flat)",
-                    padding: "6px 10px",
-                    fontFamily: "var(--font-label)",
-                    fontSize: "9.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    color: "var(--ink-95)",
+                    width: "50px",
+                    height: "50px",
+                    borderRadius: "999px",
+                    background: "#fff",
+                    border: "none",
+                    color: "#000",
                     touchAction: "manipulation",
+                    cursor: "pointer",
                   }}
                   type="button"
                 >
-                  SKIP
+                  <SkipForward size={20} strokeWidth={2} fill="currentColor" />
                 </button>
               </div>
-              </div>
-
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -3864,12 +3785,35 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             marginTop: "0px",
           }}
         >
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <button onClick={handleExit} className="text-ink-30 hover:text-ink-50 transition-colors" type="button" style={{ flexShrink: 0 }}>
-              <ArrowLeft size={18} strokeWidth={1.5} />
+          {/* Nav bar: chevron + routine name leading, the three live stats as
+              the centre title view, Finish as a trailing text action. */}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <button
+              onClick={handleExit}
+              className="flex items-center transition-colors"
+              type="button"
+              aria-label="Exit workout"
+              style={{
+                flexShrink: 0,
+                maxWidth: "34%",
+                gap: "2px",
+                background: "transparent",
+                border: "none",
+                padding: "4px 4px 4px 0",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronLeft size={24} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span
+                className="truncate"
+                style={{ fontSize: "17px", fontWeight: 400, letterSpacing: "-0.01em" }}
+              >
+                {session?.routineName || "Back"}
+              </span>
             </button>
 
-            <div className="flex items-center justify-center" style={{ gap: "18px", flex: 1 }}>
+            <div className="flex items-center justify-center" style={{ gap: "18px", flex: 1, minWidth: 0 }}>
               {session?.startedAt ? (
                 <SessionClock
                   startedAt={session.startedAt}
@@ -3890,20 +3834,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               className="transition-colors duration-base"
               style={{
                 flexShrink: 0,
-                fontFamily: "var(--font-label)",
-                fontSize: "10px",
+                fontSize: "17px",
                 fontWeight: 600,
-                letterSpacing: "0.12em",
-                padding: "7px 12px",
-                borderRadius: "var(--radius-flat)",
-                color: canFinishWorkout ? "var(--ink-95)" : "var(--ink-30)",
-                background: canFinishWorkout ? "var(--ink-06)" : "var(--ink-02)",
-                border: `1px solid ${canFinishWorkout ? "var(--ink-12)" : "var(--ink-08)"}`,
+                letterSpacing: "-0.01em",
+                padding: "4px 0 4px 8px",
+                background: "transparent",
+                border: "none",
+                color: canFinishWorkout ? "#fff" : "var(--ink-30)",
+                cursor: canFinishWorkout ? "pointer" : "default",
               }}
               type="button"
               disabled={!canFinishWorkout}
             >
-              FINISH
+              Finish
             </button>
           </div>
 
@@ -4065,5 +4008,41 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         onApply={applyReorder}
       />
     </div>
+  )
+}
+
+/** A 50pt circular ±30 button on the rest capsule's glass. */
+function RestCapsuleButton({
+  label,
+  onClick,
+  disabled = false,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center justify-center transition-opacity duration-150"
+      style={{
+        width: "50px",
+        height: "50px",
+        borderRadius: "999px",
+        background: "rgba(255, 255, 255, 0.12)",
+        border: "none",
+        boxShadow: "inset 0 0 0 0.5px rgba(255, 255, 255, 0.14)",
+        color: "#fff",
+        fontSize: "13px",
+        fontWeight: 600,
+        opacity: disabled ? 0.35 : 1,
+        touchAction: "manipulation",
+        cursor: disabled ? "default" : "pointer",
+      }}
+    >
+      {label}
+    </button>
   )
 }

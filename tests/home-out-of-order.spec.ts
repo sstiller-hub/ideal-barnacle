@@ -96,10 +96,10 @@ test("caret picker offers the current program and swaps the list when nothing is
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rest")
   await page.getByRole("heading", { level: 1 }).click()
 
-  await expect(page.getByRole("button", { name: "Legs 1 – Quad Dominant" })).toBeVisible()
-  await expect(page.getByRole("button", { name: /Upper Body – Rows, Chest & Arms/ })).toHaveCount(0)
+  await expect(page.getByRole("menuitemradio", { name: "Legs 1 – Quad Dominant" })).toBeVisible()
+  await expect(page.getByRole("menuitemradio", { name: /Upper Body – Rows, Chest & Arms/ })).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Legs 1 – Quad Dominant" }).click()
+  await page.getByRole("menuitemradio", { name: "Legs 1 – Quad Dominant" }).click()
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lower")
   await expect(page.getByText("Arsenal Pendulum Squat")).toBeVisible()
@@ -107,7 +107,7 @@ test("caret picker offers the current program and swaps the list when nothing is
 
   // Switch again: the list must follow the new pick, not the previous one.
   await page.getByRole("heading", { level: 1 }).click()
-  await page.getByRole("button", { name: "Upper 1 – Chest + Lats" }).click()
+  await page.getByRole("menuitemradio", { name: "Upper 1 – Chest + Lats" }).click()
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Upper")
   await expect(page.getByText("Incline Press Machine")).toBeVisible()

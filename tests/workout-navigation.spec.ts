@@ -162,7 +162,7 @@ test.describe("Active session: exit button", () => {
     await page.goto(`/workout/session?routineId=${routineA.id}`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
-    const exitBtn = page.locator("button:has(svg.lucide-arrow-left)").first()
+    const exitBtn = page.getByRole("button", { name: "Exit workout" }).first()
     await exitBtn.click()
 
     await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
@@ -173,7 +173,7 @@ test.describe("Active session: exit button", () => {
     await page.goto(`/workout/session?routineId=${routineA.id}`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
-    const exitBtn = page.locator("button:has(svg.lucide-arrow-left)").first()
+    const exitBtn = page.getByRole("button", { name: "Exit workout" }).first()
     await exitBtn.click()
 
     await page.waitForFunction(() => {
@@ -192,7 +192,7 @@ test.describe("Active session: exit button", () => {
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     // Exit via the back button (client-side nav to "/")
-    const exitBtn = page.locator("button:has(svg.lucide-arrow-left)").first()
+    const exitBtn = page.getByRole("button", { name: "Exit workout" }).first()
     await exitBtn.click()
 
     await expect(page).toHaveURL(/\/$/, { timeout: 10000 })

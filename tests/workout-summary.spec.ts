@@ -34,6 +34,6 @@ test("loads workout summary by id", async ({ page }) => {
   }, workout)
 
   await page.goto(`/workout-summary?workoutId=${workoutId}`)
-  await expect(page.getByText("Workout Complete")).toBeVisible()
+  await expect(page.locator(".ios-large-title")).toBeVisible()
   await expect(page.getByText(workout.name)).toBeVisible()
 })

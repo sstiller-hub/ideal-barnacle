@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { plural } from "@/lib/utils"
-import { ChevronLeft } from "lucide-react"
+import { Share } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { IosNavPage } from "@/components/ios/nav-bar"
+import { IosCard } from "@/components/ios/grouped"
 import { getWorkoutHistory, normalizeExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
@@ -366,6 +367,10 @@ export default function WorkoutSummaryPage() {
     return `${m} min`
   }
 
+  // Display numerals want a short form — 44.1K reads at 34pt, 44,120 does not.
+  const formatVolumeK = (lb: number) =>
+    lb >= 1000 ? `${(lb / 1000).toFixed(1)}K` : `${Math.round(lb)}`
+
   const durationSeconds =
     workout.duration ??
     (workout.startedAt && workout.endedAt
@@ -385,87 +390,69 @@ export default function WorkoutSummaryPage() {
       : "Baseline set"
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div
-        className="sticky top-0 z-10"
-        style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+      <IosNavPage
+        backLabel="Home"
+        onBack={() => router.push("/history")}
+        title={workout.name}
+        longTitle
+        subtitle={fullDateLabel}
+        action={
+          rawWorkout ? (
+            <button
+              type="button"
+              className="ios-navbar__action"
+              aria-label="Copy workout"
+              onClick={async () => {
+                try {
+                  await copyWorkoutToClipboard(rawWorkout)
+                  toast.success("Workout copied to clipboard")
+                } catch {
+                  toast.error("Failed to copy workout")
+                }
+              }}
+            >
+              <Share size={22} strokeWidth={1.8} />
+            </button>
+          ) : null
+        }
       >
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.push("/history")}
-            className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
-            style={{ background: "transparent", border: "none", padding: "0", cursor: "pointer" }}
-            aria-label="Back to workout history"
-          >
-            <ChevronLeft size={16} strokeWidth={2} />
-            <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>Back</span>
-          </button>
-          <div>
-            <p className="text-xs text-muted-foreground">Workout Complete</p>
-            <h1 className="text-lg font-bold text-foreground">{workout.name}</h1>
-            <p className="text-xs text-muted-foreground">{fullDateLabel}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         {workoutAlerts.length > 0 && (
           <WorkoutAlertsBanner alerts={workoutAlerts} onDismiss={dismissWorkoutAlert} className="" />
         )}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</div>
-              <div className="text-3xl font-bold text-foreground tabular-nums">
-                {summary.totalVolume.toLocaleString()} {plural(summary.totalVolume, "lb", "lbs")}
-              </div>
-            </div>
-            <div className="text-right">
-              {durationSeconds !== null && (
-                <>
-                  <div className="text-xs text-muted-foreground">Duration</div>
-                  <div className="text-sm font-medium text-foreground">{formatDuration(durationSeconds)}</div>
-                </>
-              )}
-              {timeRangeLabel && (
-                <div className="text-xs text-muted-foreground mt-0.5">{timeRangeLabel}</div>
-              )}
-              {durationSeconds === null && (
-                <>
-                  <div className="text-xs text-muted-foreground">Workout date</div>
-                  <div className="text-sm font-medium text-foreground">{dateLabel}</div>
-                </>
-              )}
-            </div>
+
+        {/* One "Session" band: the four numbers that describe the workout,
+            as display numerals over their labels. */}
+        <IosCard>
+          <div className="grid grid-cols-4" style={{ gap: "8px" }}>
+            <SummaryStat value={formatVolumeK(summary.totalVolume)} label="Volume" />
+            <SummaryStat
+              value={durationSeconds !== null ? formatDuration(durationSeconds) : dateLabel}
+              label={durationSeconds !== null ? "Duration" : "Workout date"}
+            />
+            <SummaryStat value={`${summary.totalValidSets}`} label="Sets" />
+            <SummaryStat value={`${summary.exercisesCount}`} label="Exercises" />
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div
+            className="flex items-center gap-2"
+            style={{ marginTop: "16px", paddingTop: "14px", borderTop: "0.5px solid var(--ios-hairline)" }}
+          >
             {summary.baselineTotalVolume > 0 ? (
               <Badge tone="good" className="normal-case tracking-normal">{deltaLabel}</Badge>
             ) : (
-              <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {deltaLabel}
-              </span>
+              <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">{deltaLabel}</span>
             )}
-            {summary.baselineTotalVolume > 0 && <span>vs last time</span>}
+            {summary.baselineTotalVolume > 0 && (
+              <span style={{ fontSize: "13px", color: "var(--ink-40)" }}>vs last time</span>
+            )}
+            {timeRangeLabel && (
+              <span style={{ fontSize: "13px", color: "var(--ink-40)", marginLeft: "auto" }}>{timeRangeLabel}</span>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
-            <div>
-              <div className="text-lg font-semibold text-foreground">{summary.exercisesCount}</div>
-              <div>Exercises</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-foreground">{summary.totalValidSets}</div>
-              <div>Sets</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-foreground">{summary.prCount}</div>
-              <div>PRs</div>
-            </div>
-          </div>
-        </Card>
+        </IosCard>
 
-        <Card className="p-4 space-y-3">
+        <IosCard>
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Performance</div>
           <div className="flex flex-wrap gap-2">
             <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
@@ -516,7 +503,7 @@ export default function WorkoutSummaryPage() {
               Start another workout
             </Button>
           </div>
-        </Card>
+        </IosCard>
 
         <div className="space-y-3">
           {summary.exerciseSummaries.map(
@@ -529,86 +516,160 @@ export default function WorkoutSummaryPage() {
                   : null
               const exerciseRating = rawWorkout?.exercises?.[idx]?.rating ?? null
 
+              const completedSets = exercise.sets.filter((s) => s.completed).length
+
               return (
-                <Card
-                  key={exercise.id}
-                  className={`p-4 space-y-3 ${isWarmup ? "opacity-75" : ""}`}
-                >
+                <IosCard key={exercise.id} style={isWarmup ? { opacity: 0.75 } : undefined}>
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <button
                         type="button"
                         onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
-                        className="text-base font-semibold text-foreground hover:underline"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          textAlign: "left",
+                          fontSize: "17px",
+                          fontWeight: 600,
+                          color: "#fff",
+                          cursor: "pointer",
+                        }}
                       >
                         {exercise.name}
                       </button>
-                      <p className="text-xs text-muted-foreground">Exercise history</p>
+                      <p style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                        {completedSets}/{exercise.sets.length} sets
+                        {exerciseRating
+                          ? exerciseRating === "thumbs_up"
+                            ? " · Felt good"
+                            : " · Felt rough"
+                          : ""}
+                      </p>
                     </div>
-                    <div className="flex flex-wrap gap-2 justify-end items-center">
-                      {exerciseRating && (
-                        <Badge tone={exerciseRating === "thumbs_up" ? "good" : "warn"}>
-                          {exerciseRating === "thumbs_up" ? "Felt good" : "Felt rough"}
-                        </Badge>
-                      )}
-                      {!isWarmup && visibleBadges.length > 0 && (
-                        <>
-                          {visibleBadges.map((badge) => (
-                            <AktIndicatorChip
-                              key={badge}
-                              indicatorId={`${workout.id}:${exercise.id}:${badge}`}
-                              tone="good"
-                              label={badge}
-                            />
-                          ))}
-                          {overflowCount > 0 && (
-                            <AktIndicatorChip
-                              indicatorId={`${workout.id}:${exercise.id}:overflow`}
-                              tone="good"
-                              label={`+${overflowCount}`}
-                            />
-                          )}
-                        </>
+                    <div className="text-right" style={{ flexShrink: 0 }}>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: "26px",
+                          lineHeight: 1,
+                          color: "#fff",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {formatVolumeK(volume)}
+                      </div>
+                      {delta && (
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            marginTop: "4px",
+                            color: volumeDelta > 0 ? "var(--good)" : "var(--ink-30)",
+                          }}
+                        >
+                          {delta}
+                        </div>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Volume: <span className="text-foreground">{volume.toLocaleString()} {plural(volume, "lb", "lbs")}</span>
-                    </span>
-                    {delta && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        {delta}
-                      </span>
+
+                  <div className="flex flex-wrap gap-2" style={{ marginTop: "10px" }}>
+                    {!isWarmup &&
+                      visibleBadges.map((badge) => (
+                        <AktIndicatorChip
+                          key={badge}
+                          indicatorId={`${workout.id}:${exercise.id}:${badge}`}
+                          tone="good"
+                          label={badge}
+                        />
+                      ))}
+                    {!isWarmup && overflowCount > 0 && (
+                      <AktIndicatorChip
+                        indicatorId={`${workout.id}:${exercise.id}:overflow`}
+                        tone="good"
+                        label={`+${overflowCount}`}
+                      />
                     )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Best set: {bestSet ? `${bestSet.weight ?? 0} × ${bestSet.reps ?? 0}` : "—"}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
                     {excluded > 0 && (
                       <Badge tone="warn" className="normal-case tracking-normal text-xs">
                         ⚠️ {excluded} {plural(excluded, "set", "sets")} excluded
                       </Badge>
                     )}
                     {isWarmup && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                        Warm-up
-                      </span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Warm-up</span>
                     )}
                   </div>
-                </Card>
+
+                  {/* Set table: hairline-ruled, 15pt cells. */}
+                  <div style={{ marginTop: "14px" }}>
+                    <div
+                      className="flex items-center"
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--ink-40)",
+                        paddingBottom: "6px",
+                        borderBottom: "0.5px solid var(--ios-hairline)",
+                      }}
+                    >
+                      <span style={{ flex: "1 1 auto" }}>Set</span>
+                      <span style={{ width: "88px", textAlign: "right" }}>Weight × Reps</span>
+                    </div>
+                    {exercise.sets
+                      .filter((s) => s.completed)
+                      .map((set, setIdx) => (
+                        <div
+                          key={setIdx}
+                          className="flex items-center"
+                          style={{
+                            fontSize: "15px",
+                            padding: "7px 0",
+                            borderBottom: "0.5px solid var(--ios-hairline)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          <span style={{ flex: "1 1 auto", color: "var(--ink-40)" }}>{setIdx + 1}</span>
+                          <span style={{ width: "88px", textAlign: "right", color: "#fff" }}>
+                            {set.weight ?? 0} × {set.reps ?? 0}
+                          </span>
+                        </div>
+                      ))}
+                    <div style={{ fontSize: "13px", color: "var(--ink-40)", paddingTop: "8px" }}>
+                      Best set: {bestSet ? `${bestSet.weight ?? 0} × ${bestSet.reps ?? 0}` : "—"}
+                    </div>
+                  </div>
+                </IosCard>
               )
             },
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border py-4">
+        <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border py-4 px-4">
           <Button onClick={() => router.push("/")} className="w-full text-base">
             Done
           </Button>
         </div>
       </div>
+      </IosNavPage>
+    </div>
+  )
+}
+
+/** Display numeral over a 13pt label, for the Session band. */
+function SummaryStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "34px",
+          lineHeight: 1,
+          color: "#fff",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "6px" }}>{label}</div>
     </div>
   )
 }

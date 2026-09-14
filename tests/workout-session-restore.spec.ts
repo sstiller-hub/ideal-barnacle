@@ -126,7 +126,7 @@ test.describe("Active workout: cold-start restore", () => {
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     // Leaving via the back button means home is where the user actually is.
-    await page.locator("button:has(svg.lucide-arrow-left)").first().click()
+    await page.getByRole("button", { name: "Exit workout" }).first().click()
     await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
 
     await page.goto("/")
@@ -163,7 +163,7 @@ test.describe("Active workout: cold-start restore", () => {
     await expect(page).toHaveURL(new RegExp(`/workout/session\\?routineId=${routine.id}`), { timeout: 10000 })
 
     // Leave deliberately, then relaunch again — home must stick.
-    await page.locator("button:has(svg.lucide-arrow-left)").first().click()
+    await page.getByRole("button", { name: "Exit workout" }).first().click()
     await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
     await page.goto("/")
     await expect(page).toHaveURL(/\/$/)

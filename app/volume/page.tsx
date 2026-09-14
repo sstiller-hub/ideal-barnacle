@@ -3,8 +3,10 @@
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { plural } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { ChevronRight } from "lucide-react"
 import { getWorkoutHistory } from "@/lib/workout-storage"
+import { IosNavPage } from "@/components/ios/nav-bar"
+import { IosGroup, IosSectionHeader } from "@/components/ios/grouped"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { filterByTimeRange, filterByWorkoutType, getVolumeSeriesGlobal } from "@/lib/volume-analytics"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
@@ -175,44 +177,17 @@ export default function VolumeHistoryPage() {
   )
 
   return (
-    <div
-      className="min-h-screen pb-20"
-      style={{ background: "#0D0D0F", boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)" }}
-    >
-      <div
-        className="sticky top-0 z-10"
-        style={{ background: "rgba(10, 10, 12, 0.92)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+      <IosNavPage
+        backLabel="Home"
+        onBack={() => router.back()}
+        title="Volume by Exercise"
+        longTitle
+        subtitle={`${exercises.length} ${plural(exercises.length, "exercise", "exercises")} tracked`}
       >
-        <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.back()}
-              style={{ color: "rgba(255, 255, 255, 0.7)" }}
-            >
-              ‹
-            </Button>
-            <div>
-              <div
-                className="text-ink-25 tracking-widest"
-                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.18em", fontFamily: "var(--font-label)" }}
-              >
-                TRAINING VOLUME
-              </div>
-              <h1 className="text-ink-95" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em" }}>
-                Volume by Exercise
-              </h1>
-              <p className="text-ink-35" style={{ fontSize: "11px" }}>
-                {exercises.length} {plural(exercises.length, "exercise", "exercises")} tracked
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-3">
-        {/* Controls */}
+      <div className="max-w-2xl mx-auto px-4 space-y-3">
+        {/* Controls: one segmented control for the range, pull-down chips for
+            the two dimensions that used to be their own stacked rows. */}
         <VolumeControls
           timeRange={timeRange}
           aggregation={aggregation}
@@ -489,40 +464,49 @@ export default function VolumeHistoryPage() {
           </div>
         )}
 
-        {/* Exercise list */}
-        {exercises.map((exercise) => {
-          const series = exercise.timeline.slice(-7)
-          const sparkPath = buildSparklinePath(series, 120, 40)
+      </div>
 
-          return (
-            <button
-              key={exercise.name}
-              onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
-              className="w-full text-left transition-all duration-base"
-              style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "var(--radius-2xl)",
-                padding: "14px",
-              }}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-ink-90" style={{ fontSize: "13px", fontWeight: 500 }}>
-                    {exercise.name}
-                  </div>
-                  <div className="text-ink-35" style={{ fontSize: "10px" }}>
-                    Last volume: {Math.round(exercise.lastVolume).toLocaleString()} {plural(Math.round(exercise.lastVolume), "lb", "lbs")}
-                  </div>
-                </div>
-                <div className="text-right">
+      {/* Exercise list — a grouped list rather than a stack of bordered cards,
+          so the names line up and the sparklines read as one column. */}
+      {exercises.length > 0 && (
+        <>
+          <IosSectionHeader>Exercises</IosSectionHeader>
+          <IosGroup>
+            {exercises.map((exercise) => {
+              const series = exercise.timeline.slice(-7)
+              const sparkPath = buildSparklinePath(series, 90, 20)
+              // Green is reserved for a beaten value, so a positive trend is the
+              // only case that earns it; everything else stays ink.
+              const beaten = typeof exercise.trendPct === "number" && exercise.trendPct > 0
+
+              return (
+                <button
+                  key={exercise.name}
+                  type="button"
+                  className="ios-row"
+                  style={{ minHeight: "64px" }}
+                  onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                >
+                  <span style={{ flex: "1 1 auto", minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: "16px" }}>{exercise.name}</span>
+                    <span style={{ display: "block", fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                      {Math.round(exercise.lastVolume).toLocaleString()}{" "}
+                      {plural(Math.round(exercise.lastVolume), "lb", "lbs")}
+                    </span>
+                  </span>
                   {typeof exercise.trendPct === "number" && (
-                    <div className="text-ink-50" style={{ fontSize: "10px" }}>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        color: beaten ? "var(--good)" : "var(--ink-40)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
                       {exercise.trendPct >= 0 ? "+" : ""}
                       {exercise.trendPct}%
-                    </div>
+                    </span>
                   )}
-                  <svg width="120" height="40" viewBox="0 0 120 40">
+                  <svg width="90" height="20" viewBox="0 0 90 20" style={{ flexShrink: 0 }}>
                     <path
                       d={sparkPath}
                       fill="none"
@@ -532,18 +516,20 @@ export default function VolumeHistoryPage() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                </div>
-              </div>
-            </button>
-          )
-        })}
+                  <ChevronRight size={18} strokeWidth={2} className="ios-row__chevron" />
+                </button>
+              )
+            })}
+          </IosGroup>
+        </>
+      )}
 
-        {exercises.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-ink-40">No volume data yet</p>
-          </div>
-        )}
-      </div>
+      {exercises.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-ink-40">No volume data yet</p>
+        </div>
+      )}
+      </IosNavPage>
     </div>
   )
 }
