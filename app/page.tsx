@@ -46,6 +46,8 @@ import { isSetEligibleForStats, isSetIncomplete } from "@/lib/set-validation"
 import { getPrExcludedExercises } from "@/lib/pr-exclusions"
 import { Check, ChevronDown } from "lucide-react"
 import { IosTabBar } from "@/components/ios/tab-bar"
+import { MonthHeatCalendar } from "@/components/home/month-heat-calendar"
+import { buildDaySummaries, getDateKey, startOfDay, summariseMonth } from "@/lib/home-calendar"
 import { BandHeader } from "@/components/ledger/band-header"
 import { DeltaChip } from "@/components/ledger/delta-chip"
 import { Sparkline } from "@/components/ledger/sparkline"
@@ -167,9 +169,19 @@ type DayState = "scheduled" | "rest" | "completed" | "activeSession"
 // same workout on every focus/refresh of the home screen.
 const repairAttemptedWorkoutIds = new Set<string>()
 
+// How many ledger rows the day panel shows before collapsing the rest behind
+// a "+ N more" line, so the pinned action never falls below the fold.
+const DAY_PANEL_ROW_LIMIT = 4
+
 export default function Home() {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
+  // The month the grid is showing, which is not always the selected day's month
+  // once you start swiping through the calendar.
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
   const [routinePool, setRoutinePool] = useState<WorkoutRoutine[]>([])
   const [workoutHistory, setWorkoutHistory] = useState<CompletedWorkout[]>([])
   const [scheduledRoutine, setScheduledRoutine] = useState<WorkoutRoutine | null>(null)
@@ -183,6 +195,7 @@ export default function Home() {
   const [isRestoringSession, setIsRestoringSession] = useState(false)
   const [scheduleOverride, setScheduleOverrideState] = useState<ScheduleOverrideResult | undefined>(undefined)
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
+  const [showAllExercises, setShowAllExercises] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [uiStateOverride, setUiStateOverride] = useState<DayState | null>(null)
   const [devModeEnabled, setDevModeEnabled] = useState(false)
@@ -1017,6 +1030,43 @@ export default function Home() {
     ]
   }, [workoutHistory, workoutOptions])
 
+  // One pass per visible month, rebuilt when the history or the schedule moves.
+  const daySummaries = useMemo(
+    () =>
+      buildDaySummaries({
+        month: visibleMonth,
+        history: workoutHistory,
+        resolveRoutineName: (entry) =>
+          routinePool.find((routine) => routine.id === entry.routineId)?.name ?? entry.routineName,
+      }),
+    [visibleMonth, workoutHistory, routinePool, scheduleOverride],
+  )
+
+  const monthTotals = useMemo(() => summariseMonth(daySummaries), [daySummaries])
+
+  const selectedSummary = daySummaries[getDateKey(selectedDate)] ?? null
+
+  const handleSelectDate = useCallback((date: Date) => {
+    setShowWorkoutPicker(false)
+    setShowAllExercises(false)
+    setSelectedDate(startOfDay(date))
+  }, [])
+
+  const handleChangeMonth = useCallback((delta: number) => {
+    setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
+  }, [])
+
+  // Following the selected day into its own month keeps the grid and the panel
+  // in agreement when the date changes from somewhere other than a cell tap.
+  useEffect(() => {
+    setVisibleMonth((prev) => {
+      if (prev.getFullYear() === selectedDate.getFullYear() && prev.getMonth() === selectedDate.getMonth()) {
+        return prev
+      }
+      return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    })
+  }, [selectedDate])
+
   const getExerciseLabel = (name: string) => {
     const lower = name.trim().toLowerCase()
     if (lower === "leg extension (light)") {
@@ -1404,43 +1454,8 @@ export default function Home() {
     return null
   }, [actualState, selectedDate, routinePool])
 
-  const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
-  const swipeDeltaRef = useRef<{ x: number; y: number } | null>(null)
-
-  const handleDaySwipeStart = (event: React.TouchEvent) => {
-    if (showWorkoutPicker) return
-    if (event.touches.length !== 1) return
-    swipeStartRef.current = {
-      x: event.touches[0].clientX,
-      y: event.touches[0].clientY,
-    }
-    swipeDeltaRef.current = null
-  }
-
-  const handleDaySwipeMove = (event: React.TouchEvent) => {
-    if (!swipeStartRef.current || event.touches.length !== 1) return
-    const dx = event.touches[0].clientX - swipeStartRef.current.x
-    const dy = event.touches[0].clientY - swipeStartRef.current.y
-    swipeDeltaRef.current = { x: dx, y: dy }
-  }
-
-  const handleDaySwipeEnd = () => {
-    if (!swipeStartRef.current || !swipeDeltaRef.current) {
-      swipeStartRef.current = null
-      swipeDeltaRef.current = null
-      return
-    }
-    const { x: dx, y: dy } = swipeDeltaRef.current
-    swipeStartRef.current = null
-    swipeDeltaRef.current = null
-    if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return
-    setShowWorkoutPicker(false)
-    if (dx > 0) {
-      goToPreviousDay()
-    } else {
-      goToNextDay()
-    }
-  }
+  // The day-swipe is gone: the calendar is the navigation now, and a horizontal
+  // swipe on Home belongs to the month grid instead.
 
   const relativeDayLabel = isToday()
     ? "TODAY"
@@ -1456,6 +1471,94 @@ export default function Home() {
   const weekOfLabel = getWeekRange(new Date())
     .start.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     .toUpperCase()
+
+  // The mono meta line beside the routine title. Each day state answers a
+  // different question, so each gets its own line: what you moved, what you are
+  // about to face, or where the week stands.
+  const dayMetaLine = (() => {
+    if (actualState === "completed" && workoutForDate) {
+      const durationSeconds = selectedSummary?.durationSeconds ?? null
+      const duration =
+        durationSeconds !== null
+          ? `${Math.floor(durationSeconds / 3600)}:${String(Math.floor((durationSeconds % 3600) / 60)).padStart(2, "0")}`
+          : null
+      const beaten = selectedSummary?.beaten ?? 0
+      const total = selectedSummary?.total ?? 0
+      return (
+        <>
+          {formatK(workoutForDate.stats?.totalVolume ?? 0)}
+          {duration ? ` · ${duration}` : ""}
+          {total > 0 && (
+            <>
+              {" · "}
+              <span style={{ color: beaten > 0 ? "var(--good)" : "var(--ink-40)" }}>
+                {beaten}/{total} beat
+              </span>
+            </>
+          )}
+        </>
+      )
+    }
+
+    if ((actualState === "scheduled" || actualState === "activeSession") && displayExercises) {
+      return (
+        <>
+          {displayExercises.length} ex · {plannedSets} sets
+          {lastSameWorkout ? (
+            <>
+              {" · "}
+              <span style={{ color: "var(--ink-95)" }}>{formatK(lastSameWorkout.totalVolume)}</span> to beat
+            </>
+          ) : null}
+        </>
+      )
+    }
+
+    if (actualState === "rest" && currentWeekVolumeSoFar > 0) {
+      return (
+        <>
+          {formatK(currentWeekVolumeSoFar)} this week
+          {previousWeekVolume > 0 && (
+            <>
+              {" · "}
+              <span style={{ color: weekPercent >= 0 ? "var(--good)" : "var(--ink-40)" }}>
+                {weekPercent >= 0 ? "↑" : "↓"}
+                {Math.abs(Math.round(weekPercent))}%
+              </span>
+            </>
+          )}
+        </>
+      )
+    }
+
+    return null
+  })()
+
+  // One action per day state. A completed day sends you to the record; a rest
+  // day still lets you train, but as a deliberate override rather than the
+  // default, so it stays a ghost button.
+  const pinnedAction: { label: string; filled: boolean; onClick: () => void } | null = (() => {
+    if (actualState === "activeSession") {
+      return { label: "Resume workout", filled: true, onClick: handleResumeExisting }
+    }
+    if (actualState === "completed" && workoutForDate) {
+      return {
+        label: "View session",
+        filled: false,
+        onClick: () => router.push(`/history/${workoutForDate.id}`),
+      }
+    }
+    if (actualState === "rest") {
+      const fallback = scheduledRoutine?.id ?? routinePool[0]?.id ?? null
+      if (!fallback) return null
+      return { label: "Start anyway", filled: false, onClick: () => handleStartWorkout(fallback) }
+    }
+    if (scheduledRoutine?.id) {
+      const routineId = scheduledRoutine.id
+      return { label: "Start workout", filled: true, onClick: () => handleStartWorkout(routineId) }
+    }
+    return null
+  })()
 
   // A cold start that is being redirected back into the active workout paints
   // the session screen next; showing the home screen for those few frames would
@@ -1548,79 +1651,53 @@ export default function Home() {
             </div>
           </div>
         )}
+        {/* Month heat calendar — Home's primary navigation. Tapping a cell sets
+            the selected day; the panel below re-renders for it. */}
+        <div className="flex-shrink-0 band-enter">
+          <MonthHeatCalendar
+            month={visibleMonth}
+            selectedDate={selectedDate}
+            summaries={daySummaries}
+            onSelectDate={handleSelectDate}
+            onChangeMonth={handleChangeMonth}
+            summaryLabel={`${monthTotals.sessions} ${plural(monthTotals.sessions, "session", "sessions")} · ${formatK(currentWeekVolumeSoFar)} wk`}
+          />
+        </div>
+
         <div
           className="relative z-50 flex-shrink-0"
-          style={{
-            background: "#0D0D0F",
-            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
-            touchAction: "pan-x",
-          }}
-          onTouchStart={handleDaySwipeStart}
-          onTouchMove={handleDaySwipeMove}
-          onTouchEnd={handleDaySwipeEnd}
+          style={{ background: "#0D0D0F", marginTop: "26px" }}
         >
-        <div
-          className="px-5 pb-4"
-          style={{
-            paddingRight: "60px",
-          }}
-        >
+        <div className="px-5 pb-4">
         <div className="band-enter">
-          <button
-            onClick={handleDevModeActivation}
-            className="select-none text-left"
-            style={{
-              fontSize: "9px",
-              fontWeight: 600,
-              letterSpacing: "0.2em",
-              fontFamily: "var(--font-label)",
-              color: "var(--ink-35)",
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              cursor: "default",
-            }}
-            type="button"
-          >
-            <span style={{ color: "var(--ink-70)" }}>
-              {selectedDate.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()}
-            </span>
-            {"  "}
-            {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
-            {" · "}
-            <span data-testid="selected-day-label">{relativeDayLabel}</span>
-          </button>
-          <div className="flex items-end justify-between gap-3">
+          {/* Day band: which day you are looking at, and what state it is in. */}
+          <div className="flex items-center gap-3" style={{ marginBottom: "2px" }}>
             <button
-              onClick={() => !isPastDay && setShowWorkoutPicker(!showWorkoutPicker)}
-              disabled={isPastDay}
-              className="text-left transition-opacity duration-base hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
+              onClick={handleDevModeActivation}
+              className="select-none text-left flex-shrink-0"
+              style={{
+                fontSize: "9px",
+                fontWeight: 600,
+                letterSpacing: "0.2em",
+                fontFamily: "var(--font-label)",
+                color: "var(--ink-35)",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "default",
+              }}
+              type="button"
             >
-              <h1
-                className="text-white"
-                style={{
-                  fontSize: "var(--text-marquee)",
-                  fontWeight: 400,
-                  letterSpacing: "-0.01em",
-                  lineHeight: "0.92",
-                  marginTop: "10px",
-                  fontFamily: "var(--font-display)",
-                }}
-              >
-                {selectedTitle}
-              </h1>
-              {!isPastDay && (
-                <ChevronDown
-                  size={20}
-                  strokeWidth={1.5}
-                  className="text-ink-30 mt-2 transition-transform duration-base"
-                  style={{
-                    transform: showWorkoutPicker ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                />
-              )}
+              <span style={{ color: "var(--ink-70)" }}>
+                {selectedDate.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()}
+              </span>
+              {" · "}
+              {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
+              {" · "}
+              <span data-testid="selected-day-label">{relativeDayLabel}</span>
             </button>
-            <div className="flex items-center gap-1.5 flex-shrink-0" style={{ marginBottom: "8px" }}>
+            <div style={{ flex: 1, height: "1px", background: "var(--ink-08)" }} />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {actualState === "completed" && (
                 <div
                   style={{
@@ -1662,6 +1739,52 @@ export default function Home() {
               </span>
             </div>
           </div>
+
+          {/* Title row: the routine, and the day's numbers on the right. */}
+          <div className="flex items-end justify-between gap-3">
+            <button
+              onClick={() => !isPastDay && setShowWorkoutPicker(!showWorkoutPicker)}
+              disabled={isPastDay}
+              className="text-left transition-opacity duration-base hover:opacity-80 flex items-center gap-2 disabled:opacity-100 disabled:cursor-default"
+            >
+              <h1
+                className="text-white"
+                style={{
+                  fontSize: "56px",
+                  fontWeight: 400,
+                  letterSpacing: "-0.01em",
+                  lineHeight: "0.92",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {selectedTitle}
+              </h1>
+              {!isPastDay && (
+                <ChevronDown
+                  size={20}
+                  strokeWidth={1.5}
+                  className="text-ink-30 mt-2 transition-transform duration-base"
+                  style={{
+                    transform: showWorkoutPicker ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
+              )}
+            </button>
+            {dayMetaLine && (
+              <div
+                className="flex-shrink-0 text-right"
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "12px",
+                  color: "var(--ink-40)",
+                  fontVariantNumeric: "tabular-nums",
+                  marginBottom: "6px",
+                }}
+              >
+                {dayMetaLine}
+              </div>
+            )}
+          </div>
         </div>
 
         {showWorkoutPicker && !isPastDay && (
@@ -1677,7 +1800,11 @@ export default function Home() {
               className="ios-menu"
               style={{ top: "100%", left: "20px", width: "290px", marginTop: "8px" }}
             >
-              <div className="ios-menu__header">Today&apos;s routine</div>
+              {/* The menu edits the selected day, not necessarily today, so it
+                  names the day it is about to change. */}
+              <div className="ios-menu__header">
+                {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · routine
+              </div>
               {routineMenuOptions.map((option) => {
                 const isSelected =
                   option.value === "rest" ? pickerRestSelected : pickerRoutineId === option.value
@@ -1833,30 +1960,8 @@ export default function Home() {
                 </div>
               )}
 
-              <button
-                className="w-full transition-all duration-base"
-                style={{
-                  background: "var(--ink-02)",
-                  border: "1px solid var(--ink-08)",
-                  borderRadius: "6px",
-                  minHeight: "56px",
-                  padding: isCompactExerciseList ? "9px" : "11px",
-                  color: "var(--ink-70)",
-                }}
-                onClick={() => router.push(`/history/${workoutForDate.id}`)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--ink-04)"
-                  e.currentTarget.style.borderColor = "var(--ink-12)"
-                  e.currentTarget.style.color = "var(--ink-95)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--ink-02)"
-                  e.currentTarget.style.borderColor = "var(--ink-08)"
-                  e.currentTarget.style.color = "var(--ink-70)"
-                }}
-              >
-                <span style={{ fontSize: "11px", fontWeight: 400, color: "inherit" }}>View session</span>
-              </button>
+              {/* The day's action is pinned above the tab bar now, so it stays
+                  reachable however far the ledger rows run. */}
             </>
           )}
 
@@ -1981,51 +2086,46 @@ export default function Home() {
                 })()}
               </div>
 
+              {/* Only the first few rows show by default, so the pinned action
+                  stays visible; the rest are one scroll away. */}
               <div style={{ marginBottom: "14px" }}>
-                {displayExercises.map((exercise: any, index: number) => {
-                  const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
-                  return (
-                    <ReceiptRow
-                      key={exercise.id ?? `${exercise.name}-${index}`}
-                      index={index}
-                      name={getExerciseLabel(exercise.name)}
-                      right={`${exercise.targetSets ?? exercise.sets ?? 0} × ${exercise.targetReps ?? exercise.reps ?? "-"}`}
-                      hint={
-                        last
-                          ? `last ${last.weight}×${last.reps}${last.standsOut ? ` · set ${last.ordinal}` : ""}`
-                          : null
-                      }
-                      compact={isCompactExerciseList}
-                    />
-                  )
-                })}
+                {(showAllExercises ? displayExercises : displayExercises.slice(0, DAY_PANEL_ROW_LIMIT)).map(
+                  (exercise: any, index: number) => {
+                    const last = lastPerformanceByExercise.get(normalizeExerciseName(exercise.name))
+                    return (
+                      <ReceiptRow
+                        key={exercise.id ?? `${exercise.name}-${index}`}
+                        index={index}
+                        name={getExerciseLabel(exercise.name)}
+                        right={`${exercise.targetSets ?? exercise.sets ?? 0} × ${exercise.targetReps ?? exercise.reps ?? "-"}`}
+                        hint={
+                          last
+                            ? `last ${last.weight}×${last.reps}${last.standsOut ? ` · set ${last.ordinal}` : ""}`
+                            : null
+                        }
+                        compact={isCompactExerciseList}
+                      />
+                    )
+                  },
+                )}
+                {!showAllExercises && displayExercises.length > DAY_PANEL_ROW_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllExercises(true)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: "10px 0 0 32px",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "11px",
+                      color: "var(--ink-30)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + {displayExercises.length - DAY_PANEL_ROW_LIMIT} more
+                  </button>
+                )}
               </div>
-
-              {/* The page's one filled primary: white fill, black label. Every
-                  other action on Home stays a ghost so this reads as the act. */}
-              <button
-                className="w-full flex items-center justify-center transition-opacity duration-base"
-                style={{
-                  height: "50px",
-                  background: "#fff",
-                  border: "none",
-                  borderRadius: "12px",
-                  color: "#000",
-                }}
-                onClick={() => {
-                  if (actualState === "activeSession") {
-                    handleResumeExisting()
-                    return
-                  }
-                  if (scheduledRoutine?.id) {
-                    handleStartWorkout(scheduledRoutine.id)
-                  }
-                }}
-              >
-                <span style={{ fontSize: "17px", fontWeight: 600, letterSpacing: "-0.01em", color: "inherit" }}>
-                  {actualState === "activeSession" ? "Resume Workout" : "Start Workout"}
-                </span>
-              </button>
 
               {actualState === "activeSession" && (
                 <button
@@ -2155,8 +2255,9 @@ export default function Home() {
       {session && actualState !== "activeSession" && (
         <div
           className="fixed left-0 right-0 z-[70] px-5"
-          // Sits above the floating tab bar rather than under it.
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))" }}
+          // Stacks above the pinned day action, which itself clears the tab bar:
+          // 116pt of clearance + the 56pt button + a 12pt gap.
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 184px)" }}
         >
           <div
             className="flex items-center gap-3"
@@ -2358,6 +2459,41 @@ export default function Home() {
         }
         `}</style>
       </main>
+
+      {/* The day's one action, pinned clear of the glass tab bar. It is hidden
+          while the routine menu is open — the scrim covers it anyway. */}
+      {!showWorkoutPicker && pinnedAction && (
+        <div
+          className="fixed z-[80]"
+          style={{
+            left: "20px",
+            right: "20px",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={pinnedAction.onClick}
+            className="w-full flex items-center justify-center transition-opacity duration-base"
+            data-testid="home-pinned-action"
+            style={{
+              height: "56px",
+              borderRadius: "6px",
+              background: pinnedAction.filled ? "#fff" : "transparent",
+              border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
+              color: pinnedAction.filled ? "#000" : "var(--ink-90)",
+              fontFamily: "var(--font-label)",
+              fontSize: "13px",
+              fontWeight: 700,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+            }}
+          >
+            {pinnedAction.label}
+          </button>
+        </div>
+      )}
+
       <IosTabBar active="home" />
     </>
   )
