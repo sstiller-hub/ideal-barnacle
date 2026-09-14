@@ -3689,7 +3689,16 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         background: "#0D0D0F",
       }}
     >
-      <div className="relative z-10 flex-1 flex flex-col min-h-0" style={{ paddingLeft: "20px", paddingRight: "20px", paddingTop: "20px" }}>
+      <div
+        className="relative z-10 flex-1 flex flex-col min-h-0"
+        style={{
+          paddingLeft: "calc(20px + env(safe-area-inset-left, 0px))",
+          paddingRight: "calc(20px + env(safe-area-inset-right, 0px))",
+          // viewport-fit=cover means the page paints under the status bar, so
+          // the header has to clear the Dynamic Island itself.
+          paddingTop: "calc(20px + env(safe-area-inset-top, 0px))",
+        }}
+      >
         <AnimatePresence>
           {showRestDock ? (
             <motion.div

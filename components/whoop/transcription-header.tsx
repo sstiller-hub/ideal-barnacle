@@ -24,7 +24,10 @@ export default function TranscriptionHeader({
       className="sticky top-0 z-10"
       style={{ background: "rgba(10, 10, 12, 0.92)", backdropFilter: "blur(8px)" }}
     >
-      <div className="max-w-2xl mx-auto px-4 pt-3 pb-2 flex items-start justify-between gap-4">
+      <div
+        className="max-w-2xl mx-auto px-4 pb-2 flex items-start justify-between gap-4"
+        style={{ paddingTop: "calc(12px + env(safe-area-inset-top, 0px))" }}
+      >
         <div>
           <p
             className="text-ink-35"
