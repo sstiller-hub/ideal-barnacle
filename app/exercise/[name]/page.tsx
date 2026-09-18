@@ -77,6 +77,7 @@ import { Button } from "@/components/ui/button"
 import { getExerciseHistory, getExerciseIdForName, normalizeExerciseName } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { getVolumeSeriesForExercise } from "@/lib/volume-analytics"
+import { formatWorkoutDate, parseWorkoutDate, workoutDayKey } from "@/lib/workout-date"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
 import { VolumeControls } from "@/components/volume-controls"
 import { IosNavPage } from "@/components/ios/nav-bar"
@@ -99,12 +100,14 @@ function collapseMirroredSixSetPattern<T extends { reps: number | null; weight: 
 }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {
+  // Session points carry the workout's own date, which is a full ISO timestamp
+  // for logged sessions; week and month points carry bucket keys. parseWorkoutDate
+  // handles both, and reports unparseable values instead of rendering "Invalid Date".
+  const d = parseWorkoutDate(date)
+  if (!d) return "Undated"
   if (aggregation === "month") {
-    const [year, month] = date.split("-").map(Number)
-    return new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
-  const [year, month, day] = date.split("-").map(Number)
-  const d = new Date(year, month - 1, day)
   if (aggregation === "week") {
     return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
   }
@@ -148,10 +151,7 @@ export default function ExerciseHistoryPage() {
       seenWorkoutIds.add(workout.id)
     }
 
-    const day = workout?.date ? new Date(workout.date) : null
-    const dayKey = day && !Number.isNaN(day.getTime())
-      ? day.toISOString().slice(0, 10)
-      : "unknown-date"
+    const dayKey = workoutDayKey(workout?.date) ?? "unknown-date"
     const workoutName = workout?.name || "Unknown"
 
     const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))
@@ -538,7 +538,7 @@ export default function ExerciseHistoryPage() {
                           .filter((s) => isSetEligibleForStats(s))
                           .reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0)
                       : 0
-                    const d = new Date(workout.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                    const d = formatWorkoutDate(workout.date, { month: "short", day: "numeric" })
                     return (
                       <div key={wid} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
@@ -589,7 +589,7 @@ export default function ExerciseHistoryPage() {
               {ratingTrend.sessions.slice(-40).map((s, i) => (
                 <div
                   key={i}
-                  title={`${new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} — ${
+                  title={`${formatWorkoutDate(s.date, { month: "short", day: "numeric" })} — ${
                     s.rating === "thumbs_up" ? "Good" : s.rating === "thumbs_down" ? "Rough" : "Unrated"
                   }`}
                   style={{
@@ -638,8 +638,11 @@ export default function ExerciseHistoryPage() {
           by its date, so the set rows read as a list rather than a card body. */}
       {history.map((workout) => {
         const exercise = workout.exercises.find((e) => normalizeExerciseName(e.name) === normalizeExerciseName(exerciseName))!
-        const date = new Date(workout.date)
-        const formattedDate = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        const formattedDate = formatWorkoutDate(
+          workout.date,
+          { month: "short", day: "numeric", year: "numeric" },
+          "Undated"
+        )
         const volume = exercise.sets
           .filter((set) => isSetEligibleForStats(set))
           .reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)

@@ -11,6 +11,7 @@ import { isSetEligibleForStats } from "@/lib/set-validation"
 import { filterByTimeRange, filterByWorkoutType, getVolumeSeriesGlobal } from "@/lib/volume-analytics"
 import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "@/lib/volume-analytics"
 import { VolumeControls } from "@/components/volume-controls"
+import { formatWorkoutDate, parseWorkoutDate } from "@/lib/workout-date"
 
 // Catmull-Rom → cubic bezier smooth path through an array of [x, y] points
 function buildSmoothPath(pts: [number, number][]): string {
@@ -99,13 +100,11 @@ function formatMaxVol(v: number): string {
 type VolumePoint = { date: string; volume: number }
 
 function formatPeriodLabel(date: string, aggregation: Aggregation): string {
-  const datePart = date.slice(0, 10)
+  const d = parseWorkoutDate(date)
+  if (!d) return "Undated"
   if (aggregation === "month") {
-    const [year, month] = datePart.split("-").map(Number)
-    return new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
-  const [year, month, day] = datePart.split("-").map(Number)
-  const d = new Date(year, month - 1, day)
   if (aggregation === "week") {
     return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
   }
@@ -436,7 +435,7 @@ export default function VolumeHistoryPage() {
                   {(selectedPoint.workoutIds ?? []).map((wid) => {
                     const workout = history.find((w) => w.id === wid)
                     if (!workout) return null
-                    const d = new Date(workout.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                    const d = formatWorkoutDate(workout.date, { month: "short", day: "numeric" })
                     return (
                       <div key={wid} style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)" }}>
                         {d} · {workout.name}
