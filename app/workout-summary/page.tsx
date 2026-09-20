@@ -16,6 +16,12 @@ import { toast } from "sonner"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsBanner from "@/components/workout-alerts-banner"
 import AktIndicatorChip from "@/components/akt-indicator-chip"
+import {
+  coachNoteTarget,
+  fetchAutoResolvedCoachNotes,
+  formatClearedNoteLine,
+  type ResolvedCoachNote,
+} from "@/lib/coach-notes"
 
 type WorkoutRow = {
   id: string
@@ -90,6 +96,7 @@ export default function WorkoutSummaryPage() {
   const [baselineExercises, setBaselineExercises] = useState<SummaryExercise[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [clearedNotes, setClearedNotes] = useState<ResolvedCoachNote[]>([])
 
   const buildSummaryExercises = (workoutRecord: CompletedWorkout): SummaryExercise[] => {
     return workoutRecord.exercises.map((exercise, idx) => {
@@ -169,6 +176,57 @@ export default function WorkoutSummaryPage() {
       cancelled = true
     }
   }, [router, workoutId])
+
+  // Notes this session cleared. Resolution happens server-side inside the
+  // commit request, which the finish handler fires just before routing here —
+  // so the rows may not exist yet on first paint. Poll a few times, back off,
+  // and stop the moment something lands (or nothing ever does).
+  useEffect(() => {
+    if (!rawWorkout) return
+
+    const since = rawWorkout.startedAt ?? rawWorkout.date
+    if (!since) return
+
+    const targets = [
+      ...rawWorkout.exercises.map((exercise) => exercise.name),
+      rawWorkout.name,
+    ]
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const delays = [0, 2000, 4500]
+
+    const poll = (attempt: number) => {
+      void fetchAutoResolvedCoachNotes({ since, targets }).then((notes) => {
+        if (cancelled) return
+        if (notes.length > 0) {
+          setClearedNotes(notes)
+          return
+        }
+        const next = delays[attempt + 1]
+        if (next === undefined) return
+        timer = setTimeout(() => poll(attempt + 1), next)
+      })
+    }
+
+    poll(0)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [rawWorkout])
+
+  // The casing the exercise was actually logged under, so a cleared line reads
+  // like the set list instead of like the note's lowercased target.
+  const clearedDisplayNames = useMemo(() => {
+    const names = new Map<string, string>()
+    exercises.forEach((exercise) => {
+      names.set(coachNoteTarget(exercise.name), exercise.name)
+    })
+    if (workout?.name) names.set(coachNoteTarget(workout.name), workout.name)
+    return names
+  }, [exercises, workout])
 
   const summary = useMemo<{
     totalVolume: number
@@ -504,6 +562,25 @@ export default function WorkoutSummaryPage() {
             </Button>
           </div>
         </IosCard>
+
+        {clearedNotes.length > 0 && (
+          <IosCard>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide">
+              Coach notes cleared
+            </div>
+            <div className="flex flex-col" style={{ gap: "6px", marginTop: "10px" }}>
+              {clearedNotes.map((note) => (
+                <div
+                  key={note.id}
+                  style={{ fontSize: "13px", color: "var(--ink-70)", lineHeight: 1.35 }}
+                >
+                  <span style={{ color: "var(--good-ink)" }}>Cleared:</span>{" "}
+                  {formatClearedNoteLine(note, clearedDisplayNames)}
+                </div>
+              ))}
+            </div>
+          </IosCard>
+        )}
 
         <div className="space-y-3">
           {summary.exerciseSummaries.map(

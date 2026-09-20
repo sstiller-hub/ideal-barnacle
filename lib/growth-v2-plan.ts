@@ -85,8 +85,6 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetReps: "10-12",
       }),
       ex({ id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" }),
-      ex({ id: "upper1-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12" }),
-      ex({ id: "upper1-hanging-leg-raise", name: "Hanging Leg Raise", type: "other", targetSets: 3, targetReps: "12" }),
     ],
   },
   {
@@ -132,7 +130,6 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetWeight: 70,
       }),
       ex({ id: "legs2-calf", name: "Machine Calf Raise", type: "strength", targetSets: 4, targetReps: "10-12" }),
-      ex({ id: "legs2-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" }),
     ],
   },
   {
@@ -175,7 +172,6 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
       // stall alerts and the rating views all group by workout_exercises.exercise_id,
       // so sharing the id keeps one unified history across both days.
       ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 2, targetReps: "8-12" }),
-      ex({ id: "upper2-side-crunch", name: "Side Crunch (Roman Chair)", type: "other", targetSets: 3, targetReps: "12-15" }),
     ],
   },
   {
@@ -211,7 +207,6 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetReps: "10-12",
       }),
       ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" }),
-      ex({ id: "sa-oblique-crunch", name: "Oblique Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15", notes: "Control > weight." }),
     ],
   },
 ]

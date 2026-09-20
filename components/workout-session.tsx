@@ -72,6 +72,9 @@ import { SessionClock } from "@/components/ledger/session-clock"
 import { DeltaChip } from "@/components/ledger/delta-chip"
 import { plural } from "@/lib/utils"
 import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
+import { CoachNoteList } from "@/components/coach-note-card"
+import { useCoachNotes } from "@/hooks/useCoachNotes"
+import type { CoachNote } from "@/lib/coach-notes"
 
 type ExerciseRating = "thumbs_up" | "thumbs_down" | null
 
@@ -334,6 +337,8 @@ type ExercisePageProps = {
   setPlateDisplayMode: (mode: "per-side" | "total") => void
   setPlateStartingWeight: (value: number) => void
   onOpenExercise: (name: string) => void
+  coachNotes: CoachNote[]
+  onDismissCoachNote: (noteId: string) => void | Promise<boolean | void>
   registerWeightRef: (setId: string, node: HTMLInputElement | null) => void
   registerRepsRef: (setId: string, node: HTMLInputElement | null) => void
   focusSetField: (setId: string, field: "reps" | "weight") => void
@@ -376,6 +381,8 @@ const ExercisePage = memo(function ExercisePage({
   setPlateDisplayMode,
   setPlateStartingWeight,
   onOpenExercise,
+  coachNotes,
+  onDismissCoachNote,
   registerWeightRef,
   registerRepsRef,
   focusSetField,
@@ -521,6 +528,15 @@ const ExercisePage = memo(function ExercisePage({
           )}
         </div>
       </div>
+
+      {/* Coach notes for this exercise — the one inserted slot in the Cover
+          Flow page. Above the set list, below the title block, so it is read
+          before the first set is logged and nothing else moves. */}
+      <CoachNoteList
+        notes={coachNotes}
+        onDismiss={onDismissCoachNote}
+        style={{ marginBottom: isCompactSets ? "12px" : "18px" }}
+      />
 
       <div className="flex flex-col" style={{ gap: isCompactSets ? "14px" : "24px" }}>
         {exercise.sets.map((set: any, setIndex: number) => {
@@ -1181,6 +1197,14 @@ const ExercisePage = memo(function ExercisePage({
 
 export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
   const router = useRouter()
+  // Coach notes for this session. Queried once at workout start and matched to
+  // exercises by lower(trim(name)); scope="global" notes belong to the
+  // pre-workout screen and are deliberately not surfaced in here.
+  const {
+    notesForExercise,
+    workoutNotes: coachWorkoutNotes,
+    dismiss: dismissCoachNote,
+  } = useCoachNotes({ workoutName: routine.name })
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [exercises, setExercises] = useState<any[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
@@ -3937,6 +3961,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               </button>
             ) : null}
           </div>
+
+          {/* scope="workout" notes belong to the session, not to any one
+              exercise, so they sit once under the rail rather than repeating on
+              every page of the carousel. */}
+          <CoachNoteList
+            notes={coachWorkoutNotes}
+            onDismiss={dismissCoachNote}
+            style={{ marginTop: "10px" }}
+          />
         </div>
 
         <div
@@ -3982,6 +4015,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               setPlateDisplayMode={setPlateDisplayMode}
               setPlateStartingWeight={setPlateStartingWeight}
               onOpenExercise={openExercisePage}
+              coachNotes={notesForExercise(exercise.name)}
+              onDismissCoachNote={dismissCoachNote}
               registerWeightRef={registerWeightRef}
               registerRepsRef={registerRepsRef}
               focusSetField={focusSetField}

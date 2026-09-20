@@ -4,6 +4,7 @@ import { validateWorkoutCommitPayload } from "@/lib/workout-commit-validation"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { computeWorkoutVolume, type CompletedSetRecord } from "@/lib/workout-analytics"
 import { runWorkoutAnalytics } from "@/lib/workout-analytics-server"
+import { resolveCoachNotesForWorkout } from "@/lib/coach-notes-server"
 
 type WorkoutExerciseInsert = {
   workout_id: string
@@ -176,11 +177,23 @@ export async function POST(request: Request) {
     // client-initiated /complete call is routinely never dispatched on mobile
     // (the app is backgrounded right after finishing), which is why no workout
     // ever had PRs. Best-effort: analytics failures must not fail the commit.
+    let coachNotesCleared = 0
     if (workout.completed_at) {
       try {
         await runWorkoutAnalytics(supabase, { userId, workoutId: workout.workout_id })
       } catch (error) {
         console.error("Workout analytics failed during commit:", error)
+      }
+
+      // Coach notes resolve off the same status flip, in the same request that
+      // wrote the sets they are evaluated against. Best-effort like the
+      // analytics above: an unresolved note is a stale nudge, never a reason to
+      // fail a workout the athlete already finished.
+      try {
+        const cleared = await resolveCoachNotesForWorkout(supabase, workout.workout_id)
+        coachNotesCleared = cleared.length
+      } catch (error) {
+        console.error("Coach note resolution failed during commit:", error)
       }
     }
 
@@ -188,6 +201,7 @@ export async function POST(request: Request) {
       workout_id: workout.workout_id,
       status: workout.completed_at ? "completed" : "draft",
       set_count: setRows.length,
+      coach_notes_cleared: coachNotesCleared,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Commit failed"
