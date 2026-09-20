@@ -17,7 +17,58 @@ import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import type { RoutineExercise, WorkoutRoutine } from "@/lib/routine-storage"
 
 const MIGRATION_KEY = "growth_v2_template_migration_v2"
+const CORE_DROP_KEY = "solidcore_core_drop_v1"
 const ROUTINES_KEY = "workout_routines_v2"
+
+/**
+ * Direct core work moved to Solidcore (Wed + Sun), so these no longer seed into
+ * any session. Matched on lower(trim(name)) — the same normalisation the coach
+ * notes use — because the stored snapshots spell them several ways and some
+ * carry a "(superset)" qualifier that names the pairing, not a different
+ * movement.
+ *
+ * This only stops them being *seeded*. Historical workout_exercises and
+ * workout_sets rows are untouched: the record of what was lifted is immutable.
+ */
+export const RETIRED_CORE_EXERCISES = [
+  "cable crunch",
+  "cable crunch (superset)",
+  "hanging leg raise",
+  "hanging leg raise (superset)",
+  "side crunch (roman chair)",
+  "oblique cable crunch",
+] as const
+
+const RETIRED_CORE_SET = new Set<string>(RETIRED_CORE_EXERCISES)
+
+export function isRetiredCoreExercise(name: string | null | undefined): boolean {
+  return RETIRED_CORE_SET.has((name ?? "").trim().toLowerCase())
+}
+
+/**
+ * Drops the retired core slots from every stored routine.
+ *
+ * Unlike the slot ops above this deliberately reaches into user-created
+ * routines too: the movements are gone from the program, not from one template,
+ * and leaving them seeded anywhere would keep putting sets on the screen that
+ * are no longer meant to be done. Pure, and exported for tests.
+ */
+export function dropRetiredCoreExercises(routines: WorkoutRoutine[]): {
+  routines: WorkoutRoutine[]
+  changed: boolean
+} {
+  let changed = false
+
+  const next = routines.map((routine) => {
+    if (!Array.isArray(routine.exercises)) return routine
+    const exercises = routine.exercises.filter((exercise) => !isRetiredCoreExercise(exercise?.name))
+    if (exercises.length === routine.exercises.length) return routine
+    changed = true
+    return { ...routine, exercises, updatedAt: new Date().toISOString() }
+  })
+
+  return { routines: next, changed }
+}
 
 type TemplateOp =
   /** Swap one slot for another, keeping its position in the exercise order. */
@@ -156,14 +207,34 @@ export function applyGrowthV2TemplateOps(routines: WorkoutRoutine[]): {
 
 export function runGrowthV2TemplateMigration(): void {
   if (typeof window === "undefined") return
-  if (localStorage.getItem(MIGRATION_KEY)) return
+
+  // Two independently stamped passes: the slot ops have already run on most
+  // installs, and the core drop shipped later, so they cannot share a key
+  // without re-running ops that are done.
+  const needsSlotOps = !localStorage.getItem(MIGRATION_KEY)
+  const needsCoreDrop = !localStorage.getItem(CORE_DROP_KEY)
+  if (!needsSlotOps && !needsCoreDrop) return
 
   const raw = localStorage.getItem(ROUTINES_KEY)
   if (raw) {
     try {
       const stored = JSON.parse(raw)
       if (Array.isArray(stored)) {
-        const { routines, changed } = applyGrowthV2TemplateOps(stored as WorkoutRoutine[])
+        let routines = stored as WorkoutRoutine[]
+        let changed = false
+
+        if (needsSlotOps) {
+          const result = applyGrowthV2TemplateOps(routines)
+          routines = result.routines
+          changed = changed || result.changed
+        }
+
+        if (needsCoreDrop) {
+          const result = dropRetiredCoreExercises(routines)
+          routines = result.routines
+          changed = changed || result.changed
+        }
+
         if (changed) localStorage.setItem(ROUTINES_KEY, JSON.stringify(routines))
       }
     } catch {
@@ -171,5 +242,7 @@ export function runGrowthV2TemplateMigration(): void {
     }
   }
 
-  localStorage.setItem(MIGRATION_KEY, new Date().toISOString())
+  const stamp = new Date().toISOString()
+  if (needsSlotOps) localStorage.setItem(MIGRATION_KEY, stamp)
+  if (needsCoreDrop) localStorage.setItem(CORE_DROP_KEY, stamp)
 }

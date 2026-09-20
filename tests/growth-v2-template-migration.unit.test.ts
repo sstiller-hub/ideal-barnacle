@@ -1,6 +1,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { applyGrowthV2TemplateOps } from "../lib/growth-v2-template-migration"
+import {
+  applyGrowthV2TemplateOps,
+  dropRetiredCoreExercises,
+  isRetiredCoreExercise,
+} from "../lib/growth-v2-template-migration"
 import type { WorkoutRoutine } from "../lib/routine-storage"
 
 const nowIso = "2026-08-01T00:00:00.000Z"
@@ -209,4 +213,58 @@ test("re-running does not touch the delts slot again", () => {
   const second = applyGrowthV2TemplateOps(first.routines)
   assert.equal(second.changed, false)
   assert.equal(slot(second.routines, "growth-v2-upper-1", "upper1-delts").targetSets, 3)
+})
+
+test("the retired core slots are dropped from every routine that carries them", () => {
+  const { routines, changed } = dropRetiredCoreExercises(storedRoutines())
+  assert.equal(changed, true)
+
+  assert.deepEqual(ids(routines, "growth-v2-upper-1"), ["upper1-chest-press", "upper1-delts"])
+  assert.deepEqual(ids(routines, "growth-v2-upper-2"), [
+    "upper2-overhand-row",
+    "upper2-incline-db",
+    "upper2-preacher-hammer",
+    "upper2-decline-knee",
+  ])
+  // Decline Bench Knee Raise is core too but was not on the list — only the
+  // four named movements go.
+  assert.ok(names(routines, "growth-v2-upper-2").includes("Decline Bench Knee Raise"))
+})
+
+test("the drop is name-based, so superset spellings and casing go too", () => {
+  assert.equal(isRetiredCoreExercise("Cable Crunch"), true)
+  assert.equal(isRetiredCoreExercise("  cable crunch (superset)  "), true)
+  assert.equal(isRetiredCoreExercise("Side Crunch (Roman Chair)"), true)
+  assert.equal(isRetiredCoreExercise("Hanging Leg Raise (superset)"), true)
+  assert.equal(isRetiredCoreExercise("Oblique Cable Crunch"), true)
+  assert.equal(isRetiredCoreExercise("Decline Bench Knee Raise"), false)
+  assert.equal(isRetiredCoreExercise("Cable Rotation"), false)
+  assert.equal(isRetiredCoreExercise(null), false)
+})
+
+test("the drop reaches user-created routines as well", () => {
+  const routinesIn = storedRoutines()
+  const custom = routinesIn.find((routine) => routine.id === "my-custom-day")!
+  custom.exercises = [
+    ...custom.exercises,
+    { id: "custom-crunch", name: "Cable crunch (superset)", type: "other", targetSets: 3, targetReps: "12" },
+  ]
+
+  const { routines } = dropRetiredCoreExercises(routinesIn)
+  assert.deepEqual(ids(routines, "my-custom-day"), ["custom-1"])
+})
+
+test("dropping is idempotent and leaves untouched routines identical", () => {
+  const before = storedRoutines()
+  const first = dropRetiredCoreExercises(before)
+  const second = dropRetiredCoreExercises(first.routines)
+
+  assert.equal(second.changed, false)
+  // A routine with nothing to drop is returned by reference, so no stored
+  // snapshot is rewritten for it and updatedAt does not churn.
+  const untouched = before.find((routine) => routine.id === "growth-v2-shoulders-arms")!
+  assert.equal(
+    first.routines.find((routine) => routine.id === "growth-v2-shoulders-arms"),
+    untouched
+  )
 })

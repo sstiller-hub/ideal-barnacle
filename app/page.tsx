@@ -55,6 +55,8 @@ import { StatUnit } from "@/components/ledger/stat-unit"
 import { plural } from "@/lib/utils"
 import { useWorkoutAlerts } from "@/hooks/useWorkoutAlerts"
 import WorkoutAlertsSheet from "@/components/workout-alerts-sheet"
+import { CoachNoteList } from "@/components/coach-note-card"
+import { useCoachNotes } from "@/hooks/useCoachNotes"
 import AktProgramMessageLine from "@/components/akt-program-message-line"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { runExerciseRenameMigration } from "@/lib/exercise-rename-migration"
@@ -208,6 +210,10 @@ export default function Home() {
   const selectedDateRef = useRef(selectedDate)
   const userIdRef = useRef(userId)
   const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
+  // scope="global" coach notes live here and nowhere else: they are standing
+  // instructions for the block (nutrition, weigh-in gates), not something to
+  // read between sets, so the active workout never surfaces them.
+  const { globalNotes: globalCoachNotes, dismiss: dismissCoachNote } = useCoachNotes()
   const [showAlertsSheet, setShowAlertsSheet] = useState(false)
   const { isDeload, deloadEndsAt, lastCompletedDeloadEndsAt } = useDeloadWeek()
   const [showDeloadCompleteBanner, setShowDeloadCompleteBanner] = useState(false)
@@ -1876,6 +1882,16 @@ export default function Home() {
           />
         ) : (
           <AktProgramMessageLine message={null} />
+        )}
+
+        {globalCoachNotes.length > 0 && (
+          <div className="px-5 mb-5 band-enter" style={{ animationDelay: "40ms" }}>
+            <CoachNoteList
+              notes={globalCoachNotes}
+              onDismiss={dismissCoachNote}
+              label="From your coach"
+            />
+          </div>
         )}
 
         {/* Band 1 — the day itself. One flat band; the identical BandHeader
