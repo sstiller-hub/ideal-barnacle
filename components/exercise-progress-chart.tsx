@@ -1,7 +1,11 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
 import { plural } from "@/lib/utils"
+import { IosCard } from "@/components/ios/grouped"
+import { BandHeader } from "@/components/ledger/band-header"
+import { DeltaChip } from "@/components/ledger/delta-chip"
+import { Sparkline } from "@/components/ledger/sparkline"
+import { StatUnit } from "@/components/ledger/stat-unit"
 
 type ChartDataPoint = {
   date: string
@@ -12,120 +16,79 @@ type ChartDataPoint = {
 type ExerciseProgressChartProps = {
   exerciseName: string
   data: ChartDataPoint[]
+  onOpen?: () => void
 }
 
-export default function ExerciseProgressChart({ exerciseName, data }: ExerciseProgressChartProps) {
+const formatK = (value: number) => (value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${Math.round(value)}`)
+
+// Up is earned (emerald); flat or down stays in the ink ladder — the record
+// doesn't judge a lighter day.
+function Change({ delta, unit }: { delta: number; unit: string }) {
+  if (delta === 0) return <DeltaChip tone="neutral" size="sm" value="MATCHED" context="VS LAST" />
+  return (
+    <DeltaChip
+      tone={delta > 0 ? "good" : "neutral"}
+      arrow={delta > 0 ? "up" : "down"}
+      size="sm"
+      value={`${delta > 0 ? "+" : "−"}${Math.abs(delta).toLocaleString()} ${unit}`}
+      context="VS LAST"
+    />
+  )
+}
+
+export default function ExerciseProgressChart({ exerciseName, data, onOpen }: ExerciseProgressChartProps) {
+  const title = (
+    <div style={{ fontSize: "17px", fontWeight: 600, color: "#fff" }}>{exerciseName}</div>
+  )
+
   if (!data || data.length === 0) {
     return (
-      <Card className="p-4">
-        <h3 className="font-semibold text-sm mb-2">{exerciseName}</h3>
-        <div className="text-xs text-muted-foreground py-8 text-center">
-          No data yet - complete a workout to see progress
+      <IosCard>
+        {title}
+        <div style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "6px" }}>
+          No data yet — complete a workout to see progress.
         </div>
-      </Card>
+      </IosCard>
     )
   }
 
-  const maxWeightValue = Math.max(...data.map((d) => d.maxWeight))
-  const minWeightValue = Math.min(...data.map((d) => d.maxWeight))
-  const weightRange = maxWeightValue - minWeightValue || 10
-
-  const maxVolumeValue = Math.max(...data.map((d) => d.totalVolume))
-  const minVolumeValue = Math.min(...data.map((d) => d.totalVolume))
-  const volumeRange = maxVolumeValue - minVolumeValue || 100
-
-  const latestWeight = data[data.length - 1].maxWeight
-  const previousWeight = data.length > 1 ? data[data.length - 2].maxWeight : latestWeight
-  const weightChange = latestWeight - previousWeight
-  const weightTrend = weightChange > 0 ? "up" : weightChange < 0 ? "down" : "same"
-
-  const latestVolume = data[data.length - 1].totalVolume
-  const previousVolume = data.length > 1 ? data[data.length - 2].totalVolume : latestVolume
-  const volumeChange = latestVolume - previousVolume
-  const volumeTrend = volumeChange > 0 ? "up" : volumeChange < 0 ? "down" : "same"
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  }
+  const latest = data[data.length - 1]
+  const previous = data.length > 1 ? data[data.length - 2] : latest
 
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="font-semibold text-sm">{exerciseName}</h3>
-          <p className="text-xs text-muted-foreground">{data.length} {plural(data.length, "workout", "workouts")} tracked</p>
+    <IosCard>
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        className="w-full text-left"
+        style={{ background: "transparent", border: "none", padding: 0, color: "inherit", cursor: onOpen ? "pointer" : "default" }}
+      >
+        {title}
+        <div style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "2px", marginBottom: "16px" }}>
+          {data.length} {plural(data.length, "workout", "workouts")} tracked
         </div>
-        <div className="text-right">
-          <div className="text-lg font-bold text-foreground">{latestWeight} {plural(latestWeight, "lb", "lbs")}</div>
-          <div className="text-xs text-muted-foreground">Latest max</div>
+      </button>
+
+      <BandHeader label="TOP WEIGHT">
+        {data.length > 1 ? <Change delta={latest.maxWeight - previous.maxWeight} unit="LB" /> : null}
+      </BandHeader>
+      <div className="flex items-end justify-between" style={{ gap: "16px", marginBottom: "20px" }}>
+        <StatUnit value={`${latest.maxWeight}`} unit="LB" label="LATEST" />
+        <div style={{ flex: "1 1 auto", maxWidth: "60%" }}>
+          <Sparkline data={data.map((d) => d.maxWeight)} height={44} />
         </div>
       </div>
 
-      {/* Weight Chart */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-muted-foreground">Max Weight</span>
-          {weightTrend !== "same" && (
-            <span className={`text-xs font-medium ${weightTrend === "up" ? "text-success" : "text-destructive"}`}>
-              {weightTrend === "up" ? "+" : ""}
-              {weightChange} {plural(weightChange, "lb", "lbs")}
-            </span>
-          )}
-        </div>
-        <div className="h-20 flex items-end gap-1">
-          {data.map((point, idx) => {
-            const heightPercent = ((point.maxWeight - minWeightValue) / weightRange) * 100
-            const isLatest = idx === data.length - 1
-            return (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                <div
-                  className={`w-full rounded-t transition-all ${isLatest ? "bg-primary" : "bg-primary/40"}`}
-                  style={{
-                    height: `${Math.max(heightPercent, 10)}%`,
-                  }}
-                  title={`${point.maxWeight} ${plural(point.maxWeight, "lb", "lbs")} on ${formatDate(point.date)}`}
-                />
-                {(idx === 0 || idx === data.length - 1 || data.length <= 5) && (
-                  <span className="text-[9px] text-muted-foreground rotate-0">
-                    {formatDate(point.date).split(" ")[1]}
-                  </span>
-                )}
-              </div>
-            )
-          })}
+      <BandHeader label="VOLUME">
+        {data.length > 1 ? <Change delta={latest.totalVolume - previous.totalVolume} unit="LB" /> : null}
+      </BandHeader>
+      <div className="flex items-end justify-between" style={{ gap: "16px" }}>
+        <StatUnit value={formatK(latest.totalVolume)} unit="LB" label="LATEST SESSION" />
+        <div style={{ flex: "1 1 auto", maxWidth: "60%" }}>
+          <Sparkline data={data.map((d) => d.totalVolume)} height={44} />
         </div>
       </div>
-
-      {/* Volume Chart */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-muted-foreground">Total Volume</span>
-          {volumeTrend !== "same" && (
-            <span className={`text-xs font-medium ${volumeTrend === "up" ? "text-success" : "text-destructive"}`}>
-              {volumeTrend === "up" ? "+" : ""}
-              {volumeChange.toLocaleString()} {plural(volumeChange, "lb", "lbs")}
-            </span>
-          )}
-        </div>
-        <div className="h-16 flex items-end gap-1">
-          {data.map((point, idx) => {
-            const heightPercent = ((point.totalVolume - minVolumeValue) / volumeRange) * 100
-            const isLatest = idx === data.length - 1
-            return (
-              <div
-                key={idx}
-                className={`flex-1 rounded-t transition-all ${isLatest ? "bg-accent" : "bg-accent/40"}`}
-                style={{
-                  height: `${Math.max(heightPercent, 10)}%`,
-                }}
-                title={`${point.totalVolume.toLocaleString()} ${plural(point.totalVolume, "lb", "lbs")} on ${formatDate(point.date)}`}
-              />
-            )
-          })}
-        </div>
-        <div className="text-xs text-muted-foreground text-right mt-1">{latestVolume.toLocaleString()} {plural(latestVolume, "lb", "lbs")} total</div>
-      </div>
-    </Card>
+    </IosCard>
   )
 }

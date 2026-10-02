@@ -530,7 +530,10 @@
 .ios-card {
   background: var(--ios-grouped-bg);
   border-radius: 10px;
-  margin: 0 16px;
+  /* Side margins only: a shorthand would reset margin-top and swallow the
+     space-y gaps parents use to stack cards. */
+  margin-left: 16px;
+  margin-right: 16px;
   padding: 18px;
   border: none;
 }
@@ -538,7 +541,10 @@
 .ios-grp {
   background: var(--ios-grouped-bg);
   border-radius: 10px;
-  margin: 0 16px;
+  /* Side margins only: a shorthand would reset margin-top and swallow the
+     space-y gaps parents use to stack cards. */
+  margin-left: 16px;
+  margin-right: 16px;
   overflow: hidden;
 }
 
@@ -578,6 +584,147 @@
   font-size: 17px;
   color: var(--ink-40);
   white-space: nowrap;
+}
+
+/* Inline text field / select that fills the trailing side of a row */
+.ios-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--ink-70);
+  font-size: 17px;
+  text-align: right;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ios-input::placeholder {
+  color: var(--ink-40);
+}
+
+.ios-input:focus {
+  color: #fff;
+}
+
+/* Body of an expanded Settings section: titled blocks with hairlines between */
+.ios-panel {
+  padding: 0 16px 6px 57px;
+}
+
+.ios-panel__block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0 16px;
+}
+
+.ios-panel__block + .ios-panel__block {
+  box-shadow: 0 -0.5px 0 var(--ios-hairline);
+}
+
+.ios-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.ios-panel__desc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-50);
+}
+
+.ios-panel__list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xs);
+  background: var(--ink-04);
+}
+
+.ios-panel__stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink-85);
+  font-variant-numeric: tabular-nums;
+}
+
+.ios-panel__stat + .ios-panel__stat {
+  box-shadow: 0 -0.5px 0 var(--ios-hairline);
+}
+
+/* Full-width tinted button (iOS "gray" button style). One geometry for every
+   state — only ink changes. */
+.ios-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink-08);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-theatre), color var(--duration-fast) var(--ease-theatre);
+}
+
+.ios-btn:active {
+  background: var(--ink-12);
+}
+
+.ios-btn[data-tone="primary"] {
+  background: #fff;
+  color: #000;
+}
+
+.ios-btn[data-tone="destructive"] {
+  color: #ff453a;
+}
+
+.ios-btn:disabled {
+  background: var(--ink-04);
+  color: var(--ink-30);
+  cursor: default;
+}
+
+.ios-textarea {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink-06);
+  color: #fff;
+  font-size: 15px;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.ios-textarea::placeholder {
+  color: var(--ink-40);
+}
+
+/* 44pt square hit area around a small glyph button (remove, close) */
+.ios-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-50);
+  cursor: pointer;
 }
 
 .ios-row__chevron {

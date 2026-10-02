@@ -10,7 +10,6 @@ import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { resetRoutinesToGrowthV2 } from "@/lib/routine-storage"
 import { downloadHealthExport } from "@/lib/health-integration"
 import { importWorkouts, type ImportResult } from "@/lib/import-workouts"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +42,7 @@ import { getPrExcludedExercises, setPrExcludedExercises } from "@/lib/pr-exclusi
 import { IosTabBar } from "@/components/ios/tab-bar"
 import { IosLargeTitleHeader } from "@/components/ios/nav-bar"
 import { IosGroup, IosRow } from "@/components/ios/grouped"
+import { IosSegmentedControl, IosSwitch } from "@/components/ios/controls"
 import { isRestSoundEnabled, playRestChime, setRestSoundEnabled } from "@/lib/session-feedback"
 import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 
@@ -266,89 +266,53 @@ export default function SettingsPage() {
           isExpanded={expandedSections.includes("appearance")}
           onToggle={() => toggleSection("appearance")}
         >
-          <div className="mt-3 space-y-4">
-              <div>
-                <h2 className="font-bold text-base mb-2">Appearance</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Choose a light, dark, or system theme.
-                </p>
-                {isThemeReady ? (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={theme === "light" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setTheme("light")}
-                    >
-                      Light
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={theme === "dark" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setTheme("dark")}
-                    >
-                      Dark
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={theme === "system" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setTheme("system")}
-                    >
-                      System
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">Loading theme…</div>
-                )}
-              </div>
+          <PanelBlock title="Appearance" description="Choose a light, dark, or system theme.">
+            {isThemeReady ? (
+              <IosSegmentedControl
+                ariaLabel="Theme"
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                  { value: "system", label: "System" },
+                ]}
+                value={(theme as "light" | "dark" | "system") ?? "system"}
+                onChange={(next) => setTheme(next)}
+              />
+            ) : (
+              <div className="ios-panel__desc">Loading theme…</div>
+            )}
+          </PanelBlock>
 
-              <div>
-                <h2 className="font-bold text-base mb-2">Workout Defaults</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Use recent performance to prefill reps/weight when starting a workout.
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm">Smart progressive autofill</div>
-                  <Button
-                    type="button"
-                    variant={progressiveAutofillEnabled ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const next = !progressiveAutofillEnabled
-                      setProgressiveAutofillEnabled(next)
-                      localStorage.setItem("progressive_autofill_enabled", String(next))
-                    }}
-                  >
-                    {progressiveAutofillEnabled ? "On" : "Off"}
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-4 mb-4">
-                  Play a chime when the rest timer runs out. iPhones have no
-                  vibration API in the browser, so this is the only rest cue that
-                  reaches you with the phone in a pocket.
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm">Rest timer sound</div>
-                  <Button
-                    type="button"
-                    variant={restSoundEnabled ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const next = !restSoundEnabled
-                      setRestSoundEnabledState(next)
-                      setRestSoundEnabled(next)
-                      // Turning it on is the one moment there is a user gesture
-                      // to unlock audio, so preview the cue here.
-                      if (next) playRestChime()
-                    }}
-                  >
-                    {restSoundEnabled ? "On" : "Off"}
-                  </Button>
-                </div>
-              </div>
-          </div>
+          <PanelBlock
+            title="Workout defaults"
+            description="Use recent performance to prefill reps and weight when starting a workout."
+          >
+            <PanelToggle
+              label="Smart progressive autofill"
+              checked={progressiveAutofillEnabled}
+              onChange={(next) => {
+                setProgressiveAutofillEnabled(next)
+                localStorage.setItem("progressive_autofill_enabled", String(next))
+              }}
+            />
+          </PanelBlock>
+
+          <PanelBlock
+            title="Rest timer sound"
+            description="Play a chime when the rest timer runs out. iPhones have no vibration API in the browser, so this is the only rest cue that reaches you with the phone in a pocket."
+          >
+            <PanelToggle
+              label="Rest timer sound"
+              checked={restSoundEnabled}
+              onChange={(next) => {
+                setRestSoundEnabledState(next)
+                setRestSoundEnabled(next)
+                // Turning it on is the one moment there is a user gesture
+                // to unlock audio, so preview the cue here.
+                if (next) playRestChime()
+              }}
+            />
+          </PanelBlock>
         </SettingsSection>
 
         <SettingsSection
@@ -357,20 +321,16 @@ export default function SettingsPage() {
           isExpanded={expandedSections.includes("schedule")}
           onToggle={() => toggleSection("schedule")}
         >
-          <div className="mt-3 space-y-4">
-              <WorkoutScheduleEditor />
+          <WorkoutScheduleEditor />
 
-              <div>
-                <h2 className="font-bold text-base mb-2">Reset Program</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Replace all routines and schedule with the Growth v2 program.
-                </p>
-                <Button onClick={onResetGrowthV2} className="w-full" variant="destructive" uppercase={false}>
-                  Reset to Growth v2 (Wipes old routines)
-                </Button>
-              </div>
-
-          </div>
+          <PanelBlock
+            title="Reset program"
+            description="Replace all routines and the schedule with the Growth v2 program."
+          >
+            <button type="button" className="ios-btn" data-tone="destructive" onClick={onResetGrowthV2}>
+              Reset to Growth v2 (wipes old routines)
+            </button>
+          </PanelBlock>
         </SettingsSection>
 
         <SettingsSection
@@ -379,61 +339,33 @@ export default function SettingsPage() {
           isExpanded={expandedSections.includes("training")}
           onToggle={() => toggleSection("training")}
         >
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Deload week reduces your training volume and intensity for 7 days to promote recovery. Sets are halved
-                and weights are pre-filled at ~72% of your working weights — you can still edit everything manually.
-              </p>
-
-              {isDeload ? (
-                <div
-                  style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "var(--radius-xs)",
-                    padding: "12px 14px",
+          <PanelBlock
+            title="Deload week"
+            description="Deload week reduces your training volume and intensity for 7 days to promote recovery. Sets are halved and weights are pre-filled at ~72% of your working weights — you can still edit everything manually."
+          >
+            {isDeload ? (
+              <>
+                <div className="ios-panel__desc" style={{ color: "var(--ink-70)" }}>
+                  Deload active — ends{" "}
+                  {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </div>
+                <button
+                  type="button"
+                  className="ios-btn"
+                  onClick={async () => {
+                    await cancelDeload()
+                    toast("Deload cancelled", { duration: 2000 })
                   }}
                 >
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "rgba(255, 255, 255, 0.55)",
-                      marginBottom: "8px",
-                      fontFamily: "var(--font-label)",
-                    }}
-                  >
-                    Deload active — ends{" "}
-                    {deloadEndsAt?.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  </p>
-                  <button
-                    onClick={async () => {
-                      await cancelDeload()
-                      toast("Deload cancelled", { duration: 2000 })
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      fontSize: "11px",
-                      color: "rgba(255, 255, 255, 0.28)",
-                      fontFamily: "var(--font-label)",
-                      letterSpacing: "0.06em",
-                      textDecoration: "underline",
-                    }}
-                    type="button"
-                  >
-                    Cancel deload
-                  </button>
-                </div>
-              ) : (
-                <Button variant="outline" className="w-full" onClick={() => setDeloadConfirmOpen(true)}>
-                  Start Deload Week
-                </Button>
-              )}
-            </div>
-          </div>
+                  Cancel deload
+                </button>
+              </>
+            ) : (
+              <button type="button" className="ios-btn" onClick={() => setDeloadConfirmOpen(true)}>
+                Start deload week
+              </button>
+            )}
+          </PanelBlock>
         </SettingsSection>
       </IosGroup>
 
@@ -445,115 +377,114 @@ export default function SettingsPage() {
           isExpanded={expandedSections.includes("data")}
           onToggle={() => toggleSection("data")}
         >
-          <div className="mt-3 space-y-4">
-              <div>
-                <h2 className="font-bold text-base mb-2">Import Historical Data</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Import workout data from CSV file. Useful for migrating from other apps or importing historical
-                  records.
-                </p>
+          <PanelBlock
+            title="Import historical data"
+            description="Import workout data from a CSV file — useful for migrating from other apps or importing historical records."
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "11px",
+                lineHeight: 1.5,
+                color: "var(--ink-70)",
+                background: "var(--ink-04)",
+                borderRadius: "var(--radius-xs)",
+                padding: "10px 12px",
+                overflowX: "auto",
+              }}
+            >
+              <div style={{ color: "var(--ink-50)" }}>CSV format</div>
+              <div>Date,Workout,Exercise_Normalized,Set,Reps,Weight (lbs)</div>
+              <div style={{ color: "var(--ink-50)" }}>2024-01-15,Push Day,Bench Press,1,10,135</div>
+            </div>
+            <label className="ios-btn" style={{ cursor: "pointer" }}>
+              <input
+                ref={csvFileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleCsvFileChange}
+                className="sr-only"
+              />
+              {csvFile ? csvFile.name : "Choose CSV file"}
+            </label>
+            <button
+              type="button"
+              className="ios-btn"
+              data-tone="primary"
+              onClick={handleImportCsv}
+              disabled={!csvFile || importing}
+            >
+              <Upload size={16} strokeWidth={2} />
+              {importing ? "Importing…" : "Import workouts"}
+            </button>
 
-                <div className="bg-muted p-3 rounded-lg font-mono text-xs mb-4">
-                  <div className="font-semibold mb-1">CSV Format:</div>
-                  <div>Date,Workout,Exercise_Normalized,Set,Reps,Weight (lbs)</div>
-                  <div className="text-muted-foreground">2024-01-15,Push Day,Bench Press,1,10,135</div>
+            {importResult && (
+              <div className="ios-panel__list">
+                <div className="ios-panel__stat">
+                  <span>Rows parsed</span>
+                  <span>{importResult.rowsParsed}</span>
                 </div>
-
-                <div className="space-y-3">
-                  <input
-                    ref={csvFileInputRef}
-                    type="file"
-                    accept=".csv"
-                    onChange={handleCsvFileChange}
-                    className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
-                  />
-
-                  <Button onClick={handleImportCsv} disabled={!csvFile || importing} className="w-full">
-                    <Upload className="w-4 h-4 mr-2" />
-                    {importing ? "Importing..." : "Import Workouts"}
-                  </Button>
+                <div className="ios-panel__stat">
+                  <span className="inline-flex items-center" style={{ gap: "6px" }}>
+                    <CheckCircle2 size={14} style={{ color: "var(--good-ink)" }} /> Sessions created
+                  </span>
+                  <span style={{ color: "var(--good-ink)" }}>{importResult.sessionsCreated}</span>
                 </div>
-
-                {importResult && (
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-sm">
-                      <span>Rows Parsed</span>
-                      <span className="font-semibold">{importResult.rowsParsed}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2 bg-good-tint rounded-lg text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-good-ink" />
-                        <span>Sessions Created</span>
-                      </div>
-                      <span className="font-semibold text-good-ink">{importResult.sessionsCreated}</span>
-                    </div>
-
-                    {importResult.duplicatesSkipped > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-warn-tint rounded-lg text-sm">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-warn-ink" />
-                          <span>Duplicates Skipped</span>
-                        </div>
-                        <span className="font-semibold text-warn-ink">{importResult.duplicatesSkipped}</span>
-                      </div>
-                    )}
-
-                    {importResult.errors.length > 0 && (
-                      <div className="p-2 bg-red-500/10 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <XCircle className="w-4 h-4 text-red-600" />
-                          <span className="text-sm font-medium text-red-600">Errors</span>
-                        </div>
-                        <ul className="space-y-1 text-xs text-red-600">
-                          {importResult.errors.map((error, idx) => (
-                            <li key={idx}>• {error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                {importResult.duplicatesSkipped > 0 && (
+                  <div className="ios-panel__stat">
+                    <span className="inline-flex items-center" style={{ gap: "6px" }}>
+                      <AlertCircle size={14} style={{ color: "var(--warn-ink)" }} /> Duplicates skipped
+                    </span>
+                    <span style={{ color: "var(--warn-ink)" }}>{importResult.duplicatesSkipped}</span>
+                  </div>
+                )}
+                {importResult.errors.length > 0 && (
+                  <div className="ios-panel__stat" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                    <span className="inline-flex items-center" style={{ gap: "6px", color: "var(--warn)" }}>
+                      <XCircle size={14} /> Errors
+                    </span>
+                    <ul style={{ fontSize: "12px", color: "var(--ink-70)", marginTop: "4px" }}>
+                      {importResult.errors.map((error, idx) => (
+                        <li key={idx}>• {error}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
+            )}
+          </PanelBlock>
 
-              <div>
-                <h2 className="font-bold text-base mb-2">Apple Health Integration</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Export your workouts to Apple Health. After exporting, you can import the file into the Health app.
-                </p>
-                <Button onClick={handleExportToHealth} className="w-full">
-                  Export to Apple Health
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">{workouts.length} {plural(workouts.length, "workout", "workouts")} ready to export</p>
-              </div>
+          <PanelBlock
+            title="Apple Health"
+            description={`Export your workouts to Apple Health, then import the file in the Health app. ${workouts.length} ${plural(workouts.length, "workout", "workouts")} ready to export.`}
+          >
+            <button type="button" className="ios-btn" onClick={handleExportToHealth}>
+              Export to Apple Health
+            </button>
+          </PanelBlock>
 
-              <div>
-                <h2 className="font-bold text-base mb-2">PR Exclusions</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Comma-separated list of exercises to hide from PR cards.
-                </p>
-                <textarea
-                  value={prExclusionInput}
-                  onChange={(e) => setPrExclusionInput(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Side Crunch, Decline Bench Knee Raise"
-                />
-                <Button onClick={handleSavePrExclusions} className="w-full mt-3" variant="secondary">
-                  {prExclusionSaved ? "Saved" : "Save Exclusions"}
-                </Button>
-              </div>
+          <PanelBlock title="PR exclusions" description="Comma-separated list of exercises to hide from PR cards.">
+            <textarea
+              value={prExclusionInput}
+              onChange={(e) => setPrExclusionInput(e.target.value)}
+              rows={3}
+              aria-label="PR exclusions"
+              className="ios-textarea"
+              placeholder="Side Crunch, Decline Bench Knee Raise"
+            />
+            <button type="button" className="ios-btn" onClick={handleSavePrExclusions}>
+              {prExclusionSaved ? "Saved" : "Save exclusions"}
+            </button>
+          </PanelBlock>
 
-              <div>
-                <h2 className="font-bold text-base mb-2">Clear All Data</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Remove all workout data, routines, and personal records from your device. This cannot be undone.
-                </p>
-                <Button onClick={handleClearAllData} className="w-full" variant="destructive">
-                  Clear All Data
-                </Button>
-              </div>
-          </div>
+          <PanelBlock
+            title="Clear all data"
+            description="Remove all workout data, routines, and personal records from this device. This cannot be undone."
+          >
+            <button type="button" className="ios-btn" data-tone="destructive" onClick={handleClearAllData}>
+              Clear all data
+            </button>
+          </PanelBlock>
         </SettingsSection>
 
         <SettingsSection
@@ -562,37 +493,19 @@ export default function SettingsPage() {
           isExpanded={expandedSections.includes("about")}
           onToggle={() => toggleSection("about")}
         >
-          <div className="mt-3 space-y-4">
-              <div>
-                <h2 className="font-bold text-base mb-2">Install as App</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add this app to your iPhone home screen for a native app experience.
-                </p>
-                <div className="text-xs space-y-1 text-muted-foreground">
-                  <p>1. Tap the Share button in Safari</p>
-                  <p>2. Scroll down and tap &quot;Add to Home Screen&quot;</p>
-                  <p>3. Tap &quot;Add&quot; in the top right</p>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="font-bold text-base mb-2">Data Storage</h2>
-                <p className="text-sm text-muted-foreground">
-                  All workout data is stored locally on your device. Your data never leaves your phone.
-                </p>
-              </div>
-              <div>
-                <h2 className="font-bold text-base mb-2">Version</h2>
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="app-version"
-                >
-                  {process.env.NEXT_PUBLIC_APP_VERSION ||
-                    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ||
-                    "dev"}
-                </p>
-              </div>
-          </div>
+          <PanelBlock
+            title="Install as app"
+            description="Add Akt to your iPhone home screen: tap Share in Safari, choose “Add to Home Screen”, then tap Add."
+          />
+          <PanelBlock
+            title="Data storage"
+            description="All workout data is stored locally on this device unless you turn on cloud sync in Account & Sync."
+          />
+          <PanelBlock title="Version">
+            <div className="ios-panel__desc" data-testid="app-version">
+              {process.env.NEXT_PUBLIC_APP_VERSION || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || "dev"}
+            </div>
+          </PanelBlock>
         </SettingsSection>
       </IosGroup>
 
@@ -678,11 +591,44 @@ function SettingsSection({
         />
       </button>
 
-      {isExpanded && (
-        <div style={{ padding: "4px 16px 18px 16px" }}>
-          {children}
-        </div>
-      )}
+      {isExpanded && <div className="ios-panel">{children}</div>}
     </>
+  )
+}
+
+/** One titled block inside an expanded Settings section. */
+function PanelBlock({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children?: React.ReactNode
+}) {
+  return (
+    <section className="ios-panel__block">
+      <h2 className="ios-panel__title">{title}</h2>
+      {description ? <p className="ios-panel__desc">{description}</p> : null}
+      {children}
+    </section>
+  )
+}
+
+/** Label + switch on one line, the iOS way of saying On/Off. */
+function PanelToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between" style={{ gap: "12px", minHeight: "44px" }}>
+      <span style={{ fontSize: "15px", color: "#fff" }}>{label}</span>
+      <IosSwitch checked={checked} onChange={onChange} ariaLabel={label} />
+    </div>
   )
 }

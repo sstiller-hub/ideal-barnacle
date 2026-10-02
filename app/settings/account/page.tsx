@@ -296,11 +296,10 @@ export default function AccountSyncPage() {
           />
         </IosGroup>
         <IosSectionFooter>
-          {hasGoogleDriveConfig
-            ? "Pushes local workouts to Supabase and pulls down changes from other devices. Local workouts loaded: " +
-              (Array.isArray(workouts) ? workouts.length : 0) +
-              "."
-            : "Google Drive integration requires configuration. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable it."}
+          {"Pushes local workouts to the cloud and pulls down changes from your other devices. Local workouts loaded: " +
+            (Array.isArray(workouts) ? workouts.length : 0) +
+            "."}
+          {hasGoogleDriveConfig ? null : " Google Drive backup isn’t available in this version of Akt."}
         </IosSectionFooter>
         {syncStatus ? <IosSectionFooter>{syncStatus}</IosSectionFooter> : null}
 

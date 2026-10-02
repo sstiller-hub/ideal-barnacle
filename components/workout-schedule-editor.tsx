@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { getRoutines, type WorkoutRoutine } from "@/lib/routine-storage"
 import {
   getWeeklySchedule,
@@ -72,12 +71,10 @@ export function WorkoutScheduleEditor() {
   }
 
   return (
-    <div>
-      <h2 className="font-bold text-base mb-2">Workout Schedule</h2>
-      <p className="text-sm text-muted-foreground mb-4">
-        Set your weekly schedule for Monday through Sunday. Rest days are supported.
-      </p>
-      <div className="space-y-3">
+    <section className="ios-panel__block">
+      <h2 className="ios-panel__title">Weekly schedule</h2>
+      <p className="ios-panel__desc">Pick a routine or a rest day for each day, Monday through Sunday.</p>
+      <div className="ios-panel__list">
         {weeklySchedule &&
           dayOrder.map(({ key, label }) => {
             const entry = weeklySchedule[key]
@@ -91,10 +88,11 @@ export function WorkoutScheduleEditor() {
                 : baseOptions
 
             return (
-              <div key={key} className="flex items-center justify-between gap-3 min-w-0">
-                <div className="text-sm font-medium w-24">{label}</div>
+              <label key={key} className="ios-panel__stat" style={{ minHeight: "44px", padding: "0 12px" }}>
+                <span style={{ flex: "0 0 auto", fontSize: "15px", color: "#fff" }}>{label}</span>
                 <select
-                  className="flex-1 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="ios-input"
+                  style={{ fontSize: "15px" }}
                   aria-label={`${label} schedule`}
                   value={entry ? entry.routineId : "rest"}
                   onChange={(e) => updateDaySelection(key, e.target.value)}
@@ -106,19 +104,21 @@ export function WorkoutScheduleEditor() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
             )
           })}
       </div>
-      {scheduleMessage && <p className="mt-3 text-xs text-muted-foreground">{scheduleMessage}</p>}
-      <div className="mt-4 space-y-2">
-        <Button onClick={handleSaveWeeklySchedule} className="w-full">
-          Save schedule
-        </Button>
-        <Button onClick={handleResetWeeklySchedule} className="w-full" variant="outline">
-          Reset to Growth v2 schedule
-        </Button>
-      </div>
-    </div>
+      {scheduleMessage && (
+        <p className="ios-panel__desc" role="status">
+          {scheduleMessage}
+        </p>
+      )}
+      <button type="button" className="ios-btn" data-tone="primary" onClick={handleSaveWeeklySchedule}>
+        Save schedule
+      </button>
+      <button type="button" className="ios-btn" onClick={handleResetWeeklySchedule}>
+        Reset to Growth v2 schedule
+      </button>
+    </section>
   )
 }

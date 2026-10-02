@@ -1,25 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-
-// Catmull-Rom → cubic bezier smooth path
-function buildSmoothPath(pts: [number, number][]): string {
-  if (pts.length === 0) return ""
-  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  for (let i = 1; i < pts.length; i++) {
-    const pm1 = pts[Math.max(i - 2, 0)]
-    const p0 = pts[i - 1]
-    const p1 = pts[i]
-    const p2 = pts[Math.min(i + 1, pts.length - 1)]
-    const cp1x = p0[0] + (p1[0] - pm1[0]) / 6
-    const cp1y = p0[1] + (p1[1] - pm1[1]) / 6
-    const cp2x = p1[0] - (p2[0] - p0[0]) / 6
-    const cp2y = p1[1] - (p2[1] - p0[1]) / 6
-    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`
-  }
-  return d
-}
+import { buildSmoothPath } from "@/lib/smooth-path"
 
 function buildSegmentedLinePath(
   series: { volume: number }[],
@@ -121,7 +103,13 @@ export default function ExerciseHistoryPage() {
   const fromSession = searchParams.get("from") === "session"
   const rawName = typeof params?.name === "string" ? params.name : ""
   const exerciseName = rawName ? decodeURIComponent(rawName) : "Unknown exercise"
-  const [rawHistory, setRawHistory] = useState(() => getExerciseHistory(exerciseName))
+  // Filled after mount — storage is client-only, and reading it in the
+  // initializer made the server-rendered counts disagree with the client's.
+  const [rawHistory, setRawHistory] = useState<ReturnType<typeof getExerciseHistory>>([])
+
+  useEffect(() => {
+    setRawHistory(getExerciseHistory(exerciseName))
+  }, [exerciseName])
 
   useEffect(() => {
     const exerciseId = getExerciseIdForName(exerciseName)

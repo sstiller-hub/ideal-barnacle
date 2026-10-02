@@ -27,6 +27,7 @@ export function IosSwipeToDelete({
 }) {
   const [offset, setOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [actionFocused, setActionFocused] = useState(false)
   const startX = useRef(0)
   const startOffset = useRef(0)
 
@@ -58,7 +59,12 @@ export function IosSwipeToDelete({
           setOffset(0)
           onDelete()
         }}
+        onFocus={() => setActionFocused(true)}
+        onBlur={() => setActionFocused(false)}
         style={{
+          // Rows that sit inset from the wrapper (cards with side margins)
+          // would otherwise show the red action through the margin at rest.
+          opacity: offset < 0 || dragging || actionFocused ? 1 : 0,
           position: "absolute",
           top: 0,
           right: 0,

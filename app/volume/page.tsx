@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { plural } from "@/lib/utils"
 import { ChevronRight } from "lucide-react"
-import { getWorkoutHistory } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { IosNavPage } from "@/components/ios/nav-bar"
 import { IosGroup, IosSectionHeader } from "@/components/ios/grouped"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -13,24 +13,7 @@ import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "
 import { VolumeControls } from "@/components/volume-controls"
 import { formatWorkoutDate, parseWorkoutDate } from "@/lib/workout-date"
 
-// Catmull-Rom → cubic bezier smooth path through an array of [x, y] points
-function buildSmoothPath(pts: [number, number][]): string {
-  if (pts.length === 0) return ""
-  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  for (let i = 1; i < pts.length; i++) {
-    const pm1 = pts[Math.max(i - 2, 0)]
-    const p0 = pts[i - 1]
-    const p1 = pts[i]
-    const p2 = pts[Math.min(i + 1, pts.length - 1)]
-    const cp1x = p0[0] + (p1[0] - pm1[0]) / 6
-    const cp1y = p0[1] + (p1[1] - pm1[1]) / 6
-    const cp2x = p1[0] - (p2[0] - p0[0]) / 6
-    const cp2y = p1[1] - (p2[1] - p0[1]) / 6
-    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`
-  }
-  return d
-}
+import { buildSmoothPath } from "@/lib/smooth-path"
 
 // Line path with gaps at zero-volume points
 function buildSegmentedLinePath(
@@ -113,7 +96,12 @@ function formatPeriodLabel(date: string, aggregation: Aggregation): string {
 
 export default function VolumeHistoryPage() {
   const router = useRouter()
-  const history = getWorkoutHistory()
+  // Storage is client-only: read it after mount so server and client render
+  // the same empty first frame instead of mismatching on the counts.
+  const [history, setHistory] = useState<CompletedWorkout[]>([])
+  useEffect(() => {
+    setHistory(getWorkoutHistory())
+  }, [])
 
   const [timeRange, setTimeRange] = useState<TimeRange>("8W")
   const [aggregation, setAggregation] = useState<Aggregation>("week")

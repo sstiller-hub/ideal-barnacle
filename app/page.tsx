@@ -2252,7 +2252,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex gap-3 overflow-x-auto"
+            className="flex gap-3 overflow-x-auto px-5"
             data-scroll-x="pr-cards-row-1"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
           >
@@ -2601,7 +2601,7 @@ function AllTimePRCard({
   trendPct?: number | null
   onClick?: () => void
 }) {
-  const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px) / 2), 260px)"
+  const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 40px - 12px) / 2), 260px)"
 
   return (
     <button
