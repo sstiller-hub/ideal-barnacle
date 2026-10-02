@@ -1574,8 +1574,8 @@ export default function Home() {
       <div
         className="min-h-screen"
         style={{
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
@@ -1606,7 +1606,7 @@ export default function Home() {
               width: "6px",
               height: "6px",
               borderRadius: "50%",
-              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "#F59E0B",
+              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "var(--warn)",
               boxShadow: workoutAlerts.some((a) => a.tier === 1)
                 ? "0 0 6px rgba(239, 68, 68, 0.6)"
                 : "0 0 6px rgba(245, 158, 11, 0.6)",
@@ -1634,8 +1634,8 @@ export default function Home() {
           paddingBottom: pinnedAction
             ? "calc(env(safe-area-inset-bottom, 0px) + 196px)"
             : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       >
         {devModeEnabled && (
@@ -1655,7 +1655,7 @@ export default function Home() {
                   type="button"
                 >
                   <span
-                    className={uiStateOverride === state ? "text-ink-70" : "text-ink-30"}
+                    className={uiStateOverride === state ? "text-ink-70" : "text-ink-50"}
                     style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     {state.toUpperCase()}
@@ -1680,7 +1680,7 @@ export default function Home() {
 
         <div
           className="relative z-50 flex-shrink-0"
-          style={{ background: "#0D0D0F", marginTop: "26px" }}
+          style={{ background: "var(--background)", marginTop: "26px" }}
         >
         <div className="px-5 pb-4">
         <div className="band-enter">
@@ -1694,7 +1694,7 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: "0.2em",
                 fontFamily: "var(--font-label)",
-                color: "var(--ink-35)",
+                color: "var(--ink-50)",
                 background: "transparent",
                 border: "none",
                 padding: 0,
@@ -1777,7 +1777,7 @@ export default function Home() {
                 <ChevronDown
                   size={20}
                   strokeWidth={1.5}
-                  className="text-ink-30 mt-2 transition-transform duration-base"
+                  className="text-ink-50 mt-2 transition-transform duration-base"
                   style={{
                     transform: showWorkoutPicker ? "rotate(180deg)" : "rotate(0deg)",
                   }}
@@ -1790,7 +1790,7 @@ export default function Home() {
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: "12px",
-                  color: "var(--ink-40)",
+                  color: "var(--ink-50)",
                   fontVariantNumeric: "tabular-nums",
                   marginBottom: "6px",
                 }}
@@ -1842,7 +1842,7 @@ export default function Home() {
                           style={{
                             display: "block",
                             fontSize: "13px",
-                            color: "var(--ink-40)",
+                            color: "var(--ink-50)",
                             marginTop: "2px",
                           }}
                         >
@@ -1913,6 +1913,7 @@ export default function Home() {
             ) : (actualState === "scheduled" || actualState === "activeSession") && lastSameWorkout ? (
               <button
                 onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
+                className="tap-target"
                 style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
                 type="button"
               >
@@ -1961,7 +1962,7 @@ export default function Home() {
                       fontSize: "10px",
                       fontWeight: 400,
                       letterSpacing: "0.06em",
-                      color: "var(--ink-30)",
+                      color: "var(--ink-50)",
                       marginBottom: isCompactExerciseList ? "12px" : "16px",
                     }}
                   >
@@ -2006,7 +2007,7 @@ export default function Home() {
                   fontWeight: 600,
                   letterSpacing: "0.16em",
                   fontFamily: "var(--font-label)",
-                  color: "var(--ink-35)",
+                  color: "var(--ink-50)",
                   marginBottom: "4px",
                 }}
               >
@@ -2049,7 +2050,7 @@ export default function Home() {
             return (
               <div>
                 <BandHeader label={`UP NEXT · ${nextWorkout.label}`}>
-                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--ink-40)", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--ink-50)", whiteSpace: "nowrap" }}>
                     {deriveWorkoutType(nextWorkout.routine.name)}
                   </span>
                 </BandHeader>
@@ -2136,13 +2137,14 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setShowAllExercises(true)}
+                    className="tap-target"
                     style={{
                       background: "transparent",
                       border: "none",
                       padding: "10px 0 0 32px",
                       fontFamily: "var(--font-mono)",
                       fontSize: "11px",
-                      color: "var(--ink-30)",
+                      color: "var(--ink-50)",
                       cursor: "pointer",
                     }}
                   >
@@ -2158,7 +2160,7 @@ export default function Home() {
                     background: "transparent",
                     border: "none",
                     padding: "12px",
-                    color: "var(--ink-40)",
+                    color: "var(--ink-50)",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.color = "var(--ink-70)"
@@ -2252,7 +2254,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex gap-3 overflow-x-auto"
+            className="flex gap-3 overflow-x-auto px-5"
             data-scroll-x="pr-cards-row-1"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
           >
@@ -2318,7 +2320,7 @@ export default function Home() {
               <button
                 onClick={goToSessionDay}
                 className="flex-shrink-0 transition-colors duration-base"
-                style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+                style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-50)" }}
                 type="button"
               >
                 View day
@@ -2327,7 +2329,7 @@ export default function Home() {
             <button
               onClick={handleDiscardActiveWorkout}
               className="flex-shrink-0 transition-colors duration-base"
-              style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+              style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-50)" }}
               type="button"
             >
               Discard
@@ -2356,7 +2358,7 @@ export default function Home() {
           className="border-0"
           style={{
             background: "rgba(10, 10, 12, 0.96)",
-            borderRadius: "18px",
+            borderRadius: "var(--radius-2xl)",
             boxShadow: "0 30px 80px rgba(0, 0, 0, 0.45)",
             padding: "24px",
           }}
@@ -2369,7 +2371,7 @@ export default function Home() {
               Active Workout Detected
             </AlertDialogTitle>
             <AlertDialogDescription
-              className="text-ink-40"
+              className="text-ink-50"
               style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
             >
               You have an active workout in progress ({session?.routineName || "Workout"}). Would you like to resume it
@@ -2381,9 +2383,9 @@ export default function Home() {
               onClick={handleResumeExisting}
               className="w-full"
               style={{
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: "8px",
+                background: "var(--ink-08)",
+                border: "1px solid var(--ink-15)",
+                borderRadius: "var(--radius-xs)",
                 padding: "12px",
               }}
             >
@@ -2395,9 +2397,9 @@ export default function Home() {
               onClick={handleDiscardExisting}
               className="w-full"
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "8px",
+                background: "var(--ink-04)",
+                border: "1px solid var(--ink-08)",
+                borderRadius: "var(--radius-xs)",
                 padding: "12px",
               }}
             >
@@ -2410,12 +2412,12 @@ export default function Home() {
               className="w-full"
               style={{
                 background: "transparent",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                borderRadius: "8px",
+                border: "1px solid var(--ink-06)",
+                borderRadius: "var(--radius-xs)",
                 padding: "10px",
               }}
             >
-              <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
+              <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
                 Cancel
               </span>
             </AlertDialogCancel>
@@ -2508,7 +2510,7 @@ export default function Home() {
             data-testid="home-pinned-action"
             style={{
               height: "56px",
-              borderRadius: "6px",
+              borderRadius: "var(--radius-xs)",
               background: pinnedAction.filled ? "#fff" : "#0D0D0F",
               border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
               color: pinnedAction.filled ? "#000" : "var(--ink-90)",
@@ -2551,7 +2553,7 @@ function ReceiptRow({
         style={{
           fontSize: "8.5px",
           fontWeight: 500,
-          color: "var(--ink-30)",
+          color: "var(--ink-50)",
           fontVariantNumeric: "tabular-nums",
           minWidth: "14px",
         }}
@@ -2567,14 +2569,14 @@ function ReceiptRow({
       <div className="flex flex-col items-end" style={{ gap: "1px" }}>
         {right && (
           <div
-            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-50)", fontVariantNumeric: "tabular-nums" }}
           >
             {right}
           </div>
         )}
         {hint && (
           <div
-            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-50)", fontVariantNumeric: "tabular-nums" }}
           >
             {hint}
           </div>
@@ -2601,7 +2603,7 @@ function AllTimePRCard({
   trendPct?: number | null
   onClick?: () => void
 }) {
-  const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px) / 2), 260px)"
+  const cardWidth = "clamp(172px, calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 40px - 12px) / 2), 260px)"
 
   return (
     <button
@@ -2637,7 +2639,7 @@ function AllTimePRCard({
         >
           {reps}
         </span>
-        <span style={{ fontSize: "10px", color: "var(--ink-25)" }}>&times;</span>
+        <span style={{ fontSize: "10px", color: "var(--ink-50)" }}>&times;</span>
         <span
           style={{
             fontFamily: "var(--font-display)",
@@ -2649,7 +2651,7 @@ function AllTimePRCard({
         >
           {weight}
         </span>
-        <span style={{ fontSize: "10px", color: "var(--ink-25)", letterSpacing: "0.06em" }}>LB</span>
+        <span style={{ fontSize: "10px", color: "var(--ink-50)", letterSpacing: "0.06em" }}>LB</span>
       </div>
 
       <div style={{ marginBottom: "8px" }}>
@@ -2657,7 +2659,7 @@ function AllTimePRCard({
       </div>
 
       <div className="flex items-center justify-between">
-        <span style={{ fontSize: "8px", fontWeight: 400, color: "var(--ink-25)" }}>{details}</span>
+        <span style={{ fontSize: "8px", fontWeight: 400, color: "var(--ink-50)" }}>{details}</span>
         {typeof trendPct === "number" && trendPct !== 0 && (
           <DeltaChip
             tone={trendPct > 0 ? "good" : "neutral"}

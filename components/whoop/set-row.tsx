@@ -25,7 +25,7 @@ export default function SetRow({ set, ordinal, checked, onToggle }: SetRowProps)
         padding: "0 16px",
         background: checked ? "var(--ink-02)" : "var(--ink-04)",
         border: `1px solid ${checked ? "var(--ink-06)" : "var(--ink-12)"}`,
-        borderRadius: "10px",
+        borderRadius: "var(--radius-ios)",
         cursor: "pointer",
         textAlign: "left",
         transition: "background 140ms ease, border-color 140ms ease, opacity 140ms ease",
@@ -33,7 +33,7 @@ export default function SetRow({ set, ordinal, checked, onToggle }: SetRowProps)
       }}
     >
       <span
-        className="text-ink-30"
+        className="text-ink-50"
         style={{
           fontFamily: "var(--font-label)",
           fontSize: "10px",

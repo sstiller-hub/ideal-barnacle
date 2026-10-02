@@ -104,12 +104,12 @@ export default function ExercisePanel({
             >
               {exercise.whoopName ?? aktLabel}
             </span>
-            <Pencil size={12} strokeWidth={2} className="text-ink-25 shrink-0" />
+            <Pencil size={12} strokeWidth={2} className="text-ink-50 shrink-0" />
           </button>
         )}
 
         <p
-          className="text-ink-35 mt-1.5"
+          className="text-ink-50 mt-1.5"
           style={{ fontFamily: "var(--font-label)", fontSize: "11px", letterSpacing: "0.04em" }}
         >
           {exercise.whoopName ? aktLabel : "Tap to map to a Whoop exercise"}
@@ -139,7 +139,7 @@ export default function ExercisePanel({
             toast.error("Failed to copy exercise")
           }
         }}
-        className="text-ink-40 hover:text-ink-70 transition-colors duration-base"
+        className="tap-target text-ink-50 hover:text-ink-70 transition-colors duration-base"
         style={{
           display: "flex",
           alignItems: "center",

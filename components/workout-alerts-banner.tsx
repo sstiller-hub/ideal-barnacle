@@ -48,7 +48,7 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                       fontSize: "8px",
                       fontWeight: 400,
                       letterSpacing: "0.05em",
-                      color: "var(--ink-25)",
+                      color: "var(--ink-50)",
                     }}
                   >
                     · {alert.exercise_name}

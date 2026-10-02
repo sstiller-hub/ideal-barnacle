@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { plural } from "@/lib/utils"
 import { ChevronRight } from "lucide-react"
-import { getWorkoutHistory } from "@/lib/workout-storage"
+import { getWorkoutHistory, type CompletedWorkout } from "@/lib/workout-storage"
 import { IosNavPage } from "@/components/ios/nav-bar"
 import { IosGroup, IosSectionHeader } from "@/components/ios/grouped"
 import { isSetEligibleForStats } from "@/lib/set-validation"
@@ -13,24 +13,7 @@ import type { TimeRange, Aggregation, WorkoutTypeFilter, AnnotatedPoint } from "
 import { VolumeControls } from "@/components/volume-controls"
 import { formatWorkoutDate, parseWorkoutDate } from "@/lib/workout-date"
 
-// Catmull-Rom → cubic bezier smooth path through an array of [x, y] points
-function buildSmoothPath(pts: [number, number][]): string {
-  if (pts.length === 0) return ""
-  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
-  for (let i = 1; i < pts.length; i++) {
-    const pm1 = pts[Math.max(i - 2, 0)]
-    const p0 = pts[i - 1]
-    const p1 = pts[i]
-    const p2 = pts[Math.min(i + 1, pts.length - 1)]
-    const cp1x = p0[0] + (p1[0] - pm1[0]) / 6
-    const cp1y = p0[1] + (p1[1] - pm1[1]) / 6
-    const cp2x = p1[0] - (p2[0] - p0[0]) / 6
-    const cp2y = p1[1] - (p2[1] - p0[1]) / 6
-    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`
-  }
-  return d
-}
+import { buildSmoothPath } from "@/lib/smooth-path"
 
 // Line path with gaps at zero-volume points
 function buildSegmentedLinePath(
@@ -113,7 +96,12 @@ function formatPeriodLabel(date: string, aggregation: Aggregation): string {
 
 export default function VolumeHistoryPage() {
   const router = useRouter()
-  const history = getWorkoutHistory()
+  // Storage is client-only: read it after mount so server and client render
+  // the same empty first frame instead of mismatching on the counts.
+  const [history, setHistory] = useState<CompletedWorkout[]>([])
+  useEffect(() => {
+    setHistory(getWorkoutHistory())
+  }, [])
 
   const [timeRange, setTimeRange] = useState<TimeRange>("8W")
   const [aggregation, setAggregation] = useState<Aggregation>("week")
@@ -176,7 +164,7 @@ export default function VolumeHistoryPage() {
   )
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+    <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
       <IosNavPage
         backLabel="Home"
         onBack={() => router.back()}
@@ -200,19 +188,19 @@ export default function VolumeHistoryPage() {
         {globalSeries.length > 0 && (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              background: "var(--ink-02)",
+              border: "1px solid var(--ink-08)",
               borderRadius: "var(--radius-2xl)",
               padding: "14px",
             }}
           >
             <div
               style={{
-                fontSize: "7px",
+                fontSize: "8px",
                 fontWeight: 500,
                 letterSpacing: "0.18em",
                 fontFamily: "var(--font-label)",
-                color: "rgba(255,255,255,0.25)",
+                color: "var(--ink-50)",
                 marginBottom: "8px",
               }}
             >
@@ -223,7 +211,7 @@ export default function VolumeHistoryPage() {
               {globalSeries.length > 0 && (
                 <div style={{
                   position: "absolute", top: 0, left: 0, zIndex: 1,
-                  fontSize: "8px", color: "rgba(255,255,255,0.20)",
+                  fontSize: "8px", color: "var(--ink-20)",
                   fontFamily: "var(--font-label)",
                   lineHeight: 1, pointerEvents: "none",
                 }}>
@@ -340,13 +328,13 @@ export default function VolumeHistoryPage() {
             <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1.5px", background: "rgba(255,255,255,0.6)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
+                <span style={{ fontSize: "9px", color: "var(--ink-50)", fontFamily: "var(--font-label)" }}>
                   Volume
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                <div style={{ width: "16px", height: "1px", background: "rgba(255,255,255,0.25)", borderTop: "1px dashed rgba(255,255,255,0.25)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
+                <div style={{ width: "16px", height: "1px", background: "var(--ink-25)", borderTop: "1px dashed var(--ink-25)" }} />
+                <span style={{ fontSize: "9px", color: "var(--ink-50)", fontFamily: "var(--font-label)" }}>
                   Rolling avg
                 </span>
               </div>
@@ -358,29 +346,29 @@ export default function VolumeHistoryPage() {
         {selectedPoint && (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              borderRadius: "14px",
+              background: "var(--ink-04)",
+              border: "1px solid var(--ink-12)",
+              borderRadius: "var(--radius-ios)",
               padding: "14px",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.40)", marginBottom: "2px" }}>
+                <div style={{ fontSize: "11px", color: "var(--ink-50)", marginBottom: "2px" }}>
                   {formatPeriodLabel(selectedPoint.date, aggregation)}
                 </div>
-                <div style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.90)", letterSpacing: "-0.02em" }}>
+                <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--ink-90)", letterSpacing: "-0.02em" }}>
                   {Math.round(selectedPoint.volume).toLocaleString()} {plural(Math.round(selectedPoint.volume), "lb", "lbs")}
                 </div>
                 {selectedPoint.rollingAvg !== null && (
-                  <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>
+                  <div style={{ fontSize: "10px", color: "var(--ink-50)", marginTop: "2px" }}>
                     vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} {plural(Math.round(selectedPoint.rollingAvg), "lb", "lbs")} rolling avg
                   </div>
                 )}
               </div>
               <button
                 onClick={() => setSelectedPoint(null)}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.35)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
+                style={{ background: "none", border: "none", color: "var(--ink-50)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
               >
                 ✕
               </button>
@@ -391,7 +379,7 @@ export default function VolumeHistoryPage() {
                 style={{
                   display: "inline-block",
                   padding: "3px 8px",
-                  borderRadius: "6px",
+                  borderRadius: "var(--radius-xs)",
                   background: selectedPoint.annotation.kind === "peak"
                     ? "rgba(255,255,255,0.08)"
                     : selectedPoint.annotation.kind === "dip"
@@ -412,7 +400,7 @@ export default function VolumeHistoryPage() {
             )}
 
             {selectedPoint.annotation?.kind === "missed_week" && (
-              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>
+              <div style={{ fontSize: "11px", color: "var(--ink-50)" }}>
                 No workouts recorded this week.
               </div>
             )}
@@ -424,7 +412,7 @@ export default function VolumeHistoryPage() {
                     fontSize: "8px",
                     fontWeight: 500,
                     letterSpacing: "0.18em",
-                    color: "rgba(255,255,255,0.25)",
+                    color: "var(--ink-50)",
                     fontFamily: "var(--font-label)",
                     marginBottom: "6px",
                   }}
@@ -456,7 +444,7 @@ export default function VolumeHistoryPage() {
             )}
 
             {selectedPoint.sessionCount !== undefined && (
-              <div style={{ marginTop: "8px", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>
+              <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-50)" }}>
                 {selectedPoint.sessionCount} session{selectedPoint.sessionCount !== 1 ? "s" : ""} in period
               </div>
             )}
@@ -488,7 +476,7 @@ export default function VolumeHistoryPage() {
                 >
                   <span style={{ flex: "1 1 auto", minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: "16px" }}>{exercise.name}</span>
-                    <span style={{ display: "block", fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                    <span style={{ display: "block", fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                       {Math.round(exercise.lastVolume).toLocaleString()}{" "}
                       {plural(Math.round(exercise.lastVolume), "lb", "lbs")}
                     </span>
@@ -525,7 +513,7 @@ export default function VolumeHistoryPage() {
 
       {exercises.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-ink-40">No volume data yet</p>
+          <p className="text-ink-50">No volume data yet</p>
         </div>
       )}
       </IosNavPage>

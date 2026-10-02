@@ -1,42 +1,19 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Card } from "@/components/ui/card"
 import { WorkoutScheduleEditor } from "@/components/workout-schedule-editor"
-import { ChevronLeft } from "lucide-react"
+import { IosNavPage } from "@/components/ios/nav-bar"
+import { IosCard } from "@/components/ios/grouped"
 
 export default function SchedulePage() {
   const router = useRouter()
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 bg-background border-b p-3 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="flex items-center gap-2 text-ink-40 hover:text-ink-70 transition-colors duration-base"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "0",
-            cursor: "pointer",
-          }}
-          aria-label="Back to home"
-        >
-          <ChevronLeft size={16} strokeWidth={2} />
-          <span style={{ fontSize: "11px", fontWeight: 400, letterSpacing: "0.01em" }}>
-            Back
-          </span>
-        </button>
-        <h1 className="text-lg font-bold">Schedule</h1>
-        <div className="w-6" />
-      </header>
-
-      <main className="p-4">
-        <Card className="p-4">
+    <main style={{ minHeight: "100%", background: "var(--background)", paddingBottom: "40px" }}>
+      <IosNavPage backLabel="Home" onBack={() => router.push("/")} title="Schedule">
+        <IosCard style={{ paddingTop: "4px", paddingBottom: "8px" }}>
           <WorkoutScheduleEditor />
-        </Card>
-      </main>
-
-    </div>
+        </IosCard>
+      </IosNavPage>
+    </main>
   )
 }

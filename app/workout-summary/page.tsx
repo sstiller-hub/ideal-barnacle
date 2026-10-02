@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { plural } from "@/lib/utils"
-import { Share } from "lucide-react"
+import { AlertTriangle, Share } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { IosNavPage } from "@/components/ios/nav-bar"
-import { IosCard } from "@/components/ios/grouped"
+import { IosCard, IosGroup, IosRow, IosSectionHeader } from "@/components/ios/grouped"
+import { DeltaChip } from "@/components/ledger/delta-chip"
+import { IosStat } from "@/components/ios/stat"
 import { getWorkoutHistory, normalizeExerciseName, type CompletedWorkout } from "@/lib/workout-storage"
 import { isSetEligibleForStats } from "@/lib/set-validation"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
@@ -448,10 +449,10 @@ export default function WorkoutSummaryPage() {
       : "Baseline set"
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+    <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
       <IosNavPage
         backLabel="Home"
-        onBack={() => router.push("/history")}
+        onBack={() => router.push("/")}
         title={workout.name}
         longTitle
         subtitle={fullDateLabel}
@@ -484,84 +485,70 @@ export default function WorkoutSummaryPage() {
             as display numerals over their labels. */}
         <IosCard>
           <div className="grid grid-cols-4" style={{ gap: "8px" }}>
-            <SummaryStat value={formatVolumeK(summary.totalVolume)} label="Volume" />
-            <SummaryStat
+            <IosStat value={formatVolumeK(summary.totalVolume)} label="Volume" />
+            <IosStat
               value={durationSeconds !== null ? formatDuration(durationSeconds) : dateLabel}
               label={durationSeconds !== null ? "Duration" : "Workout date"}
             />
-            <SummaryStat value={`${summary.totalValidSets}`} label="Sets" />
-            <SummaryStat value={`${summary.exercisesCount}`} label="Exercises" />
+            <IosStat value={`${summary.totalValidSets}`} label="Sets" />
+            <IosStat value={`${summary.exercisesCount}`} label="Exercises" />
           </div>
           <div
             className="flex items-center gap-2"
             style={{ marginTop: "16px", paddingTop: "14px", borderTop: "0.5px solid var(--ios-hairline)" }}
           >
-            {summary.baselineTotalVolume > 0 ? (
-              <Badge tone="good" className="normal-case tracking-normal">{deltaLabel}</Badge>
-            ) : (
-              <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">{deltaLabel}</span>
-            )}
+            <DeltaChip
+              size="sm"
+              tone={summary.baselineTotalVolume > 0 && summary.totalVolume > summary.baselineTotalVolume ? "good" : "neutral"}
+              value={deltaLabel.toUpperCase()}
+            />
             {summary.baselineTotalVolume > 0 && (
-              <span style={{ fontSize: "13px", color: "var(--ink-40)" }}>vs last time</span>
+              <span style={{ fontSize: "13px", color: "var(--ink-50)" }}>vs last time</span>
             )}
             {timeRangeLabel && (
-              <span style={{ fontSize: "13px", color: "var(--ink-40)", marginLeft: "auto" }}>{timeRangeLabel}</span>
+              <span style={{ fontSize: "13px", color: "var(--ink-50)", marginLeft: "auto" }}>{timeRangeLabel}</span>
             )}
           </div>
         </IosCard>
 
-        <IosCard>
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Performance</div>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
-              Improved on {summary.improvedCount}/{summary.nonWarmupExerciseCount} exercises
-            </span>
+        <div>
+          <IosSectionHeader>Performance</IosSectionHeader>
+          <IosGroup>
+            <IosRow
+              label="Exercises improved"
+              value={`${summary.improvedCount} of ${summary.nonWarmupExerciseCount}`}
+            />
             {summary.biggestJump && (
-              <span className="text-xs text-foreground bg-muted px-2 py-1 rounded-full">
-                Biggest jump: {summary.biggestJump.name} +{Math.round(summary.biggestJump.delta).toLocaleString()} lb
-              </span>
+              <IosRow
+                label="Biggest volume jump"
+                detail={summary.biggestJump.name}
+                value={`+${Math.round(summary.biggestJump.delta).toLocaleString()} lb`}
+              />
             )}
             {summary.excludedSets > 0 && (
-              <Badge tone="warn" className="normal-case tracking-normal text-xs py-1">
-                ⚠️ {summary.excludedSets} {plural(summary.excludedSets, "set", "sets")} excluded
-              </Badge>
+              <IosRow
+                label={
+                  <span className="inline-flex items-center" style={{ gap: "8px" }}>
+                    <AlertTriangle size={16} strokeWidth={2} style={{ color: "var(--warn-ink)" }} />
+                    Sets excluded from stats
+                  </span>
+                }
+                value={`${summary.excludedSets}`}
+              />
             )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => router.push(`/workout-summary/transcribe?workoutId=${workout.id}`)}
-            >
-              Log to Whoop
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push(`/history/${workout.id}`)}>
-              View workout details
-            </Button>
-            {rawWorkout && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await copyWorkoutToClipboard(rawWorkout)
-                    toast.success("Workout copied to clipboard")
-                  } catch {
-                    toast.error("Failed to copy workout")
-                  }
-                }}
-              >
-                Copy workout
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => router.push("/history")}>
-              All workouts
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => router.push("/workout")}>
-              Start another workout
-            </Button>
-          </div>
-        </IosCard>
+          </IosGroup>
+        </div>
+
+        <IosGroup>
+          <IosRow
+            label="Log to Whoop"
+            chevron
+            onClick={() => router.push(`/workout-summary/transcribe?workoutId=${workout.id}`)}
+          />
+          <IosRow label="View workout details" chevron onClick={() => router.push(`/history/${workout.id}`)} />
+          <IosRow label="All workouts" chevron onClick={() => router.push("/history")} />
+          <IosRow label="Start another workout" chevron onClick={() => router.push("/workout")} />
+        </IosGroup>
 
         {clearedNotes.length > 0 && (
           <IosCard>
@@ -602,6 +589,7 @@ export default function WorkoutSummaryPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                        className="tap-target"
                         style={{
                           background: "transparent",
                           border: "none",
@@ -615,7 +603,7 @@ export default function WorkoutSummaryPage() {
                       >
                         {exercise.name}
                       </button>
-                      <p style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                      <p style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                         {completedSets}/{exercise.sets.length} sets
                         {exerciseRating
                           ? exerciseRating === "thumbs_up"
@@ -668,12 +656,16 @@ export default function WorkoutSummaryPage() {
                       />
                     )}
                     {excluded > 0 && (
-                      <Badge tone="warn" className="normal-case tracking-normal text-xs">
-                        ⚠️ {excluded} {plural(excluded, "set", "sets")} excluded
-                      </Badge>
+                      <span
+                        className="inline-flex items-center"
+                        style={{ gap: "5px", fontSize: "12px", color: "var(--warn-ink)" }}
+                      >
+                        <AlertTriangle size={13} strokeWidth={2} />
+                        {excluded} {plural(excluded, "set", "sets")} excluded
+                      </span>
                     )}
                     {isWarmup && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Warm-up</span>
+                      <span style={{ fontSize: "12px", color: "var(--ink-50)" }}>Warm-up</span>
                     )}
                   </div>
 
@@ -683,7 +675,7 @@ export default function WorkoutSummaryPage() {
                       className="flex items-center"
                       style={{
                         fontSize: "13px",
-                        color: "var(--ink-40)",
+                        color: "var(--ink-50)",
                         paddingBottom: "6px",
                         borderBottom: "0.5px solid var(--ios-hairline)",
                       }}
@@ -704,13 +696,13 @@ export default function WorkoutSummaryPage() {
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          <span style={{ flex: "1 1 auto", color: "var(--ink-40)" }}>{setIdx + 1}</span>
+                          <span style={{ flex: "1 1 auto", color: "var(--ink-50)" }}>{setIdx + 1}</span>
                           <span style={{ width: "88px", textAlign: "right", color: "#fff" }}>
                             {set.weight ?? 0} × {set.reps ?? 0}
                           </span>
                         </div>
                       ))}
-                    <div style={{ fontSize: "13px", color: "var(--ink-40)", paddingTop: "8px" }}>
+                    <div style={{ fontSize: "13px", color: "var(--ink-50)", paddingTop: "8px" }}>
                       Best set: {bestSet ? `${bestSet.weight ?? 0} × ${bestSet.reps ?? 0}` : "—"}
                     </div>
                   </div>
@@ -720,33 +712,20 @@ export default function WorkoutSummaryPage() {
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border py-4 px-4">
-          <Button onClick={() => router.push("/")} className="w-full text-base">
+        <div
+          className="sticky bottom-0 backdrop-blur"
+          style={{
+            background: "rgba(0, 0, 0, 0.72)",
+            boxShadow: "0 -0.5px 0 var(--ios-hairline)",
+            padding: "12px 16px calc(12px + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <button type="button" className="ios-btn" data-tone="primary" onClick={() => router.push("/")}>
             Done
-          </Button>
+          </button>
         </div>
       </div>
       </IosNavPage>
-    </div>
-  )
-}
-
-/** Display numeral over a 13pt label, for the Session band. */
-function SummaryStat({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <div
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "34px",
-          lineHeight: 1,
-          color: "#fff",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "6px" }}>{label}</div>
     </div>
   )
 }

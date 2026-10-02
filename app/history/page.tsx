@@ -82,7 +82,7 @@ export default function HistoryPage() {
     <div
       className="min-h-screen"
       style={{
-        background: "#000",
+        background: "var(--background)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
       }}
     >
@@ -108,7 +108,7 @@ export default function HistoryPage() {
               <IosCard>
                 {ratingSummary.rough.length > 0 ? (
                   <>
-                    <p style={{ fontSize: "13px", color: "var(--ink-40)", marginBottom: "12px" }}>
+                    <p style={{ fontSize: "13px", color: "var(--ink-50)", marginBottom: "12px" }}>
                       Exercises that tend to feel rough
                     </p>
                     <div className="space-y-3">
@@ -116,7 +116,7 @@ export default function HistoryPage() {
                         <div key={entry.name}>
                           <div className="flex items-center justify-between mb-1">
                             <span style={{ fontSize: "15px", color: "#fff" }}>{entry.name}</span>
-                            <span style={{ fontSize: "13px", color: "var(--ink-40)" }}>
+                            <span style={{ fontSize: "13px", color: "var(--ink-50)" }}>
                               {entry.pctGood}% good · {entry.rough} rough of {entry.total}
                             </span>
                           </div>
@@ -129,7 +129,7 @@ export default function HistoryPage() {
                     </div>
                   </>
                 ) : (
-                  <p style={{ fontSize: "13px", color: "var(--ink-40)" }}>
+                  <p style={{ fontSize: "13px", color: "var(--ink-50)" }}>
                     No exercises consistently feel rough — nice work.
                   </p>
                 )}
@@ -160,7 +160,7 @@ export default function HistoryPage() {
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div style={{ minWidth: 0 }}>
                         <h3 style={{ fontSize: "17px", fontWeight: 600, color: "#fff" }}>{workout.name}</h3>
-                        <p style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                        <p style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                           {formatDate(workout.date)}
                           {" · "}
                           {(() => {
@@ -183,7 +183,7 @@ export default function HistoryPage() {
                         const completedSets = exercise.sets.filter((s) => s.completed).length
                         return (
                           <div key={idx} className="flex items-center justify-between" style={{ fontSize: "13px" }}>
-                            <span style={{ color: "var(--ink-40)" }}>{exercise.name}</span>
+                            <span style={{ color: "var(--ink-50)" }}>{exercise.name}</span>
                             <span style={{ color: "#fff", fontWeight: 500 }}>
                               {completedSets}/{exercise.sets.length} sets
                             </span>
@@ -220,7 +220,7 @@ function HistoryStat({ value, label }: { value: string; label: string }) {
       >
         {value}
       </div>
-      <div style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "4px" }}>{label}</div>
+      <div style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "4px" }}>{label}</div>
     </div>
   )
 }

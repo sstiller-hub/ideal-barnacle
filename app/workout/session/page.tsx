@@ -137,8 +137,8 @@ export default function WorkoutSessionPage() {
         <div
           className="min-h-screen"
           style={{
-            background: "#0D0D0F",
-            boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+            background: "var(--background)",
+            boxShadow: "inset 0 0 200px var(--ink-02)",
           }}
         />
         <AlertDialog open={conflictOpen} onOpenChange={setConflictOpen}>
@@ -146,7 +146,7 @@ export default function WorkoutSessionPage() {
             className="border-0"
             style={{
               background: "rgba(10, 10, 12, 0.96)",
-              borderRadius: "18px",
+              borderRadius: "var(--radius-2xl)",
               boxShadow: "0 30px 80px rgba(0, 0, 0, 0.45)",
               padding: "24px",
             }}
@@ -159,7 +159,7 @@ export default function WorkoutSessionPage() {
                 Active Workout Detected
               </AlertDialogTitle>
               <div
-                className="text-ink-40"
+                className="text-ink-50"
                 style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
               >
                 You have an active workout in progress ({activeSession?.routineName || "Workout"}). Would you like to
@@ -171,9 +171,9 @@ export default function WorkoutSessionPage() {
                 onClick={handleResumeExisting}
                 className="w-full"
                 style={{
-                  background: "rgba(255, 255, 255, 0.08)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: "8px",
+                  background: "var(--ink-08)",
+                  border: "1px solid var(--ink-15)",
+                  borderRadius: "var(--radius-xs)",
                   padding: "12px",
                 }}
               >
@@ -185,9 +185,9 @@ export default function WorkoutSessionPage() {
                 onClick={handleDiscardExisting}
                 className="w-full"
                 style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "8px",
+                  background: "var(--ink-04)",
+                  border: "1px solid var(--ink-08)",
+                  borderRadius: "var(--radius-xs)",
                   padding: "12px",
                 }}
               >
@@ -200,12 +200,12 @@ export default function WorkoutSessionPage() {
                 className="w-full"
                 style={{
                   background: "transparent",
-                  border: "1px solid rgba(255, 255, 255, 0.06)",
-                  borderRadius: "8px",
+                  border: "1px solid var(--ink-06)",
+                  borderRadius: "var(--radius-xs)",
                   padding: "10px",
                 }}
               >
-                <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
+                <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
                   Cancel
                 </span>
               </AlertDialogCancel>
@@ -221,8 +221,8 @@ export default function WorkoutSessionPage() {
       <div
         className="min-h-screen"
         style={{
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )

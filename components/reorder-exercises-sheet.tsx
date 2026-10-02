@@ -46,20 +46,20 @@ function ReorderRow({
       className="flex items-center gap-3"
       style={{
         listStyle: "none",
-        background: isCurrent ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)",
-        border: `1px solid ${isCurrent ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.06)"}`,
-        borderRadius: "10px",
+        background: isCurrent ? "var(--ink-08)" : "var(--ink-04)",
+        border: `1px solid ${isCurrent ? "var(--ink-20)" : "var(--ink-06)"}`,
+        borderRadius: "var(--radius-ios)",
         padding: "10px 12px",
         marginBottom: "8px",
       }}
       whileDrag={{
         scale: 1.02,
-        background: "rgba(255,255,255,0.12)",
+        background: "var(--ink-12)",
         boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
       }}
     >
       <div
-        className="text-ink-25"
+        className="text-ink-50"
         style={{ fontSize: "10px", fontWeight: 600, width: "16px", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
       >
         {index + 1}
@@ -72,8 +72,8 @@ function ReorderRow({
           {exercise.name}
         </div>
         <div
-          className="text-ink-30"
-          style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}
+          className="text-ink-50"
+          style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}
         >
           {setCount} SET{setCount !== 1 ? "S" : ""}
           {isCurrent ? " • CURRENT" : done ? " • DONE" : ""}
@@ -86,7 +86,7 @@ function ReorderRow({
         onPointerDown={(event) => controls.start(event)}
         style={{ flexShrink: 0, background: "transparent", border: "none", padding: "4px", touchAction: "none", cursor: "grab" }}
       >
-        <GripVertical size={18} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.35)" }} />
+        <GripVertical size={18} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
       </button>
     </Reorder.Item>
   )
@@ -143,7 +143,7 @@ export function ReorderExercisesSheet({
               background: "#141417",
               borderTopLeftRadius: "20px",
               borderTopRightRadius: "20px",
-              borderTop: "1px solid rgba(255,255,255,0.08)",
+              borderTop: "1px solid var(--ink-08)",
               maxHeight: "85vh",
               display: "flex",
               flexDirection: "column",
@@ -152,7 +152,7 @@ export function ReorderExercisesSheet({
           >
             {/* Grabber */}
             <div style={{ display: "flex", justifyContent: "center", paddingTop: "10px" }}>
-              <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.15)" }} />
+              <div style={{ width: "36px", height: "4px", borderRadius: "var(--radius-flat)", background: "var(--ink-15)" }} />
             </div>
 
             {/* Title */}
@@ -164,8 +164,8 @@ export function ReorderExercisesSheet({
                 Reorder Exercises
               </h2>
               <div
-                className="text-ink-30"
-                style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "4px", fontFamily: "var(--font-label)" }}
+                className="text-ink-50"
+                style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "4px", fontFamily: "var(--font-label)" }}
               >
                 DRAG THE HANDLE TO CHANGE THE ORDER
               </div>
@@ -197,7 +197,7 @@ export function ReorderExercisesSheet({
                   <div className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
                     Save order to my routine
                   </div>
-                  <div className="text-ink-30" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
+                  <div className="text-ink-50" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
                     Use this order for future workouts
                   </div>
                 </div>
@@ -206,8 +206,8 @@ export function ReorderExercisesSheet({
                   style={{
                     width: "40px",
                     height: "22px",
-                    borderRadius: "11px",
-                    background: saveToRoutine ? "#fff" : "rgba(255,255,255,0.12)",
+                    borderRadius: "var(--radius-ios)",
+                    background: saveToRoutine ? "#fff" : "var(--ink-12)",
                     position: "relative",
                     flexShrink: 0,
                     transition: "background 0.2s",
@@ -237,8 +237,8 @@ export function ReorderExercisesSheet({
                 style={{
                   flex: 1,
                   padding: "12px",
-                  borderRadius: "10px",
-                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: "var(--radius-ios)",
+                  background: "var(--ink-06)",
                   border: "none",
                   fontSize: "10px",
                   fontWeight: 700,
@@ -254,7 +254,7 @@ export function ReorderExercisesSheet({
                 style={{
                   flex: 2,
                   padding: "12px",
-                  borderRadius: "10px",
+                  borderRadius: "var(--radius-ios)",
                   background: "#fff",
                   border: "none",
                   fontSize: "10px",

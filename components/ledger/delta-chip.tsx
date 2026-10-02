@@ -29,15 +29,16 @@ export function DeltaChip({ tone, arrow, value, pct, context, size = "md" }: Del
         fontWeight: 600,
         letterSpacing: "0.05em",
         fontVariantNumeric: "tabular-nums",
-        color: isGood ? "var(--good-ink)" : "var(--ink-40)",
+        // Full-strength ink so the faded pct/context spans still clear 4.5:1.
+        color: isGood ? "var(--good)" : "var(--ink-70)",
         background: isGood ? "var(--good-tint)" : "var(--ink-04)",
         border: isGood ? "1px solid rgba(52, 211, 153, 0.22)" : "1px solid var(--ink-08)",
       }}
     >
       {arrow && <span aria-hidden="true">{arrow === "up" ? "↑" : "↓"}</span>}
       <span>{value}</span>
-      {pct && <span style={{ opacity: 0.65 }}>{pct}</span>}
-      {context && <span style={{ opacity: 0.55, letterSpacing: "0.08em" }}>{context}</span>}
+      {pct && <span style={{ opacity: 0.8 }}>{pct}</span>}
+      {context && <span style={{ opacity: 0.75, letterSpacing: "0.08em" }}>{context}</span>}
     </span>
   )
 }

@@ -75,7 +75,7 @@ export default function WhoopTranscribePage() {
             style={{
               background: "transparent",
               border: "1px solid var(--ink-15)",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-xs)",
               padding: "8px 16px",
               cursor: "pointer",
               fontSize: "13px",

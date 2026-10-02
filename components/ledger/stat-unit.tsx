@@ -28,7 +28,7 @@ export function StatUnit({ value, unit, label, size = "md" }: StatUnitProps) {
           <span
             style={{
               fontSize: isSm ? "10px" : "12px",
-              color: "var(--ink-30)",
+              color: "var(--ink-50)",
               letterSpacing: "0.06em",
               marginLeft: "3px",
             }}
@@ -40,10 +40,10 @@ export function StatUnit({ value, unit, label, size = "md" }: StatUnitProps) {
       <div
         style={{
           fontFamily: "var(--font-label)",
-          fontSize: isSm ? "7px" : "8px",
+          fontSize: "8px",
           fontWeight: 600,
           letterSpacing: "0.16em",
-          color: "var(--ink-30)",
+          color: "var(--ink-50)",
           textTransform: "uppercase",
           marginTop: isSm ? "4px" : "5px",
         }}

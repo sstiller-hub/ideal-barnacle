@@ -16,7 +16,7 @@ export function BandHeader({ label, children }: BandHeaderProps) {
           fontSize: "10px",
           fontWeight: 600,
           letterSpacing: "0.2em",
-          color: "var(--ink-35)",
+          color: "var(--ink-50)",
           textTransform: "uppercase",
           whiteSpace: "nowrap",
         }}

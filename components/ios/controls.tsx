@@ -134,7 +134,7 @@ export function IosPullDownChip<T extends string>({
               <span style={{ minWidth: 0, flex: "1 1 auto" }}>
                 <span style={{ display: "block" }}>{option.label}</span>
                 {option.detail ? (
-                  <span style={{ display: "block", fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                  <span style={{ display: "block", fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                     {option.detail}
                   </span>
                 ) : null}
