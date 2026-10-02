@@ -8,7 +8,7 @@ import { IosCard } from "@/components/ios/grouped"
 export default function SchedulePage() {
   const router = useRouter()
   return (
-    <main style={{ minHeight: "100%", background: "#000", paddingBottom: "40px" }}>
+    <main style={{ minHeight: "100%", background: "var(--background)", paddingBottom: "40px" }}>
       <IosNavPage backLabel="Home" onBack={() => router.push("/")} title="Schedule">
         <IosCard style={{ paddingTop: "4px", paddingBottom: "8px" }}>
           <WorkoutScheduleEditor />

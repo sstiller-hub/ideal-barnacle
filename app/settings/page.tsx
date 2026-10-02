@@ -225,7 +225,7 @@ export default function SettingsPage() {
       style={{
         minHeight: "100%",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
-        background: "#000",
+        background: "var(--background)",
       }}
     >
       {/* Settings is a tab root now: large title, no back button. */}

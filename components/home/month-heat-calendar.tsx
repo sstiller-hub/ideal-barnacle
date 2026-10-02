@@ -179,7 +179,7 @@ export function MonthHeatCalendar({
                 aspectRatio: "1",
                 width: "100%",
                 border: "none",
-                borderRadius: "3px",
+                borderRadius: "var(--radius-flat)",
                 background,
                 boxShadow: rings.length > 0 ? rings.join(", ") : undefined,
                 padding: "3px",

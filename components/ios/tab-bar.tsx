@@ -75,7 +75,7 @@ export function IosTabBar({ active }: { active?: TabId }) {
               height: compact ? "46px" : "54px",
               borderRadius: "999px",
               border: "none",
-              background: selected ? "rgba(255,255,255,0.16)" : "transparent",
+              background: selected ? "var(--ink-15)" : "transparent",
               color: selected ? "#fff" : "var(--ink-50)",
               cursor: "pointer",
               transition:

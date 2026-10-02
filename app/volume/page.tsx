@@ -164,7 +164,7 @@ export default function VolumeHistoryPage() {
   )
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+    <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
       <IosNavPage
         backLabel="Home"
         onBack={() => router.back()}
@@ -188,19 +188,19 @@ export default function VolumeHistoryPage() {
         {globalSeries.length > 0 && (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              background: "var(--ink-02)",
+              border: "1px solid var(--ink-08)",
               borderRadius: "var(--radius-2xl)",
               padding: "14px",
             }}
           >
             <div
               style={{
-                fontSize: "7px",
+                fontSize: "8px",
                 fontWeight: 500,
                 letterSpacing: "0.18em",
                 fontFamily: "var(--font-label)",
-                color: "rgba(255,255,255,0.25)",
+                color: "var(--ink-25)",
                 marginBottom: "8px",
               }}
             >
@@ -211,7 +211,7 @@ export default function VolumeHistoryPage() {
               {globalSeries.length > 0 && (
                 <div style={{
                   position: "absolute", top: 0, left: 0, zIndex: 1,
-                  fontSize: "8px", color: "rgba(255,255,255,0.20)",
+                  fontSize: "8px", color: "var(--ink-20)",
                   fontFamily: "var(--font-label)",
                   lineHeight: 1, pointerEvents: "none",
                 }}>
@@ -328,13 +328,13 @@ export default function VolumeHistoryPage() {
             <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1.5px", background: "rgba(255,255,255,0.6)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
+                <span style={{ fontSize: "9px", color: "var(--ink-30)", fontFamily: "var(--font-label)" }}>
                   Volume
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                <div style={{ width: "16px", height: "1px", background: "rgba(255,255,255,0.25)", borderTop: "1px dashed rgba(255,255,255,0.25)" }} />
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.30)", fontFamily: "var(--font-label)" }}>
+                <div style={{ width: "16px", height: "1px", background: "var(--ink-25)", borderTop: "1px dashed var(--ink-25)" }} />
+                <span style={{ fontSize: "9px", color: "var(--ink-30)", fontFamily: "var(--font-label)" }}>
                   Rolling avg
                 </span>
               </div>
@@ -346,29 +346,29 @@ export default function VolumeHistoryPage() {
         {selectedPoint && (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              borderRadius: "14px",
+              background: "var(--ink-04)",
+              border: "1px solid var(--ink-12)",
+              borderRadius: "var(--radius-ios)",
               padding: "14px",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.40)", marginBottom: "2px" }}>
+                <div style={{ fontSize: "11px", color: "var(--ink-40)", marginBottom: "2px" }}>
                   {formatPeriodLabel(selectedPoint.date, aggregation)}
                 </div>
-                <div style={{ fontSize: "18px", fontWeight: 600, color: "rgba(255,255,255,0.90)", letterSpacing: "-0.02em" }}>
+                <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--ink-90)", letterSpacing: "-0.02em" }}>
                   {Math.round(selectedPoint.volume).toLocaleString()} {plural(Math.round(selectedPoint.volume), "lb", "lbs")}
                 </div>
                 {selectedPoint.rollingAvg !== null && (
-                  <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>
+                  <div style={{ fontSize: "10px", color: "var(--ink-35)", marginTop: "2px" }}>
                     vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} {plural(Math.round(selectedPoint.rollingAvg), "lb", "lbs")} rolling avg
                   </div>
                 )}
               </div>
               <button
                 onClick={() => setSelectedPoint(null)}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.35)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
+                style={{ background: "none", border: "none", color: "var(--ink-35)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
               >
                 ✕
               </button>
@@ -379,7 +379,7 @@ export default function VolumeHistoryPage() {
                 style={{
                   display: "inline-block",
                   padding: "3px 8px",
-                  borderRadius: "6px",
+                  borderRadius: "var(--radius-xs)",
                   background: selectedPoint.annotation.kind === "peak"
                     ? "rgba(255,255,255,0.08)"
                     : selectedPoint.annotation.kind === "dip"
@@ -400,7 +400,7 @@ export default function VolumeHistoryPage() {
             )}
 
             {selectedPoint.annotation?.kind === "missed_week" && (
-              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>
+              <div style={{ fontSize: "11px", color: "var(--ink-35)" }}>
                 No workouts recorded this week.
               </div>
             )}
@@ -412,7 +412,7 @@ export default function VolumeHistoryPage() {
                     fontSize: "8px",
                     fontWeight: 500,
                     letterSpacing: "0.18em",
-                    color: "rgba(255,255,255,0.25)",
+                    color: "var(--ink-25)",
                     fontFamily: "var(--font-label)",
                     marginBottom: "6px",
                   }}
@@ -444,7 +444,7 @@ export default function VolumeHistoryPage() {
             )}
 
             {selectedPoint.sessionCount !== undefined && (
-              <div style={{ marginTop: "8px", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>
+              <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-25)" }}>
                 {selectedPoint.sessionCount} session{selectedPoint.sessionCount !== 1 ? "s" : ""} in period
               </div>
             )}

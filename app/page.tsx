@@ -1574,8 +1574,8 @@ export default function Home() {
       <div
         className="min-h-screen"
         style={{
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
@@ -1606,7 +1606,7 @@ export default function Home() {
               width: "6px",
               height: "6px",
               borderRadius: "50%",
-              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "#F59E0B",
+              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "var(--warn)",
               boxShadow: workoutAlerts.some((a) => a.tier === 1)
                 ? "0 0 6px rgba(239, 68, 68, 0.6)"
                 : "0 0 6px rgba(245, 158, 11, 0.6)",
@@ -1634,8 +1634,8 @@ export default function Home() {
           paddingBottom: pinnedAction
             ? "calc(env(safe-area-inset-bottom, 0px) + 196px)"
             : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       >
         {devModeEnabled && (
@@ -1680,7 +1680,7 @@ export default function Home() {
 
         <div
           className="relative z-50 flex-shrink-0"
-          style={{ background: "#0D0D0F", marginTop: "26px" }}
+          style={{ background: "var(--background)", marginTop: "26px" }}
         >
         <div className="px-5 pb-4">
         <div className="band-enter">
@@ -1913,6 +1913,7 @@ export default function Home() {
             ) : (actualState === "scheduled" || actualState === "activeSession") && lastSameWorkout ? (
               <button
                 onClick={() => router.push(`/history/${lastSameWorkout.id}`)}
+                className="tap-target"
                 style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
                 type="button"
               >
@@ -2136,6 +2137,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setShowAllExercises(true)}
+                    className="tap-target"
                     style={{
                       background: "transparent",
                       border: "none",
@@ -2356,7 +2358,7 @@ export default function Home() {
           className="border-0"
           style={{
             background: "rgba(10, 10, 12, 0.96)",
-            borderRadius: "18px",
+            borderRadius: "var(--radius-2xl)",
             boxShadow: "0 30px 80px rgba(0, 0, 0, 0.45)",
             padding: "24px",
           }}
@@ -2381,9 +2383,9 @@ export default function Home() {
               onClick={handleResumeExisting}
               className="w-full"
               style={{
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: "8px",
+                background: "var(--ink-08)",
+                border: "1px solid var(--ink-15)",
+                borderRadius: "var(--radius-xs)",
                 padding: "12px",
               }}
             >
@@ -2395,9 +2397,9 @@ export default function Home() {
               onClick={handleDiscardExisting}
               className="w-full"
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "8px",
+                background: "var(--ink-04)",
+                border: "1px solid var(--ink-08)",
+                borderRadius: "var(--radius-xs)",
                 padding: "12px",
               }}
             >
@@ -2410,8 +2412,8 @@ export default function Home() {
               className="w-full"
               style={{
                 background: "transparent",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                borderRadius: "8px",
+                border: "1px solid var(--ink-06)",
+                borderRadius: "var(--radius-xs)",
                 padding: "10px",
               }}
             >
@@ -2508,7 +2510,7 @@ export default function Home() {
             data-testid="home-pinned-action"
             style={{
               height: "56px",
-              borderRadius: "6px",
+              borderRadius: "var(--radius-xs)",
               background: pinnedAction.filled ? "#fff" : "#0D0D0F",
               border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
               color: pinnedAction.filled ? "#000" : "var(--ink-90)",

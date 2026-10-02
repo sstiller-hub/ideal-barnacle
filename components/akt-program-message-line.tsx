@@ -109,7 +109,7 @@ export default function AktProgramMessageLine({
           boxSizing: "border-box",
           padding: "10px 12px",
           borderRadius: "var(--radius-xs)",
-          background: isWarn ? "var(--warn-tint)" : "rgba(255, 255, 255, 0.03)",
+          background: isWarn ? "var(--warn-tint)" : "var(--ink-04)",
           border: `1px solid ${isWarn ? "var(--warn-ink)" : "var(--ink-08)"}`,
           // Glow only when lit and calm; steady in reduced-motion.
           boxShadow: entered ? glow : "none",

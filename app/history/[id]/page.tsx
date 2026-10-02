@@ -112,12 +112,12 @@ export default function WorkoutDetailPage() {
   }, [workout])
 
   if (loading) {
-    return <div className="min-h-screen" style={{ background: "#000" }} />
+    return <div className="min-h-screen" style={{ background: "var(--background)" }} />
   }
 
   if (!workout) {
     return (
-      <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+      <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
         <IosNavPage backLabel="History" onBack={() => router.push("/history")} title="Workout not found">
           <div className="ios-gft">This workout may have been deleted.</div>
         </IosNavPage>
@@ -129,7 +129,7 @@ export default function WorkoutDetailPage() {
     volume >= 1000 ? `${(volume / 1000).toFixed(1)}K` : `${Math.round(volume)}`
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+    <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
       <IosNavPage
         backLabel="History"
         onBack={() => router.push("/history")}

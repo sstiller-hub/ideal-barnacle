@@ -236,7 +236,7 @@ export default function AccountSyncPage() {
   return (
     <div
       className="flex flex-col"
-      style={{ minHeight: "100%", background: "#000", paddingBottom: "40px" }}
+      style={{ minHeight: "100%", background: "var(--background)", paddingBottom: "40px" }}
     >
       <IosNavPage backLabel="Settings" onBack={() => router.push("/settings")} title="Account & Sync">
         {/* --- Identity --- */}

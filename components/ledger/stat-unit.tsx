@@ -40,7 +40,7 @@ export function StatUnit({ value, unit, label, size = "md" }: StatUnitProps) {
       <div
         style={{
           fontFamily: "var(--font-label)",
-          fontSize: isSm ? "7px" : "8px",
+          fontSize: "8px",
           fontWeight: 600,
           letterSpacing: "0.16em",
           color: "var(--ink-30)",

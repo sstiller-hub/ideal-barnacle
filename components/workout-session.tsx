@@ -454,7 +454,7 @@ const ExercisePage = memo(function ExercisePage({
                 if (exerciseIndex !== currentExerciseIndex) return
                 handleTogglePlateCalc()
               }}
-              className="ios-chip transition-colors duration-150"
+              className="tap-target ios-chip transition-colors duration-150"
               data-open={showPlateCalc}
               aria-pressed={showPlateCalc}
               style={{ padding: "5px 10px", fontSize: "13px" }}
@@ -634,7 +634,7 @@ const ExercisePage = memo(function ExercisePage({
                   <span
                     style={{
                       fontFamily: "var(--font-label)",
-                      fontSize: "7.5px",
+                      fontSize: "8px",
                       fontWeight: 600,
                       letterSpacing: "0.18em",
                       color: "var(--ink-50)",
@@ -693,7 +693,7 @@ const ExercisePage = memo(function ExercisePage({
                     width: "100%",
                     background: weightBg,
                     border: `1px solid ${weightBorder}`,
-                    borderRadius: "8px",
+                    borderRadius: "var(--radius-xs)",
                     height: inputHeight,
                     padding: "0 8px",
                     fontSize: inputFontSize,
@@ -759,7 +759,7 @@ const ExercisePage = memo(function ExercisePage({
                     width: "100%",
                     background: repsBg,
                     border: `1px solid ${repsBorder}`,
-                    borderRadius: "8px",
+                    borderRadius: "var(--radius-xs)",
                     height: inputHeight,
                     padding: "0 8px",
                     fontSize: inputFontSize,
@@ -782,7 +782,7 @@ const ExercisePage = memo(function ExercisePage({
                     void completeSet(setIndex, { exerciseIndex, startRest: isCurrentSet })
                   }}
                   disabled={!canEditExercise || (!set.completed && (isSetIncomplete(set) || repCapError))}
-                  className="flex items-center justify-center transition-colors duration-150"
+                  className="tap-target flex items-center justify-center transition-colors duration-150"
                   style={{
                     justifySelf: "center",
                     alignSelf: "center",
@@ -807,7 +807,7 @@ const ExercisePage = memo(function ExercisePage({
                   className="text-center transition-colors duration-150"
                   style={{
                     fontFamily: "var(--font-label)",
-                    fontSize: "7.5px",
+                    fontSize: "8px",
                     fontWeight: 600,
                     letterSpacing: "0.14em",
                     color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
@@ -819,7 +819,7 @@ const ExercisePage = memo(function ExercisePage({
                   className="text-center transition-colors duration-150"
                   style={{
                     fontFamily: "var(--font-label)",
-                    fontSize: "7.5px",
+                    fontSize: "8px",
                     fontWeight: 600,
                     letterSpacing: "0.14em",
                     color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
@@ -932,7 +932,7 @@ const ExercisePage = memo(function ExercisePage({
                         height: "40px",
                         background: "var(--ink-06)",
                         border: "none",
-                        borderRadius: "8px",
+                        borderRadius: "var(--radius-xs)",
                         padding: "0 8px",
                         fontSize: "17px",
                         color: "#fff",
@@ -979,7 +979,7 @@ const ExercisePage = memo(function ExercisePage({
                                 width: "7px",
                                 height: `${getPlateHeight()}px`,
                                 background: getPlateColor(),
-                                borderRadius: "2px",
+                                borderRadius: "var(--radius-flat)",
                               }}
                             />
                           )
@@ -991,7 +991,7 @@ const ExercisePage = memo(function ExercisePage({
                         width: "40px",
                         height: "5px",
                         background: "rgba(160, 160, 160, 0.4)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border: "1px solid var(--ink-12)",
                         borderRadius: "var(--radius-flat)",
                         marginLeft: "4px",
                       }}
@@ -3329,8 +3329,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       <div
         className="min-h-screen"
         style={{
-          background: "#0D0D0F",
-          boxShadow: "inset 0 0 200px rgba(255, 255, 255, 0.01)",
+          background: "var(--background)",
+          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
@@ -3348,7 +3348,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         className="flex flex-col"
         style={{
           height: "var(--app-vh)",
-          background: "#0D0D0F",
+          background: "var(--background)",
           paddingLeft: "env(safe-area-inset-left, 0px)",
           paddingRight: "env(safe-area-inset-right, 0px)",
         }}
@@ -3367,7 +3367,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 left: "calc(16px + env(safe-area-inset-left, 0px))",
                 right: "calc(16px + env(safe-area-inset-right, 0px))",
                 bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
-                borderColor: restRemainingSeconds <= 10 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)",
+                borderColor: restRemainingSeconds <= 10 ? "var(--ink-35)" : "var(--ink-15)",
                 background: "rgba(0,0,0,0.75)",
                 borderRadius: "var(--radius-xs)",
                 padding: "6px 10px",
@@ -3379,9 +3379,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 transition={restRemainingSeconds <= 10 ? { duration: 1, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
               >
                 <div className="flex flex-col items-start" style={{ paddingBottom: "3px" }}>
-                  <div className="text-ink-35" style={{ fontSize: "7px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
+                  <div className="text-ink-35" style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
                   {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
-                    <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.04em", color: "rgba(255,255,255,0.22)", lineHeight: 1, marginTop: "2px" }}>
+                    <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em", color: "var(--ink-20)", lineHeight: 1, marginTop: "2px" }}>
                       {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
                     </div>
                   )}
@@ -3394,21 +3394,21 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 <button
                   onClick={() => adjustRest(-30)}
                   disabled={restRemainingSeconds <= 5}
-                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", opacity: restRemainingSeconds <= 5 ? 0.35 : 1, touchAction: "manipulation" }}
+                  style={{ background: "var(--ink-06)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", opacity: restRemainingSeconds <= 5 ? 0.35 : 1, touchAction: "manipulation" }}
                   type="button"
                 >
                   <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>−30s</span>
                 </button>
                 <button
                   onClick={() => adjustRest(30)}
-                  style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", touchAction: "manipulation" }}
+                  style={{ background: "var(--ink-06)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 8px", touchAction: "manipulation" }}
                   type="button"
                 >
                   <span className="text-ink-90" style={{ fontSize: "10px", fontWeight: 500 }}>+30s</span>
                 </button>
                 <button
                   onClick={() => void setRestStateAndPersist(null)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 10px" }}
+                  style={{ background: "var(--ink-08)", border: "none", borderRadius: "var(--radius-flat)", padding: "5px 10px" }}
                   type="button"
                 >
                   <span className="text-ink-95" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em" }}>SKIP</span>
@@ -3422,7 +3422,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         <div style={{ padding: "10px 16px 6px", flexShrink: 0 }}>
           <div className="flex items-center gap-3">
             <button onClick={handleExit} type="button" style={{ flexShrink: 0 }}>
-              <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+              <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
             </button>
 
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -3433,7 +3433,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               >
                 {getExerciseLabel(lsExercise.name)}
               </h1>
-              <div className="text-ink-30" style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
+              <div className="text-ink-30" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
                 EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} {plural(lsExercise.sets.length, "SET", "SETS")}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} ${plural(Number(lsExercise.targetReps), "REP", "REPS")}` : ""} • {session?.startedAt ? <SessionClock startedAt={session.startedAt} render={(f) => <>{f}</>} /> : formatSeconds(elapsedSeconds)}
                 {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
               </div>
@@ -3441,10 +3441,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
             <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
               <div className="text-center">
-                <div className="text-ink-30" style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
+                <div className="text-ink-30" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
                 <div className="text-ink-70" style={{ fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{totalSetsCompleted}/{totalSets}</div>
               </div>
-              <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.06)" }} />
+              <div style={{ width: "1px", height: "16px", background: "var(--ink-06)" }} />
               <button
                 onClick={() => { if (!canFinishWorkout) return; void finishWorkout() }}
                 className="transition-colors duration-base"
@@ -3481,7 +3481,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   style={{
                     width: isCurrent ? "20px" : "5px",
                     height: "5px",
-                    background: isCurrent ? "rgba(255,255,255,0.5)" : isComplete ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
+                    background: isCurrent ? "var(--ink-50)" : isComplete ? "var(--ink-30)" : "var(--ink-12)",
                     borderRadius: "var(--radius-flat)",
                     border: "none",
                   }}
@@ -3493,17 +3493,17 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 type="button"
                 aria-label="Reorder exercises"
                 onClick={() => setIsReorderOpen(true)}
-                className="absolute"
+                className="tap-target absolute"
                 style={{ right: 0, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", padding: "4px" }}
               >
-                <ListOrdered size={14} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.3)" }} />
+                <ListOrdered size={14} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
               </button>
             ) : null}
           </div>
         </div>
 
         {/* Divider */}
-        <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)", margin: "0 16px", flexShrink: 0 }} />
+        <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, var(--ink-06), transparent)", margin: "0 16px", flexShrink: 0 }} />
 
         {/* Sets list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 64px" }}>
@@ -3532,12 +3532,12 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   alignItems: "center",
                   gap: "8px",
                   padding: "6px 0",
-                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  borderBottom: "1px solid var(--ink-04)",
                   opacity: isCurrentSet ? 1 : set.completed ? 0.45 : 0.65,
                 }}
               >
                 {/* Set number */}
-                <div style={{ fontSize: "7px", fontWeight: 500, letterSpacing: "0.12em", color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-label)", minWidth: "28px", flexShrink: 0 }}>
+                <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", color: "var(--ink-30)", fontFamily: "var(--font-label)", minWidth: "28px", flexShrink: 0 }}>
                   SET {setIndex + 1}
                 </div>
 
@@ -3574,14 +3574,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     disabled={!lsCanEdit}
                     className="w-full"
                     style={{
-                      background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${showMissing && missingWeight ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-weight` ? "rgba(255,255,255,0.2)" : "transparent"}`,
+                      background: set.completed ? "var(--ink-02)" : focusedInput === `${setKey}-weight` ? "var(--ink-06)" : "var(--ink-04)",
+                      border: `1px solid ${showMissing && missingWeight ? "var(--ink-40)" : focusedInput === `${setKey}-weight` ? "var(--ink-20)" : "transparent"}`,
                       borderRadius: "var(--radius-flat)", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
-                      color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
+                      color: set.completed ? "var(--ink-25)" : "var(--ink-95)",
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
                   />
-                  <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.06em", color: "rgba(255,255,255,0.25)", textAlign: "center", marginTop: "2px" }}>LBS</div>
+                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-25)", textAlign: "center", marginTop: "2px" }}>LBS</div>
                 </div>
 
                 {/* Reps input */}
@@ -3628,14 +3628,14 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     disabled={!lsCanEdit}
                     className="w-full"
                     style={{
-                      background: set.completed ? "rgba(255,255,255,0.02)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${(repCapError || (showMissing && missingReps)) ? "rgba(255,255,255,0.4)" : focusedInput === `${setKey}-reps` ? "rgba(255,255,255,0.2)" : "transparent"}`,
+                      background: set.completed ? "var(--ink-02)" : focusedInput === `${setKey}-reps` ? "var(--ink-06)" : "var(--ink-04)",
+                      border: `1px solid ${(repCapError || (showMissing && missingReps)) ? "var(--ink-40)" : focusedInput === `${setKey}-reps` ? "var(--ink-20)" : "transparent"}`,
                       borderRadius: "var(--radius-flat)", padding: "6px", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.02em",
-                      color: set.completed ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.95)",
+                      color: set.completed ? "var(--ink-25)" : "var(--ink-95)",
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
                   />
-                  <div style={{ fontSize: "6px", fontWeight: 500, letterSpacing: "0.06em", color: "rgba(255,255,255,0.25)", textAlign: "center", marginTop: "2px" }}>REPS</div>
+                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-25)", textAlign: "center", marginTop: "2px" }}>REPS</div>
                 </div>
 
                 {/* Complete button */}
@@ -3646,10 +3646,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     void completeSet(setIndex, { exerciseIndex: uiExerciseIndex, startRest: isCurrentSet && uiExerciseIndex === currentExerciseIndex })
                   }}
                   disabled={!lsCanEdit || (!set.completed && (isSetIncomplete(set) || repCapError))}
-                  className="flex items-center justify-center"
+                  className="tap-target flex items-center justify-center"
                   style={{
                     width: "32px", height: "32px",
-                    background: set.completed ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                    background: set.completed ? "var(--ink-08)" : "var(--ink-04)",
                     border: "none", borderRadius: "var(--radius-flat)", flexShrink: 0,
                     opacity: !lsCanEdit || (!set.completed && (isSetIncomplete(set) || repCapError)) ? 0.35 : 1,
                   }}
@@ -3659,7 +3659,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   {set.completed ? (
                     <Check size={14} strokeWidth={2} style={{ color: "rgba(255,255,255,0.8)" }} />
                   ) : (
-                    <div style={{ width: "10px", height: "10px", borderRadius: "var(--radius-flat)", border: "1px solid rgba(255,255,255,0.35)" }} />
+                    <div style={{ width: "10px", height: "10px", borderRadius: "var(--radius-flat)", border: "1px solid var(--ink-35)" }} />
                   )}
                 </button>
 
@@ -3710,7 +3710,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       className="flex flex-col relative overflow-hidden"
       style={{
         height: "var(--app-vh)",
-        background: "#0D0D0F",
+        background: "var(--background)",
       }}
     >
       <div
@@ -3835,7 +3835,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           <div className="flex items-center justify-between gap-2 mb-4">
             <button
               onClick={handleExit}
-              className="flex items-center transition-colors"
+              className="tap-target flex items-center transition-colors"
               type="button"
               aria-label="Exit workout"
               style={{
@@ -3876,7 +3876,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 if (!canFinishWorkout) return
                 void finishWorkout()
               }}
-              className="transition-colors duration-base"
+              className="tap-target transition-colors duration-base"
               style={{
                 flexShrink: 0,
                 fontSize: "17px",
@@ -3915,6 +3915,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   <button
                     key={exercise.id}
                     onClick={() => { focusIntentRef.current = true; void setExerciseIndex(index) }}
+                    className="tap-target"
                     type="button"
                     aria-label={`Exercise ${index + 1} of ${exercises.length}: ${getExerciseLabel(exercise.name)}, ${completedEligible} of ${totalExSets} sets`}
                     style={{
@@ -3929,7 +3930,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       style={{
                         position: "relative",
                         height: "3px",
-                        borderRadius: "1px",
+                        borderRadius: "var(--radius-flat)",
                         background: baseColor,
                         overflow: "hidden",
                       }}
@@ -3941,7 +3942,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                             inset: 0,
                             width: `${fillPct}%`,
                             background: fillColor,
-                            borderRadius: "1px",
+                            borderRadius: "var(--radius-flat)",
                           }}
                         />
                       )}
@@ -3955,6 +3956,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 type="button"
                 aria-label="Reorder exercises"
                 onClick={() => setIsReorderOpen(true)}
+                className="tap-target"
                 style={{ flexShrink: 0, background: "transparent", border: "none", padding: "4px" }}
               >
                 <ListOrdered size={15} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
@@ -4087,9 +4089,9 @@ function RestCapsuleButton({
         width: "50px",
         height: "50px",
         borderRadius: "999px",
-        background: "rgba(255, 255, 255, 0.12)",
+        background: "var(--ink-12)",
         border: "none",
-        boxShadow: "inset 0 0 0 0.5px rgba(255, 255, 255, 0.14)",
+        boxShadow: "inset 0 0 0 0.5px var(--ink-15)",
         color: "#fff",
         fontSize: "13px",
         fontWeight: 600,

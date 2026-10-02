@@ -121,7 +121,7 @@ export default function TranscriptionSession({ workout, onClose }: Transcription
             style={{
               background: "transparent",
               border: "1px solid var(--ink-15)",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-xs)",
               padding: "8px 16px",
               cursor: "pointer",
               fontSize: "13px",
@@ -209,7 +209,7 @@ export default function TranscriptionSession({ workout, onClose }: Transcription
               width: "56px",
               background: "transparent",
               border: "1px solid var(--ink-12)",
-              borderRadius: "10px",
+              borderRadius: "var(--radius-ios)",
               color: safeIndex === 0 ? "var(--ink-15)" : "var(--ink-70)",
               cursor: safeIndex === 0 ? "default" : "pointer",
             }}
@@ -228,7 +228,7 @@ export default function TranscriptionSession({ workout, onClose }: Transcription
               minHeight: "48px",
               background: activeComplete ? "var(--foreground)" : "transparent",
               border: `1px solid ${activeComplete ? "var(--foreground)" : "var(--ink-12)"}`,
-              borderRadius: "10px",
+              borderRadius: "var(--radius-ios)",
               color: activeComplete ? "var(--background)" : "var(--ink-70)",
               cursor: "pointer",
               fontFamily: "var(--font-label)",

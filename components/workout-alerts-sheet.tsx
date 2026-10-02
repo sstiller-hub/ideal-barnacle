@@ -24,7 +24,7 @@ export default function WorkoutAlertsSheet({ alerts, onDismiss, onClose }: Worko
       <div
         className="fixed left-0 right-0 bottom-0 z-[71] px-5 pt-5"
         style={{
-          background: "#0D0D0F",
+          background: "var(--background)",
           borderTop: "1px solid var(--ink-08)",
           borderRadius: "var(--radius-lg) var(--radius-lg) 0 0",
           paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))",

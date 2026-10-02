@@ -57,7 +57,7 @@ export default function RoutineForm({ title, backLabel, onBack, initial, onSave 
   }
 
   return (
-    <main style={{ minHeight: "100%", background: "#000", paddingBottom: "40px" }}>
+    <main style={{ minHeight: "100%", background: "var(--background)", paddingBottom: "40px" }}>
       <IosNavPage
         backLabel={backLabel}
         onBack={onBack}

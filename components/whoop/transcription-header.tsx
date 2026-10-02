@@ -59,7 +59,7 @@ export default function TranscriptionHeader({
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-40 hover:text-ink-70 transition-colors duration-base"
+            className="tap-target text-ink-40 hover:text-ink-70 transition-colors duration-base"
             style={{ background: "transparent", border: "none", padding: "4px", cursor: "pointer" }}
             aria-label="Close Whoop transcription"
           >

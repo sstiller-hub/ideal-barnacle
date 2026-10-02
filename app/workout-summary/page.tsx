@@ -449,7 +449,7 @@ export default function WorkoutSummaryPage() {
       : "Baseline set"
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: "#000" }}>
+    <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
       <IosNavPage
         backLabel="Home"
         onBack={() => router.push("/")}
@@ -589,6 +589,7 @@ export default function WorkoutSummaryPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/exercise/${encodeURIComponent(exercise.name)}`)}
+                        className="tap-target"
                         style={{
                           background: "transparent",
                           border: "none",

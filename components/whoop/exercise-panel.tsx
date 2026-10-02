@@ -139,7 +139,7 @@ export default function ExercisePanel({
             toast.error("Failed to copy exercise")
           }
         }}
-        className="text-ink-40 hover:text-ink-70 transition-colors duration-base"
+        className="tap-target text-ink-40 hover:text-ink-70 transition-colors duration-base"
         style={{
           display: "flex",
           alignItems: "center",

@@ -17,11 +17,11 @@ export default function EditRoutinePage() {
     setRoutine(routineId ? getRoutineById(routineId) ?? null : null)
   }, [routineId])
 
-  if (routine === undefined) return <main style={{ minHeight: "100%", background: "#000" }} />
+  if (routine === undefined) return <main style={{ minHeight: "100%", background: "var(--background)" }} />
 
   if (routine === null) {
     return (
-      <main style={{ minHeight: "100%", background: "#000" }}>
+      <main style={{ minHeight: "100%", background: "var(--background)" }}>
         <IosNavPage backLabel="Routines" onBack={() => router.push("/workout")} title="Edit Routine">
           <div className="ios-gft">This routine no longer exists.</div>
         </IosNavPage>

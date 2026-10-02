@@ -82,7 +82,7 @@ export default function HistoryPage() {
     <div
       className="min-h-screen"
       style={{
-        background: "#000",
+        background: "var(--background)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
       }}
     >

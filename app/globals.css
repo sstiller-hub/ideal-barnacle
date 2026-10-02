@@ -110,6 +110,7 @@
   --radius-flat: 1px;
   --radius-xs: 4px;
   --radius-2xl: 16px;
+  --radius-ios: 10px; /* iOS grouped surfaces and buttons */
 
   /* Motion */
   --ease-theatre: cubic-bezier(0.16, 1, 0.3, 1);
@@ -529,7 +530,7 @@
 
 .ios-card {
   background: var(--ios-grouped-bg);
-  border-radius: 10px;
+  border-radius: var(--radius-ios);
   /* Side margins only: a shorthand would reset margin-top and swallow the
      space-y gaps parents use to stack cards. */
   margin-left: 16px;
@@ -540,7 +541,7 @@
 
 .ios-grp {
   background: var(--ios-grouped-bg);
-  border-radius: 10px;
+  border-radius: var(--radius-ios);
   /* Side margins only: a shorthand would reset margin-top and swallow the
      space-y gaps parents use to stack cards. */
   margin-left: 16px;
@@ -669,7 +670,7 @@
   min-height: 44px;
   padding: 0 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-ios);
   background: var(--ink-08);
   color: #fff;
   font-size: 15px;
@@ -700,7 +701,7 @@
 .ios-textarea {
   width: 100%;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-ios);
   background: var(--ink-06);
   color: #fff;
   font-size: 15px;
@@ -711,6 +712,23 @@
 
 .ios-textarea::placeholder {
   color: var(--ink-40);
+}
+
+/* Grows a control's touch area to at least 44×44pt without changing how it
+   looks or how it sits in the layout — for marks and chips the Ledger spec
+   draws smaller than a fingertip (set checkmarks, rail segments, chips). */
+.tap-target {
+  position: relative;
+}
+
+.tap-target::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
 }
 
 /* 44pt square hit area around a small glyph button (remove, close) */

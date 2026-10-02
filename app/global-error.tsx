@@ -41,7 +41,7 @@ export default function GlobalError({
           style={{
             width: "100%",
             maxWidth: "384px",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-ios)",
             border: "1px solid #2A2A2A",
             backgroundColor: "#1A1A1A",
             padding: "24px",
@@ -73,7 +73,7 @@ export default function GlobalError({
               marginTop: "24px",
               width: "100%",
               height: "48px",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-xs)",
               border: 0,
               backgroundColor: "#FFFFFF",
               color: "#0D0D0F",
