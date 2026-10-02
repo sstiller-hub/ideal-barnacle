@@ -1583,37 +1583,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Settings is a tab now (see IosTabBar below), so the header carries no
-          gear — only the alert dot, which is state, not navigation. */}
-      {workoutAlerts.length > 0 && (
-        <button
-          onClick={() => setShowAlertsSheet(true)}
-          className="fixed z-[60]"
-          style={{
-            top: "calc(env(safe-area-inset-top, 0px) + 14px)",
-            right: "calc(20px + env(safe-area-inset-right, 0px))",
-            background: "transparent",
-            border: "none",
-            padding: "8px",
-            cursor: "pointer",
-            pointerEvents: "auto",
-          }}
-          aria-label={`${workoutAlerts.length} flagged ${plural(workoutAlerts.length, "exercise", "exercises")}`}
-          type="button"
-        >
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "var(--warn)",
-              boxShadow: workoutAlerts.some((a) => a.tier === 1)
-                ? "0 0 6px rgba(239, 68, 68, 0.6)"
-                : "0 0 6px rgba(245, 158, 11, 0.6)",
-            }}
-          />
-        </button>
-      )}
       <WorkoutAlertsSheet
         alerts={showAlertsSheet ? workoutAlerts : []}
         onDismiss={dismissWorkoutAlert}
@@ -1632,7 +1601,8 @@ export default function Home() {
           // The calendar carries the top safe-area inset itself, so adding it
           // here as well left a dead band above the month header.
           paddingBottom: pinnedAction
-            ? "calc(env(safe-area-inset-bottom, 0px) + 196px)"
+            ? // Clears the pinned stack: tab bar (116) + gap (12) + button (56) + fade (24) + 4
+              "calc(env(safe-area-inset-bottom, 0px) + 212px)"
             : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
           background: "var(--background)",
           boxShadow: "inset 0 0 200px var(--ink-02)",
@@ -1675,6 +1645,41 @@ export default function Home() {
             onSelectDate={handleSelectDate}
             onChangeMonth={handleChangeMonth}
             summaryLabel={`${monthTotals.sessions} ${plural(monthTotals.sessions, "session", "sessions")} · ${formatK(currentWeekVolumeSoFar)} wk`}
+            headerAccessory={
+              // The alert flag sits in the header row. It used to be fixed at
+              // the top-right beside the settings gear; once settings moved
+              // to the tab bar it floated over this row's summary text.
+              workoutAlerts.length > 0 ? (
+                <button
+                  onClick={() => setShowAlertsSheet(true)}
+                  className="tap-target inline-flex items-center"
+                  style={{
+                    gap: "6px",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "11px",
+                    color: "var(--ink-70)",
+                    flexShrink: 0,
+                  }}
+                  aria-label={`${workoutAlerts.length} flagged ${plural(workoutAlerts.length, "exercise", "exercises")}`}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: workoutAlerts.some((a) => a.tier === 1) ? "#EF4444" : "var(--warn)",
+                    }}
+                  />
+                  {workoutAlerts.length}
+                </button>
+              ) : null
+            }
           />
         </div>
 
@@ -2494,13 +2499,17 @@ export default function Home() {
           style={{
             left: 0,
             right: 0,
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)",
+            // The ground runs all the way to the bottom edge, behind the tab
+            // bar. Stopping it above the tab bar left a strip where rows
+            // scrolled through between the button and the bar.
+            bottom: 0,
             padding: "0 20px",
-            // The page scrolls underneath, so the action needs its own ground —
-            // a transparent button let ledger rows read straight through it.
-            background: "linear-gradient(to bottom, rgba(13,13,15,0) 0%, #0D0D0F 22%, #0D0D0F 100%)",
+            // Fades into the page black itself (a hardcoded #0D0D0F read as a
+            // grey box over the pure-black page). Pixel stops keep the fade
+            // 24px tall however tall the ground is.
+            background: "linear-gradient(to bottom, transparent 0px, var(--background) 24px)",
             paddingTop: "24px",
-            paddingBottom: "12px",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 128px)",
           }}
         >
           <button
@@ -2511,7 +2520,7 @@ export default function Home() {
             style={{
               height: "56px",
               borderRadius: "var(--radius-xs)",
-              background: pinnedAction.filled ? "#fff" : "#0D0D0F",
+              background: pinnedAction.filled ? "#fff" : "var(--background)",
               border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
               color: pinnedAction.filled ? "#000" : "var(--ink-90)",
               fontFamily: "var(--font-label)",

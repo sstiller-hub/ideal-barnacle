@@ -36,6 +36,8 @@ type Props = {
   onChangeMonth: (delta: number) => void
   /** Right-hand summary line, e.g. "12 sessions · 187.2K wk". */
   summaryLabel: string
+  /** Optional trailing control in the header row (the workout-alerts flag). */
+  headerAccessory?: React.ReactNode
 }
 
 export function MonthHeatCalendar({
@@ -45,6 +47,7 @@ export function MonthHeatCalendar({
   onSelectDate,
   onChangeMonth,
   summaryLabel,
+  headerAccessory,
 }: Props) {
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
 
@@ -75,8 +78,10 @@ export function MonthHeatCalendar({
   }
 
   return (
-    <div className="px-5" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
-      <div className="flex items-baseline justify-between gap-3" style={{ marginBottom: "14px" }}>
+    // 20pt below the safe area, not 8: iOS 26 softens content sitting right
+    // under the status bar in standalone web apps, which blurred this row.
+    <div className="px-5" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)" }}>
+      <div className="flex items-center justify-between gap-3" style={{ marginBottom: "14px" }}>
         <span
           style={{
             fontFamily: "var(--font-label)",
@@ -98,6 +103,7 @@ export function MonthHeatCalendar({
         >
           {summaryLabel}
         </span>
+        {headerAccessory}
       </div>
 
       <div
