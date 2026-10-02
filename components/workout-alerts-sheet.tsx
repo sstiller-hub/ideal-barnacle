@@ -36,7 +36,7 @@ export default function WorkoutAlertsSheet({ alerts, onDismiss, onClose }: Worko
         <div className="flex items-center justify-between mb-4">
           <span
             className="font-label"
-            style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.14em", color: "var(--ink-40)", textTransform: "uppercase" as const }}
+            style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.14em", color: "var(--ink-50)", textTransform: "uppercase" as const }}
           >
             Flagged
           </span>
@@ -44,7 +44,7 @@ export default function WorkoutAlertsSheet({ alerts, onDismiss, onClose }: Worko
             onClick={onClose}
             aria-label="Close"
             type="button"
-            style={{ background: "transparent", border: "none", color: "var(--ink-40)", padding: "4px", cursor: "pointer" }}
+            style={{ background: "transparent", border: "none", color: "var(--ink-50)", padding: "4px", cursor: "pointer" }}
           >
             <X size={16} strokeWidth={1.5} />
           </button>

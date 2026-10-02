@@ -503,10 +503,10 @@ export default function WorkoutSummaryPage() {
               value={deltaLabel.toUpperCase()}
             />
             {summary.baselineTotalVolume > 0 && (
-              <span style={{ fontSize: "13px", color: "var(--ink-40)" }}>vs last time</span>
+              <span style={{ fontSize: "13px", color: "var(--ink-50)" }}>vs last time</span>
             )}
             {timeRangeLabel && (
-              <span style={{ fontSize: "13px", color: "var(--ink-40)", marginLeft: "auto" }}>{timeRangeLabel}</span>
+              <span style={{ fontSize: "13px", color: "var(--ink-50)", marginLeft: "auto" }}>{timeRangeLabel}</span>
             )}
           </div>
         </IosCard>
@@ -603,7 +603,7 @@ export default function WorkoutSummaryPage() {
                       >
                         {exercise.name}
                       </button>
-                      <p style={{ fontSize: "13px", color: "var(--ink-40)", marginTop: "2px" }}>
+                      <p style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                         {completedSets}/{exercise.sets.length} sets
                         {exerciseRating
                           ? exerciseRating === "thumbs_up"
@@ -675,7 +675,7 @@ export default function WorkoutSummaryPage() {
                       className="flex items-center"
                       style={{
                         fontSize: "13px",
-                        color: "var(--ink-40)",
+                        color: "var(--ink-50)",
                         paddingBottom: "6px",
                         borderBottom: "0.5px solid var(--ios-hairline)",
                       }}
@@ -696,13 +696,13 @@ export default function WorkoutSummaryPage() {
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          <span style={{ flex: "1 1 auto", color: "var(--ink-40)" }}>{setIdx + 1}</span>
+                          <span style={{ flex: "1 1 auto", color: "var(--ink-50)" }}>{setIdx + 1}</span>
                           <span style={{ width: "88px", textAlign: "right", color: "#fff" }}>
                             {set.weight ?? 0} × {set.reps ?? 0}
                           </span>
                         </div>
                       ))}
-                    <div style={{ fontSize: "13px", color: "var(--ink-40)", paddingTop: "8px" }}>
+                    <div style={{ fontSize: "13px", color: "var(--ink-50)", paddingTop: "8px" }}>
                       Best set: {bestSet ? `${bestSet.weight ?? 0} × ${bestSet.reps ?? 0}` : "—"}
                     </div>
                   </div>

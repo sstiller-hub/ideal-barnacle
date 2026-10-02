@@ -141,7 +141,7 @@ export default function AktProgramMessageLine({
               border: "none",
               padding: "0 2px",
               cursor: "pointer",
-              color: "var(--ink-25)",
+              color: "var(--ink-50)",
               fontSize: "16px",
               lineHeight: 1,
               flexShrink: 0,

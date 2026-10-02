@@ -59,7 +59,7 @@ function ReorderRow({
       }}
     >
       <div
-        className="text-ink-25"
+        className="text-ink-50"
         style={{ fontSize: "10px", fontWeight: 600, width: "16px", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
       >
         {index + 1}
@@ -72,7 +72,7 @@ function ReorderRow({
           {exercise.name}
         </div>
         <div
-          className="text-ink-30"
+          className="text-ink-50"
           style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}
         >
           {setCount} SET{setCount !== 1 ? "S" : ""}
@@ -86,7 +86,7 @@ function ReorderRow({
         onPointerDown={(event) => controls.start(event)}
         style={{ flexShrink: 0, background: "transparent", border: "none", padding: "4px", touchAction: "none", cursor: "grab" }}
       >
-        <GripVertical size={18} strokeWidth={1.5} style={{ color: "var(--ink-35)" }} />
+        <GripVertical size={18} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
       </button>
     </Reorder.Item>
   )
@@ -164,7 +164,7 @@ export function ReorderExercisesSheet({
                 Reorder Exercises
               </h2>
               <div
-                className="text-ink-30"
+                className="text-ink-50"
                 style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "4px", fontFamily: "var(--font-label)" }}
               >
                 DRAG THE HANDLE TO CHANGE THE ORDER
@@ -197,7 +197,7 @@ export function ReorderExercisesSheet({
                   <div className="text-ink-85" style={{ fontSize: "12px", fontWeight: 500 }}>
                     Save order to my routine
                   </div>
-                  <div className="text-ink-30" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
+                  <div className="text-ink-50" style={{ fontSize: "10px", fontWeight: 400, marginTop: "2px" }}>
                     Use this order for future workouts
                   </div>
                 </div>

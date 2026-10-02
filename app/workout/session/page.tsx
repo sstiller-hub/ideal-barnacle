@@ -159,7 +159,7 @@ export default function WorkoutSessionPage() {
                 Active Workout Detected
               </AlertDialogTitle>
               <div
-                className="text-ink-40"
+                className="text-ink-50"
                 style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
               >
                 You have an active workout in progress ({activeSession?.routineName || "Workout"}). Would you like to
@@ -205,7 +205,7 @@ export default function WorkoutSessionPage() {
                   padding: "10px",
                 }}
               >
-                <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
+                <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
                   Cancel
                 </span>
               </AlertDialogCancel>

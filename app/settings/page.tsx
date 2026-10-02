@@ -513,7 +513,7 @@ export default function SettingsPage() {
         style={{
           padding: "26px 32px 0",
           fontSize: "13px",
-          color: "var(--ink-40)",
+          color: "var(--ink-50)",
           textAlign: "center",
         }}
       >

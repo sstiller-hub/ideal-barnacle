@@ -1655,7 +1655,7 @@ export default function Home() {
                   type="button"
                 >
                   <span
-                    className={uiStateOverride === state ? "text-ink-70" : "text-ink-30"}
+                    className={uiStateOverride === state ? "text-ink-70" : "text-ink-50"}
                     style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.05em", fontFamily: "var(--font-label)" }}
                   >
                     {state.toUpperCase()}
@@ -1694,7 +1694,7 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: "0.2em",
                 fontFamily: "var(--font-label)",
-                color: "var(--ink-35)",
+                color: "var(--ink-50)",
                 background: "transparent",
                 border: "none",
                 padding: 0,
@@ -1777,7 +1777,7 @@ export default function Home() {
                 <ChevronDown
                   size={20}
                   strokeWidth={1.5}
-                  className="text-ink-30 mt-2 transition-transform duration-base"
+                  className="text-ink-50 mt-2 transition-transform duration-base"
                   style={{
                     transform: showWorkoutPicker ? "rotate(180deg)" : "rotate(0deg)",
                   }}
@@ -1790,7 +1790,7 @@ export default function Home() {
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: "12px",
-                  color: "var(--ink-40)",
+                  color: "var(--ink-50)",
                   fontVariantNumeric: "tabular-nums",
                   marginBottom: "6px",
                 }}
@@ -1842,7 +1842,7 @@ export default function Home() {
                           style={{
                             display: "block",
                             fontSize: "13px",
-                            color: "var(--ink-40)",
+                            color: "var(--ink-50)",
                             marginTop: "2px",
                           }}
                         >
@@ -1962,7 +1962,7 @@ export default function Home() {
                       fontSize: "10px",
                       fontWeight: 400,
                       letterSpacing: "0.06em",
-                      color: "var(--ink-30)",
+                      color: "var(--ink-50)",
                       marginBottom: isCompactExerciseList ? "12px" : "16px",
                     }}
                   >
@@ -2007,7 +2007,7 @@ export default function Home() {
                   fontWeight: 600,
                   letterSpacing: "0.16em",
                   fontFamily: "var(--font-label)",
-                  color: "var(--ink-35)",
+                  color: "var(--ink-50)",
                   marginBottom: "4px",
                 }}
               >
@@ -2050,7 +2050,7 @@ export default function Home() {
             return (
               <div>
                 <BandHeader label={`UP NEXT · ${nextWorkout.label}`}>
-                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--ink-40)", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--ink-50)", whiteSpace: "nowrap" }}>
                     {deriveWorkoutType(nextWorkout.routine.name)}
                   </span>
                 </BandHeader>
@@ -2144,7 +2144,7 @@ export default function Home() {
                       padding: "10px 0 0 32px",
                       fontFamily: "var(--font-mono)",
                       fontSize: "11px",
-                      color: "var(--ink-30)",
+                      color: "var(--ink-50)",
                       cursor: "pointer",
                     }}
                   >
@@ -2160,7 +2160,7 @@ export default function Home() {
                     background: "transparent",
                     border: "none",
                     padding: "12px",
-                    color: "var(--ink-40)",
+                    color: "var(--ink-50)",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.color = "var(--ink-70)"
@@ -2320,7 +2320,7 @@ export default function Home() {
               <button
                 onClick={goToSessionDay}
                 className="flex-shrink-0 transition-colors duration-base"
-                style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+                style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-50)" }}
                 type="button"
               >
                 View day
@@ -2329,7 +2329,7 @@ export default function Home() {
             <button
               onClick={handleDiscardActiveWorkout}
               className="flex-shrink-0 transition-colors duration-base"
-              style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-40)" }}
+              style={{ background: "transparent", border: "none", padding: "6px 4px", fontSize: "10px", fontWeight: 400, color: "var(--ink-50)" }}
               type="button"
             >
               Discard
@@ -2371,7 +2371,7 @@ export default function Home() {
               Active Workout Detected
             </AlertDialogTitle>
             <AlertDialogDescription
-              className="text-ink-40"
+              className="text-ink-50"
               style={{ fontSize: "12px", fontWeight: 400, letterSpacing: "0.01em", lineHeight: "1.5" }}
             >
               You have an active workout in progress ({session?.routineName || "Workout"}). Would you like to resume it
@@ -2417,7 +2417,7 @@ export default function Home() {
                 padding: "10px",
               }}
             >
-              <span className="text-ink-40" style={{ fontSize: "11px", fontWeight: 400 }}>
+              <span className="text-ink-50" style={{ fontSize: "11px", fontWeight: 400 }}>
                 Cancel
               </span>
             </AlertDialogCancel>
@@ -2553,7 +2553,7 @@ function ReceiptRow({
         style={{
           fontSize: "8.5px",
           fontWeight: 500,
-          color: "var(--ink-30)",
+          color: "var(--ink-50)",
           fontVariantNumeric: "tabular-nums",
           minWidth: "14px",
         }}
@@ -2569,14 +2569,14 @@ function ReceiptRow({
       <div className="flex flex-col items-end" style={{ gap: "1px" }}>
         {right && (
           <div
-            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-50)", fontVariantNumeric: "tabular-nums" }}
           >
             {right}
           </div>
         )}
         {hint && (
           <div
-            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-35)", fontVariantNumeric: "tabular-nums" }}
+            style={{ fontSize: "8.5px", fontWeight: 400, color: "var(--ink-50)", fontVariantNumeric: "tabular-nums" }}
           >
             {hint}
           </div>
@@ -2639,7 +2639,7 @@ function AllTimePRCard({
         >
           {reps}
         </span>
-        <span style={{ fontSize: "10px", color: "var(--ink-25)" }}>&times;</span>
+        <span style={{ fontSize: "10px", color: "var(--ink-50)" }}>&times;</span>
         <span
           style={{
             fontFamily: "var(--font-display)",
@@ -2651,7 +2651,7 @@ function AllTimePRCard({
         >
           {weight}
         </span>
-        <span style={{ fontSize: "10px", color: "var(--ink-25)", letterSpacing: "0.06em" }}>LB</span>
+        <span style={{ fontSize: "10px", color: "var(--ink-50)", letterSpacing: "0.06em" }}>LB</span>
       </div>
 
       <div style={{ marginBottom: "8px" }}>
@@ -2659,7 +2659,7 @@ function AllTimePRCard({
       </div>
 
       <div className="flex items-center justify-between">
-        <span style={{ fontSize: "8px", fontWeight: 400, color: "var(--ink-25)" }}>{details}</span>
+        <span style={{ fontSize: "8px", fontWeight: 400, color: "var(--ink-50)" }}>{details}</span>
         {typeof trendPct === "number" && trendPct !== 0 && (
           <DeltaChip
             tone={trendPct > 0 ? "good" : "neutral"}

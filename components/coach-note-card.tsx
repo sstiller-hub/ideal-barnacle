@@ -159,7 +159,7 @@ export function CoachNoteCard({
           fontWeight: 600,
           letterSpacing: "0.16em",
           textTransform: "uppercase",
-          color: "var(--ink-30)",
+          color: "var(--ink-50)",
           cursor: "pointer",
           opacity: offset < 0 || dismissFocused ? 1 : 0,
           // Keyboard activation still reaches it — pointer-events only gates
@@ -246,7 +246,7 @@ export function CoachNoteCard({
                   flexShrink: 0,
                   fontFamily: "var(--font-label)",
                   fontSize: "9px",
-                  color: "var(--ink-25)",
+                  color: "var(--ink-50)",
                   lineHeight: 1,
                   transform: expanded ? "rotate(180deg)" : "none",
                   transition: prefersReducedMotion
@@ -310,7 +310,7 @@ export function CoachNoteList({
             fontWeight: 600,
             letterSpacing: "0.2em",
             textTransform: "uppercase",
-            color: "var(--ink-35)",
+            color: "var(--ink-50)",
             marginBottom: "6px",
           }}
         >

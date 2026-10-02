@@ -20,10 +20,11 @@ const LEVEL_BG: Record<HeatLevel, string> = {
 }
 
 const LEVEL_TEXT: Record<HeatLevel, string> = {
-  0: "var(--ink-35)",
+  0: "var(--ink-50)",
   1: "var(--ink-50)",
   2: "#fff",
-  3: "#000",
+  // White, not black: black on the ink-40 fill is only 3.7:1.
+  3: "#fff",
   4: "#000",
 }
 
@@ -91,7 +92,7 @@ export function MonthHeatCalendar({
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: "11px",
-            color: "var(--ink-35)",
+            color: "var(--ink-50)",
             fontVariantNumeric: "tabular-nums",
           }}
         >
@@ -111,7 +112,7 @@ export function MonthHeatCalendar({
               fontFamily: "var(--font-label)",
               fontSize: "9px",
               fontWeight: 700,
-              color: "var(--ink-30)",
+              color: "var(--ink-50)",
               textAlign: "center",
               marginBottom: "2px",
             }}
@@ -157,9 +158,9 @@ export function MonthHeatCalendar({
           const color = isSelected
             ? "#000"
             : isPlanned
-              ? "var(--ink-40)"
+              ? "var(--ink-70)"
               : isFuture
-                ? "var(--ink-20)"
+                ? "var(--ink-50)"
                 : LEVEL_TEXT[level]
 
           const label = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })

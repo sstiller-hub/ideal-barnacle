@@ -284,7 +284,7 @@ export default function ExerciseHistoryPage() {
                 fontWeight: 500,
                 letterSpacing: "0.18em",
                 fontFamily: "var(--font-label)",
-                color: "var(--ink-25)",
+                color: "var(--ink-50)",
                 marginBottom: "6px",
               }}
             >
@@ -396,11 +396,11 @@ export default function ExerciseHistoryPage() {
             <div style={{ display: "flex", gap: "12px", marginTop: "6px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1.5px", background: "rgba(255,255,255,0.6)" }} />
-                <span style={{ fontSize: "9px", color: "var(--ink-30)", fontFamily: "var(--font-label)" }}>Volume</span>
+                <span style={{ fontSize: "9px", color: "var(--ink-50)", fontFamily: "var(--font-label)" }}>Volume</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <div style={{ width: "16px", height: "1px", borderTop: "1px dashed var(--ink-25)" }} />
-                <span style={{ fontSize: "9px", color: "var(--ink-30)", fontFamily: "var(--font-label)" }}>Rolling avg</span>
+                <span style={{ fontSize: "9px", color: "var(--ink-50)", fontFamily: "var(--font-label)" }}>Rolling avg</span>
               </div>
             </div>
           </div>
@@ -418,21 +418,21 @@ export default function ExerciseHistoryPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--ink-40)", marginBottom: "2px" }}>
+                <div style={{ fontSize: "11px", color: "var(--ink-50)", marginBottom: "2px" }}>
                   {formatPeriodLabel(selectedPoint.date, aggregation)}
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--ink-90)", letterSpacing: "-0.02em" }}>
                   {Math.round(selectedPoint.volume).toLocaleString()} {plural(Math.round(selectedPoint.volume), "lb", "lbs")}
                 </div>
                 {selectedPoint.rollingAvg !== null && selectedPoint.volume > 0 && (
-                  <div style={{ fontSize: "10px", color: "var(--ink-35)", marginTop: "2px" }}>
+                  <div style={{ fontSize: "10px", color: "var(--ink-50)", marginTop: "2px" }}>
                     vs {Math.round(selectedPoint.rollingAvg).toLocaleString()} {plural(Math.round(selectedPoint.rollingAvg), "lb", "lbs")} rolling avg
                   </div>
                 )}
               </div>
               <button
                 onClick={() => setSelectedPoint(null)}
-                style={{ background: "none", border: "none", color: "var(--ink-35)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
+                style={{ background: "none", border: "none", color: "var(--ink-50)", cursor: "pointer", fontSize: "16px", padding: "0 0 0 8px" }}
               >
                 ✕
               </button>
@@ -458,7 +458,7 @@ export default function ExerciseHistoryPage() {
             )}
 
             {selectedPoint.annotation?.kind === "missed_week" && (
-              <div style={{ fontSize: "11px", color: "var(--ink-35)" }}>
+              <div style={{ fontSize: "11px", color: "var(--ink-50)" }}>
                 No workouts with this exercise recorded this week.
               </div>
             )}
@@ -475,7 +475,7 @@ export default function ExerciseHistoryPage() {
                       fontSize: "8px",
                       fontWeight: 500,
                       letterSpacing: "0.18em",
-                      color: "var(--ink-25)",
+                      color: "var(--ink-50)",
                       fontFamily: "var(--font-label)",
                       marginBottom: "6px",
                     }}
@@ -485,7 +485,7 @@ export default function ExerciseHistoryPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                     {exercise.sets.filter((s) => s.completed).map((set, idx) => (
                       <div key={idx} style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: "11px", color: "var(--ink-35)" }}>Set {idx + 1}</span>
+                        <span style={{ fontSize: "11px", color: "var(--ink-50)" }}>Set {idx + 1}</span>
                         <span style={{ fontSize: "12px", fontWeight: 500, color: "rgba(255,255,255,0.80)" }}>
                           {set.weight} {plural(set.weight, "lb", "lbs")} × {set.reps} {plural(set.reps, "rep", "reps")}
                         </span>
@@ -493,7 +493,7 @@ export default function ExerciseHistoryPage() {
                     ))}
                   </div>
                   {workout && (
-                    <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-25)" }}>
+                    <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-50)" }}>
                       {workout.name}
                     </div>
                   )}
@@ -509,7 +509,7 @@ export default function ExerciseHistoryPage() {
                     fontSize: "8px",
                     fontWeight: 500,
                     letterSpacing: "0.18em",
-                    color: "var(--ink-25)",
+                    color: "var(--ink-50)",
                     fontFamily: "var(--font-label)",
                     marginBottom: "6px",
                   }}
@@ -531,7 +531,7 @@ export default function ExerciseHistoryPage() {
                       <div key={wid} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <span style={{ fontSize: "11px", color: "var(--ink-50)" }}>{d}</span>
-                          <span style={{ fontSize: "11px", color: "var(--ink-30)", marginLeft: "6px" }}>{workout.name}</span>
+                          <span style={{ fontSize: "11px", color: "var(--ink-50)", marginLeft: "6px" }}>{workout.name}</span>
                         </div>
                         {vol > 0 && (
                           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.60)", fontWeight: 500 }}>
@@ -543,7 +543,7 @@ export default function ExerciseHistoryPage() {
                   })}
                 </div>
                 {selectedPoint.sessionCount !== undefined && (
-                  <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-25)" }}>
+                  <div style={{ marginTop: "8px", fontSize: "10px", color: "var(--ink-50)" }}>
                     {selectedPoint.sessionCount} session{selectedPoint.sessionCount !== 1 ? "s" : ""}
                   </div>
                 )}
@@ -564,7 +564,7 @@ export default function ExerciseHistoryPage() {
                 <span style={{ fontSize: "22px", fontWeight: 600, color: "var(--ink-90)", letterSpacing: "-0.02em" }}>
                   {ratingTrend.pctGood}%
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--ink-35)", marginLeft: "6px" }}>felt good</span>
+                <span style={{ fontSize: "11px", color: "var(--ink-50)", marginLeft: "6px" }}>felt good</span>
               </div>
               <div style={{ display: "flex", gap: "10px", fontSize: "11px" }}>
                 <span style={{ color: "rgba(52, 211, 153, 0.75)" }}>{ratingTrend.good} good</span>
@@ -646,7 +646,7 @@ export default function ExerciseHistoryPage() {
                 .filter((s) => s.completed)
                 .map((set, idx) => (
                   <div key={idx} className="ios-row" style={{ cursor: "default" }}>
-                    <span style={{ color: "var(--ink-40)", flex: "1 1 auto" }}>Set {idx + 1}</span>
+                    <span style={{ color: "var(--ink-50)", flex: "1 1 auto" }}>Set {idx + 1}</span>
                     <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
                       {set.weight} × {set.reps}
                     </span>
@@ -662,7 +662,7 @@ export default function ExerciseHistoryPage() {
 
       {history.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-ink-40">No history for this exercise yet</p>
+          <p className="text-ink-50">No history for this exercise yet</p>
         </div>
       )}
       </IosNavPage>

@@ -33,7 +33,7 @@ export default function SetRow({ set, ordinal, checked, onToggle }: SetRowProps)
       }}
     >
       <span
-        className="text-ink-30"
+        className="text-ink-50"
         style={{
           fontFamily: "var(--font-label)",
           fontSize: "10px",

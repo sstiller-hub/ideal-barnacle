@@ -166,7 +166,7 @@ export default function TranscriptionSession({ workout, onClose }: Transcription
             <button
               type="button"
               onClick={toggleWarmups}
-              className="text-ink-30 hover:text-ink-50 transition-colors duration-base"
+              className="text-ink-50 hover:text-ink-50 transition-colors duration-base"
               style={{
                 background: "transparent",
                 border: "none",

@@ -423,7 +423,7 @@ const ExercisePage = memo(function ExercisePage({
               fontSize: "9px",
               fontWeight: 600,
               letterSpacing: "0.2em",
-              color: "var(--ink-35)",
+              color: "var(--ink-50)",
             }}
           >
             EXERCISE {exerciseIndex + 1} OF {exercisesCount}
@@ -482,7 +482,7 @@ const ExercisePage = memo(function ExercisePage({
                 fontSize: "8px",
                 fontWeight: 600,
                 letterSpacing: "0.16em",
-                color: "var(--ink-35)",
+                color: "var(--ink-50)",
                 textTransform: "uppercase",
               }}
             >
@@ -512,7 +512,7 @@ const ExercisePage = memo(function ExercisePage({
             fontSize: "9px",
             fontWeight: 500,
             letterSpacing: "0.14em",
-            color: "var(--ink-30)",
+            color: "var(--ink-50)",
             marginTop: "8px",
           }}
         >
@@ -625,7 +625,7 @@ const ExercisePage = memo(function ExercisePage({
                     fontSize: "8.5px",
                     fontWeight: 600,
                     letterSpacing: "0.18em",
-                    color: isCurrentSet ? "var(--ink-50)" : "var(--ink-30)",
+                    color: isCurrentSet ? "var(--ink-85)" : "var(--ink-50)",
                   }}
                 >
                   SET {String(setIndex + 1).padStart(2, "0")}
@@ -810,7 +810,7 @@ const ExercisePage = memo(function ExercisePage({
                     fontSize: "8px",
                     fontWeight: 600,
                     letterSpacing: "0.14em",
-                    color: focusedWeight ? "var(--ink-50)" : "var(--ink-25)",
+                    color: focusedWeight ? "var(--ink-85)" : "var(--ink-50)",
                   }}
                 >
                   LB
@@ -822,7 +822,7 @@ const ExercisePage = memo(function ExercisePage({
                     fontSize: "8px",
                     fontWeight: 600,
                     letterSpacing: "0.14em",
-                    color: focusedReps ? "var(--ink-50)" : "var(--ink-25)",
+                    color: focusedReps ? "var(--ink-85)" : "var(--ink-50)",
                   }}
                 >
                   REPS
@@ -841,13 +841,13 @@ const ExercisePage = memo(function ExercisePage({
               >
                 {repCapError || showMissing ? (
                   <div className="flex items-center gap-1.5">
-                    <AlertCircle size={10} strokeWidth={2} style={{ color: "var(--ink-40)" }} />
+                    <AlertCircle size={10} strokeWidth={2} style={{ color: "var(--ink-50)" }} />
                     <span
                       style={{
                         fontFamily: "var(--font-label)",
                         fontSize: "9px",
                         fontWeight: 500,
-                        color: "var(--ink-40)",
+                        color: "var(--ink-50)",
                       }}
                     >
                       {repCapError
@@ -865,7 +865,7 @@ const ExercisePage = memo(function ExercisePage({
                         fontSize: "8.5px",
                         fontWeight: 500,
                         letterSpacing: "0.1em",
-                        color: "var(--ink-25)",
+                        color: "var(--ink-50)",
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
@@ -905,7 +905,7 @@ const ExercisePage = memo(function ExercisePage({
                         fontSize: "8px",
                         fontWeight: 600,
                         letterSpacing: "0.1em",
-                        color: "var(--ink-30)",
+                        color: "var(--ink-50)",
                       }}
                     >
                       BAR
@@ -1023,7 +1023,7 @@ const ExercisePage = memo(function ExercisePage({
                         </span>
                       ))}
                     </span>
-                    <span style={{ fontSize: "13px", fontWeight: 400, color: "var(--ink-40)" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 400, color: "var(--ink-50)" }}>
                       {plateDisplayMode === "per-side" ? "per side" : "total"}
                     </span>
                   </div>
@@ -1056,7 +1056,7 @@ const ExercisePage = memo(function ExercisePage({
           >
             <div
               className="text-center"
-              style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.2em", color: "var(--ink-35)", marginBottom: "12px" }}
+              style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.2em", color: "var(--ink-50)", marginBottom: "12px" }}
             >
               HOW DID THIS FEEL?
             </div>
@@ -1076,7 +1076,7 @@ const ExercisePage = memo(function ExercisePage({
                   gap: "6px",
                 }}
               >
-                <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "var(--ink-40)" }} />
+                <ThumbsDown size={14} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
                 <span style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.12em", color: "var(--ink-70)" }}>
                   ROUGH
                 </span>
@@ -1096,7 +1096,7 @@ const ExercisePage = memo(function ExercisePage({
                   gap: "6px",
                 }}
               >
-                <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "var(--ink-40)" }} />
+                <ThumbsUp size={14} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
                 <span style={{ fontFamily: "var(--font-label)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.12em", color: "var(--ink-70)" }}>
                   GOOD
                 </span>
@@ -1128,12 +1128,12 @@ const ExercisePage = memo(function ExercisePage({
           >
             <div className="flex items-center justify-center gap-2">
               {exercise.rating === "thumbs_up" ? (
-                <ThumbsUp size={12} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+                <ThumbsUp size={12} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
               ) : (
-                <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+                <ThumbsDown size={12} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
               )}
               <span
-                style={{ fontFamily: "var(--font-label)", fontSize: "8px", fontWeight: 600, letterSpacing: "0.16em", color: "var(--ink-30)" }}
+                style={{ fontFamily: "var(--font-label)", fontSize: "8px", fontWeight: 600, letterSpacing: "0.16em", color: "var(--ink-50)" }}
               >
                 {exercise.rating === "thumbs_up" ? "FELT GOOD" : "FELT ROUGH"}
               </span>
@@ -3379,7 +3379,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 transition={restRemainingSeconds <= 10 ? { duration: 1, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
               >
                 <div className="flex flex-col items-start" style={{ paddingBottom: "3px" }}>
-                  <div className="text-ink-35" style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
+                  <div className="text-ink-50" style={{ fontSize: "8px", fontWeight: 600, letterSpacing: "0.12em" }}>REST</div>
                   {restExtensionTrend && (restExtensionTrend.currentMonthCount > 0 || restExtensionTrend.lastMonthCount > 0) && (
                     <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.04em", color: "var(--ink-20)", lineHeight: 1, marginTop: "2px" }}>
                       {restExtensionTrend.direction === "up" ? "↑" : restExtensionTrend.direction === "down" ? "↓" : "–"}{restExtensionTrend.currentMonthCount}/mo
@@ -3422,7 +3422,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         <div style={{ padding: "10px 16px 6px", flexShrink: 0 }}>
           <div className="flex items-center gap-3">
             <button onClick={handleExit} type="button" style={{ flexShrink: 0 }}>
-              <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+              <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
             </button>
 
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -3433,7 +3433,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               >
                 {getExerciseLabel(lsExercise.name)}
               </h1>
-              <div className="text-ink-30" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
+              <div className="text-ink-50" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.1em", marginTop: "2px", fontFamily: "var(--font-label)" }}>
                 EXERCISE {uiExerciseIndex + 1} • {lsExercise.sets.length} {plural(lsExercise.sets.length, "SET", "SETS")}{lsExercise.targetReps ? ` • TARGET ${lsExercise.targetReps} ${plural(Number(lsExercise.targetReps), "REP", "REPS")}` : ""} • {session?.startedAt ? <SessionClock startedAt={session.startedAt} render={(f) => <>{f}</>} /> : formatSeconds(elapsedSeconds)}
                 {pacePillLabel && <span style={{ color: pacePillLabel.color }}> • {pacePillLabel.text}</span>}
               </div>
@@ -3441,7 +3441,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
             <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
               <div className="text-center">
-                <div className="text-ink-30" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
+                <div className="text-ink-50" style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", marginBottom: "1px" }}>SETS</div>
                 <div className="text-ink-70" style={{ fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{totalSetsCompleted}/{totalSets}</div>
               </div>
               <div style={{ width: "1px", height: "16px", background: "var(--ink-06)" }} />
@@ -3496,7 +3496,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 className="tap-target absolute"
                 style={{ right: 0, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", padding: "4px" }}
               >
-                <ListOrdered size={14} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+                <ListOrdered size={14} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
               </button>
             ) : null}
           </div>
@@ -3537,7 +3537,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 }}
               >
                 {/* Set number */}
-                <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", color: "var(--ink-30)", fontFamily: "var(--font-label)", minWidth: "28px", flexShrink: 0 }}>
+                <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.12em", color: "var(--ink-50)", fontFamily: "var(--font-label)", minWidth: "28px", flexShrink: 0 }}>
                   SET {setIndex + 1}
                 </div>
 
@@ -3581,7 +3581,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
                   />
-                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-25)", textAlign: "center", marginTop: "2px" }}>LBS</div>
+                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-50)", textAlign: "center", marginTop: "2px" }}>LBS</div>
                 </div>
 
                 {/* Reps input */}
@@ -3635,7 +3635,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                       fontVariantNumeric: "tabular-nums", outline: "none", textAlign: "center",
                     }}
                   />
-                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-25)", textAlign: "center", marginTop: "2px" }}>REPS</div>
+                  <div style={{ fontSize: "8px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--ink-50)", textAlign: "center", marginTop: "2px" }}>REPS</div>
                 </div>
 
                 {/* Complete button */}
@@ -3676,8 +3676,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 {/* Validation error */}
                 {(repCapError || showMissing) && (
                   <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-                    <AlertCircle size={8} strokeWidth={2} style={{ color: "var(--ink-40)" }} />
-                    <div style={{ fontFamily: "var(--font-label)", fontSize: "8px", color: "var(--ink-40)" }}>
+                    <AlertCircle size={8} strokeWidth={2} style={{ color: "var(--ink-50)" }} />
+                    <div style={{ fontFamily: "var(--font-label)", fontSize: "8px", color: "var(--ink-50)" }}>
                       {repCapError ? `Max ${REP_MAX}` : missingWeight ? "Enter weight" : "Enter reps"}
                     </div>
                   </div>
@@ -3767,7 +3767,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                     fontSize: "9px",
                     fontWeight: 700,
                     letterSpacing: "0.19em",
-                    color: "var(--ink-40)",
+                    color: "var(--ink-50)",
                     lineHeight: 1,
                   }}
                 >
@@ -3959,7 +3959,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                 className="tap-target"
                 style={{ flexShrink: 0, background: "transparent", border: "none", padding: "4px" }}
               >
-                <ListOrdered size={15} strokeWidth={1.5} style={{ color: "var(--ink-30)" }} />
+                <ListOrdered size={15} strokeWidth={1.5} style={{ color: "var(--ink-50)" }} />
               </button>
             ) : null}
           </div>

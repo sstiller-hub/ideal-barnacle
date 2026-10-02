@@ -30,7 +30,7 @@ export default function TranscriptionHeader({
       >
         <div>
           <p
-            className="text-ink-35"
+            className="text-ink-50"
             style={{
               fontFamily: "var(--font-label)",
               fontSize: "10px",
@@ -47,7 +47,7 @@ export default function TranscriptionHeader({
         </div>
         <div className="flex items-center gap-4">
           <span
-            className="text-ink-40"
+            className="text-ink-50"
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: "12px",
@@ -59,7 +59,7 @@ export default function TranscriptionHeader({
           <button
             type="button"
             onClick={onClose}
-            className="tap-target text-ink-40 hover:text-ink-70 transition-colors duration-base"
+            className="tap-target text-ink-50 hover:text-ink-70 transition-colors duration-base"
             style={{ background: "transparent", border: "none", padding: "4px", cursor: "pointer" }}
             aria-label="Close Whoop transcription"
           >
