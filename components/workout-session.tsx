@@ -44,6 +44,7 @@ import {
   markWorkoutPending,
   updateWorkoutDraft,
   upsertSet as upsertSetDraft,
+  deleteSet as deleteSetDraft,
   upsertAllSets,
   getWorkoutDraft,
   type WorkoutSetDraft,
@@ -235,12 +236,6 @@ function getExerciseLabel(name: string): string {
   return name
 }
 
-function parseRepRange(targetReps: string): { low: number; high: number } | null {
-  const match = targetReps.match(/^(\d+)\s*[-–]\s*(\d+)$/)
-  if (!match) return null
-  return { low: parseInt(match[1], 10), high: parseInt(match[2], 10) }
-}
-
 function isMachineExercise(name: string): boolean {
   const lower = name.toLowerCase()
   return (
@@ -333,7 +328,9 @@ type ExercisePageProps = {
   setValidationTrigger: (value: number) => void
   completeSet: (setIndex: number, options?: { startRest?: boolean; exerciseIndex?: number }) => void
   rateExercise: (exerciseIndex: number, rating: ExerciseRating) => void
-  handleApplyProgressiveOverload: (exerciseIndex: number) => void
+  endExerciseHere: (exerciseIndex: number) => void
+  restoreTrimmedSets: (exerciseIndex: number) => void
+  addSet: (exerciseIndex: number) => void
   setPlateDisplayMode: (mode: "per-side" | "total") => void
   setPlateStartingWeight: (value: number) => void
   onOpenExercise: (name: string) => void
@@ -377,7 +374,9 @@ const ExercisePage = memo(function ExercisePage({
   setValidationTrigger,
   completeSet,
   rateExercise,
-  handleApplyProgressiveOverload,
+  endExerciseHere,
+  restoreTrimmedSets,
+  addSet,
   setPlateDisplayMode,
   setPlateStartingWeight,
   onOpenExercise,
@@ -396,15 +395,9 @@ const ExercisePage = memo(function ExercisePage({
     exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
   const isCompactSets = exercise.sets.length >= 4
   const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
-  const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
-
-  const showProgressiveOverload =
-    exerciseIndex === currentExerciseIndex &&
-    exerciseRepRange !== null &&
-    exercise.sets.length > 0 &&
-    exercise.sets.every(
-      (set: any) => set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
-    )
+  const completedCount = exercise.sets.filter((set: any) => set.completed).length
+  const hasIncompleteSets = exercise.sets.some((set: any) => !set.completed)
+  const trimmedCount = Array.isArray(exercise.trimmedSets) ? exercise.trimmedSets.length : 0
 
   return (
     <div
@@ -1159,41 +1152,78 @@ const ExercisePage = memo(function ExercisePage({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showProgressiveOverload && (
-          <motion.div
-            key="progressive-overload"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
-          >
-            <button
-              onClick={() => void handleApplyProgressiveOverload(exerciseIndex)}
-              type="button"
-              className="transition-colors duration-150"
-              style={{
-                background: "var(--ink-02)",
-                border: "1px solid var(--ink-08)",
-                borderRadius: "var(--radius-flat)",
-                padding: "7px 16px",
-                fontFamily: "var(--font-label)",
-                fontSize: "9px",
-                fontWeight: 600,
-                letterSpacing: "0.12em",
-                color: "var(--ink-70)",
-                cursor: "pointer",
-              }}
-            >
-              PROGRESSIVE OVERLOAD ↑
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* The honest exits. Finish stays gated on every remaining set being
+          logged, so the record never carries a set that did not happen; these
+          are how a set list is made to match what did. END HERE drops the
+          unlogged tail (SKIP EXERCISE when nothing was logged), UNDO brings it
+          back, + SET appends one more prefilled from the last row. */}
+      {exerciseIndex === currentExerciseIndex && canEditExercise && (
+        <div
+          className="flex items-center justify-between flex-wrap"
+          style={{ marginTop: "22px", gap: "10px" }}
+          data-testid="set-list-actions"
+        >
+          {trimmedCount > 0 ? (
+            <div className="flex items-center" style={{ gap: "10px" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-label)",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  color: "var(--ink-50)",
+                }}
+              >
+                {completedCount > 0 ? `ENDED AFTER SET ${completedCount}` : "SKIPPED"}
+                {" · "}
+                {trimmedCount} {plural(trimmedCount, "SET", "SETS")} DROPPED
+              </span>
+              <QuietAction label="UNDO" onClick={() => restoreTrimmedSets(exerciseIndex)} />
+            </div>
+          ) : (
+            <>
+              <QuietAction label="+ SET" onClick={() => addSet(exerciseIndex)} />
+              {hasIncompleteSets && (
+                <QuietAction
+                  label={completedCount > 0 ? "END HERE" : "SKIP EXERCISE"}
+                  onClick={() => endExerciseHere(exerciseIndex)}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 })
+
+// A quiet §4.6 control at a full 44pt height — the same chrome as the rating
+// buttons, sized so a thumb finds it without looking.
+function QuietAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="transition-colors duration-150"
+      style={{
+        minHeight: "44px",
+        background: "var(--ink-02)",
+        border: "1px solid var(--ink-08)",
+        borderRadius: "var(--radius-flat)",
+        padding: "0 16px",
+        fontFamily: "var(--font-label)",
+        fontSize: "9px",
+        fontWeight: 600,
+        letterSpacing: "0.12em",
+        color: "var(--ink-70)",
+        cursor: "pointer",
+        touchAction: "manipulation",
+      }}
+    >
+      {label}
+    </button>
+  )
+}
 
 export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
   const router = useRouter()
@@ -2519,76 +2549,126 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     signalAutoSaved()
   }
 
-  const handleApplyProgressiveOverload = async (exerciseIndex: number) => {
-    if (!session) return
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-
-    const repRange = parseRepRange(exercise.targetReps ?? "")
-    if (!repRange) return
-
+  // Replace one exercise's set list and persist it everywhere the live session
+  // lives. Removed sets are deleted from the draft store explicitly: its bulk
+  // write merges by set id, so a set merely absent from the list would still
+  // ride into the committed workout.
+  const commitSetList = async (
+    exerciseIndex: number,
+    nextSets: any[],
+    removedSets: any[],
+    extra: Record<string, unknown> = {},
+  ) => {
+    if (!session) return null
     const workoutId = session.workoutId
-    const historyReps = getCachedHistoryReps(exercise.name)
-
-    const newExercises = exercises.map((ex: any, idx: number) => {
-      if (idx !== exerciseIndex) return ex
-
-      const newSets = ex.sets.map((set: any, setIdx: number) => {
-        const newWeight = typeof set.weight === "number" ? set.weight + 5 : 5
-        const newReps = repRange.low
-
-        const newSet = { ...set, weight: newWeight, reps: newReps, completed: false }
-
-        const flagsResult = getSetFlags({
-          reps: newSet.reps,
-          weight: newSet.weight,
-          targetReps: ex.targetReps,
-          historyReps,
-        })
-
-        const updatedSet = {
-          ...newSet,
-          isOutlier: flagsResult.flags.includes("rep_outlier"),
-          validationFlags: flagsResult.flags,
-          isIncomplete: flagsResult.isIncomplete,
-        }
-
-        if (workoutId) {
-          void persistSetDraft(workoutId, ex, updatedSet, setIdx)
-        }
-        if (session?.remoteSessionId) {
-          void upsertSet({
-            sessionId: session.remoteSessionId,
-            setId: updatedSet.id,
-            exerciseId: ex.id,
-            setIndex: setIdx,
-            reps: updatedSet.reps,
-            weight: updatedSet.weight,
-            completed: updatedSet.completed,
-            validationFlags: updatedSet.validationFlags,
-          })
-        }
-
-        return updatedSet
-      })
-
-      return { ...ex, sets: newSets, completed: false }
+    const newExercises = exercises.map((exercise: any, idx: number) => {
+      if (idx !== exerciseIndex) return exercise
+      return {
+        ...exercise,
+        ...extra,
+        sets: nextSets,
+        // An emptied exercise is finishable but not "completed": nothing was
+        // done, so it earns no rating prompt.
+        completed:
+          nextSets.length > 0 && nextSets.every((set: any) => set.completed && !isSetIncomplete(set)),
+      }
     })
+    const exercise = newExercises[exerciseIndex]
+    if (workoutId) {
+      removedSets.forEach((set: any) => {
+        if (set?.id) void deleteSetDraft(workoutId, set.id)
+      })
+      void syncExerciseDraft(workoutId, exercise, nextSets)
+    }
+    if (session.remoteSessionId) {
+      nextSets.forEach((set: any, idx: number) => {
+        void upsertSet({
+          sessionId: session.remoteSessionId!,
+          setId: set.id,
+          exerciseId: exercise.id,
+          setIndex: idx,
+          reps: set.reps,
+          weight: set.weight,
+          completed: set.completed,
+          validationFlags: set.validationFlags,
+        })
+      })
+    }
 
     exercisesRef.current = newExercises
     setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
+    const updatedSession: WorkoutSession = { ...session, exercises: newExercises }
     sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
+    return newExercises
+  }
 
-    toast.success("+5 lbs applied", { duration: 2000 })
+  // Drop every unlogged set so the exercise is finishable as it stands. The
+  // dropped sets are kept on the exercise for UNDO and never reach the record.
+  const endExerciseHere = async (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const kept = exercise.sets.filter((set: any) => set.completed)
+    const dropped = exercise.sets.filter((set: any) => !set.completed)
+    if (dropped.length === 0) return
+    haptic("tap")
+    const newExercises = await commitSetList(exerciseIndex, kept, dropped, {
+      trimmedSets: [...(Array.isArray(exercise.trimmedSets) ? exercise.trimmedSets : []), ...dropped],
+    })
+    if (!newExercises) return
+
+    toast(kept.length > 0 ? `Ended after set ${kept.length}` : `Skipped ${getExerciseLabel(exercise.name)}`, {
+      duration: 5000,
+      action: { label: "Undo", onClick: () => void restoreTrimmedSets(exerciseIndex) },
+    })
+
+    // Same hand-off as logging the last set: on to the next exercise that
+    // still has work, and no rest dock counting down to nothing.
+    const finishable = newExercises.every((ex: any) => canExerciseBeFinished(ex))
+    if (finishable && restState) await setRestStateAndPersist(null, newExercises)
+    if (!finishable && exerciseIndex === currentExerciseIndex) {
+      const nextIndex = newExercises.findIndex(
+        (ex: any, idx: number) => idx > exerciseIndex && !canExerciseBeFinished(ex),
+      )
+      if (nextIndex !== -1) await setExerciseIndex(nextIndex)
+    }
+  }
+
+  const restoreTrimmedSets = async (exerciseIndex: number) => {
+    const exercise = exercisesRef.current[exerciseIndex]
+    const trimmed = exercise?.trimmedSets
+    if (!Array.isArray(trimmed) || trimmed.length === 0) return
+    haptic("tap")
+    await commitSetList(exerciseIndex, [...exercise.sets, ...trimmed], [], { trimmedSets: undefined })
+  }
+
+  // One more set, prefilled from the row above it so the common case (same
+  // weight, see how many reps are left) is a single check away.
+  const addSet = async (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const last = exercise.sets[exercise.sets.length - 1]
+    const reps = last?.reps ?? null
+    const weight = last?.weight ?? null
+    const flagsResult = getSetFlags({
+      reps,
+      weight,
+      targetReps: exercise.targetReps,
+      historyReps: getCachedHistoryReps(exercise.name),
+    })
+    const newSet = {
+      id: generateSetId(),
+      reps,
+      weight,
+      completed: false,
+      isOutlier: flagsResult.flags.includes("rep_outlier"),
+      validationFlags: flagsResult.flags,
+      isIncomplete: flagsResult.isIncomplete,
+    }
+    haptic("tap")
+    await commitSetList(exerciseIndex, [...exercise.sets, newSet], [])
   }
 
   const updateExerciseMachineSetting = async (
@@ -3245,7 +3325,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     handleInputAutoSelect,
     completeSet,
     rateExercise,
-    handleApplyProgressiveOverload,
+    endExerciseHere,
+    restoreTrimmedSets,
+    addSet,
   })
   exercisePageHandlersRef.current = {
     updateExerciseMachineSetting,
@@ -3256,7 +3338,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     handleInputAutoSelect,
     completeSet,
     rateExercise,
-    handleApplyProgressiveOverload,
+    endExerciseHere,
+    restoreTrimmedSets,
+    addSet,
   }
   const stableUpdateMachineSetting = useCallback(
     (i: number, f: "seat", v: string) => exercisePageHandlersRef.current.updateExerciseMachineSetting(i, f, v),
@@ -3292,10 +3376,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     (i: number, r: ExerciseRating) => exercisePageHandlersRef.current.rateExercise(i, r),
     [],
   )
-  const stableApplyProgressiveOverload = useCallback(
-    (i: number) => exercisePageHandlersRef.current.handleApplyProgressiveOverload(i),
+  const stableEndExerciseHere = useCallback(
+    (i: number) => exercisePageHandlersRef.current.endExerciseHere(i),
     [],
   )
+  const stableRestoreTrimmedSets = useCallback(
+    (i: number) => exercisePageHandlersRef.current.restoreTrimmedSets(i),
+    [],
+  )
+  const stableAddSet = useCallback((i: number) => exercisePageHandlersRef.current.addSet(i), [])
   const registerWeightRef = useCallback((setId: string, node: HTMLInputElement | null) => {
     if (node) weightInputRefs.current.set(setId, node)
     else weightInputRefs.current.delete(setId)
@@ -4012,7 +4101,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               setValidationTrigger={setValidationTrigger}
               completeSet={stableCompleteSet}
               rateExercise={stableRateExercise}
-              handleApplyProgressiveOverload={stableApplyProgressiveOverload}
+              endExerciseHere={stableEndExerciseHere}
+              restoreTrimmedSets={stableRestoreTrimmedSets}
+              addSet={stableAddSet}
               setPlateDisplayMode={setPlateDisplayMode}
               setPlateStartingWeight={setPlateStartingWeight}
               onOpenExercise={openExercisePage}
