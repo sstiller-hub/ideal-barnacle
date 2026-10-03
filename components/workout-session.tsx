@@ -4273,6 +4273,16 @@ function SetKeyboardBar({
   onLog: () => void
 }) {
   const [inset, setInset] = useState(0)
+  // iOS floats its own ▲ ▼ ✓ form-assistant pill over the page just above
+  // the keyboard — roughly 20–60pt up from the keyboard's top edge, outside
+  // what the visual viewport reports. A bar parked on the viewport's bottom
+  // edge ends up underneath it, half covered and half untappable, so on iOS
+  // the bar lifts clear of it while a keyboard is up.
+  const isIOS =
+    typeof navigator !== "undefined" &&
+    (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+  const assistantClearance = inset > 0 && isIOS ? 64 : 0
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -4334,15 +4344,17 @@ function SetKeyboardBar({
       data-testid="set-keyboard-bar"
       className="ios-glass fixed z-[95] flex items-center"
       style={{
-        left: 0,
-        right: 0,
-        bottom: inset,
+        // Lifted clear of the iOS pill it floats as a toolbar; on the edge it
+        // runs edge to edge like a keyboard row.
+        left: assistantClearance ? 12 : 0,
+        right: assistantClearance ? 12 : 0,
+        bottom: inset + assistantClearance,
         gap: "8px",
         padding: "6px 12px",
         // With no keyboard (hardware keyboard, desktop) the bar sits on the
         // home indicator instead, so it clears that.
         paddingBottom: inset > 0 ? "6px" : "calc(6px + env(safe-area-inset-bottom, 0px))",
-        borderRadius: 0,
+        borderRadius: assistantClearance ? 20 : 0,
       }}
     >
       {button(`−${step}`, () => onStep(-step), { testId: "kb-step-down" })}
