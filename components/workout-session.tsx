@@ -44,6 +44,7 @@ import {
   markWorkoutPending,
   updateWorkoutDraft,
   upsertSet as upsertSetDraft,
+  deleteSet as deleteSetDraft,
   upsertAllSets,
   getWorkoutDraft,
   type WorkoutSetDraft,
@@ -235,12 +236,6 @@ function getExerciseLabel(name: string): string {
   return name
 }
 
-function parseRepRange(targetReps: string): { low: number; high: number } | null {
-  const match = targetReps.match(/^(\d+)\s*[-–]\s*(\d+)$/)
-  if (!match) return null
-  return { low: parseInt(match[1], 10), high: parseInt(match[2], 10) }
-}
-
 function isMachineExercise(name: string): boolean {
   const lower = name.toLowerCase()
   return (
@@ -333,7 +328,9 @@ type ExercisePageProps = {
   setValidationTrigger: (value: number) => void
   completeSet: (setIndex: number, options?: { startRest?: boolean; exerciseIndex?: number }) => void
   rateExercise: (exerciseIndex: number, rating: ExerciseRating) => void
-  handleApplyProgressiveOverload: (exerciseIndex: number) => void
+  endExerciseHere: (exerciseIndex: number) => void
+  restoreTrimmedSets: (exerciseIndex: number) => void
+  addSet: (exerciseIndex: number) => void
   setPlateDisplayMode: (mode: "per-side" | "total") => void
   setPlateStartingWeight: (value: number) => void
   onOpenExercise: (name: string) => void
@@ -377,7 +374,9 @@ const ExercisePage = memo(function ExercisePage({
   setValidationTrigger,
   completeSet,
   rateExercise,
-  handleApplyProgressiveOverload,
+  endExerciseHere,
+  restoreTrimmedSets,
+  addSet,
   setPlateDisplayMode,
   setPlateStartingWeight,
   onOpenExercise,
@@ -396,15 +395,9 @@ const ExercisePage = memo(function ExercisePage({
     exercise.sets.every((set: any) => set.completed && !isSetIncomplete(set))
   const isCompactSets = exercise.sets.length >= 4
   const canEditExercise = exerciseIndex === currentExerciseIndex || exerciseIndex < currentExerciseIndex
-  const exerciseRepRange = parseRepRange(exercise.targetReps ?? "")
-
-  const showProgressiveOverload =
-    exerciseIndex === currentExerciseIndex &&
-    exerciseRepRange !== null &&
-    exercise.sets.length > 0 &&
-    exercise.sets.every(
-      (set: any) => set.completed && typeof set.reps === "number" && set.reps >= exerciseRepRange.high
-    )
+  const completedCount = exercise.sets.filter((set: any) => set.completed).length
+  const hasIncompleteSets = exercise.sets.some((set: any) => !set.completed)
+  const trimmedCount = Array.isArray(exercise.trimmedSets) ? exercise.trimmedSets.length : 0
 
   return (
     <div
@@ -518,7 +511,7 @@ const ExercisePage = memo(function ExercisePage({
         >
           {exercise.sets.length} {plural(exercise.sets.length, "SET", "SETS")}
           {exercise.targetReps ? ` · TARGET ${exercise.targetReps} ${plural(Number(exercise.targetReps), "REP", "REPS")}` : ""}
-          {!isExerciseComplete && (
+          {!isExerciseComplete && exercise.sets.length > 0 && (
             <>
               {" · "}
               <span style={{ color: "var(--ink-50)", fontWeight: 600 }}>
@@ -1159,41 +1152,78 @@ const ExercisePage = memo(function ExercisePage({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showProgressiveOverload && (
-          <motion.div
-            key="progressive-overload"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}
-          >
-            <button
-              onClick={() => void handleApplyProgressiveOverload(exerciseIndex)}
-              type="button"
-              className="transition-colors duration-150"
-              style={{
-                background: "var(--ink-02)",
-                border: "1px solid var(--ink-08)",
-                borderRadius: "var(--radius-flat)",
-                padding: "7px 16px",
-                fontFamily: "var(--font-label)",
-                fontSize: "9px",
-                fontWeight: 600,
-                letterSpacing: "0.12em",
-                color: "var(--ink-70)",
-                cursor: "pointer",
-              }}
-            >
-              PROGRESSIVE OVERLOAD ↑
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* The honest exits. Finish stays gated on every remaining set being
+          logged, so the record never carries a set that did not happen; these
+          are how a set list is made to match what did. END HERE drops the
+          unlogged tail (SKIP EXERCISE when nothing was logged), UNDO brings it
+          back, + SET appends one more prefilled from the last row. */}
+      {exerciseIndex === currentExerciseIndex && canEditExercise && (
+        <div
+          className="flex items-center justify-between flex-wrap"
+          style={{ marginTop: "22px", gap: "10px" }}
+          data-testid="set-list-actions"
+        >
+          {trimmedCount > 0 ? (
+            <div className="flex items-center" style={{ gap: "10px" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-label)",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  color: "var(--ink-50)",
+                }}
+              >
+                {completedCount > 0 ? `ENDED AFTER SET ${completedCount}` : "SKIPPED"}
+                {" · "}
+                {trimmedCount} {plural(trimmedCount, "SET", "SETS")} DROPPED
+              </span>
+              <QuietAction label="UNDO" onClick={() => restoreTrimmedSets(exerciseIndex)} />
+            </div>
+          ) : (
+            <>
+              <QuietAction label="+ SET" onClick={() => addSet(exerciseIndex)} />
+              {hasIncompleteSets && (
+                <QuietAction
+                  label={completedCount > 0 ? "END HERE" : "SKIP EXERCISE"}
+                  onClick={() => endExerciseHere(exerciseIndex)}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 })
+
+// A quiet §4.6 control at a full 44pt height — the same chrome as the rating
+// buttons, sized so a thumb finds it without looking.
+function QuietAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="transition-colors duration-150"
+      style={{
+        minHeight: "44px",
+        background: "var(--ink-02)",
+        border: "1px solid var(--ink-08)",
+        borderRadius: "var(--radius-flat)",
+        padding: "0 16px",
+        fontFamily: "var(--font-label)",
+        fontSize: "9px",
+        fontWeight: 600,
+        letterSpacing: "0.12em",
+        color: "var(--ink-70)",
+        cursor: "pointer",
+        touchAction: "manipulation",
+      }}
+    >
+      {label}
+    </button>
+  )
+}
 
 export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
   const router = useRouter()
@@ -1359,7 +1389,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
-    const update = () => {
+    const update = (isFlip: boolean) => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
         scrollSettleTimeoutRef.current = null
@@ -1377,14 +1407,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // to be read as a swipe. holdIndexWrites owns the only release timer, so
       // an alignment landing inside this window extends it rather than racing
       // it.
-      holdIndexWrites(700)
+      //
+      // Only on a real flip. Arming it on mount as well made the pager deaf
+      // to a swipe for its first 700ms (longer under React's dev double
+      // mount), and the initial alignment already holds for its own scroll.
+      if (isFlip) holdIndexWrites(700)
     }
-    update()
-    query.addEventListener("change", update)
-    window.addEventListener("orientationchange", update)
+    const onFlip = () => update(true)
+    update(false)
+    query.addEventListener("change", onFlip)
+    window.addEventListener("orientationchange", onFlip)
     return () => {
-      query.removeEventListener("change", update)
-      window.removeEventListener("orientationchange", update)
+      query.removeEventListener("change", onFlip)
+      window.removeEventListener("orientationchange", onFlip)
     }
   }, [holdIndexWrites])
 
@@ -2188,6 +2223,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       const width = container.offsetWidth
       // Mid-relayout the container can report 0; there is nothing to align to.
       if (!width) return
+      // A swipe in flight is not drift. A late layout change (fonts settling,
+      // a row growing) used to fire this mid-swipe and snap the pager back to
+      // the page the user was leaving; scrollend records where it lands.
+      if (userDrivenScrollRef.current) return
       const target = currentExerciseIndexRef.current * width
       if (width === pageWidthRef.current && Math.abs(container.scrollLeft - target) <= 1) return
       alignCarousel(currentExerciseIndexRef.current)
@@ -2519,76 +2558,126 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     signalAutoSaved()
   }
 
-  const handleApplyProgressiveOverload = async (exerciseIndex: number) => {
-    if (!session) return
-    const exercise = exercises[exerciseIndex]
-    if (!exercise) return
-
-    const repRange = parseRepRange(exercise.targetReps ?? "")
-    if (!repRange) return
-
+  // Replace one exercise's set list and persist it everywhere the live session
+  // lives. Removed sets are deleted from the draft store explicitly: its bulk
+  // write merges by set id, so a set merely absent from the list would still
+  // ride into the committed workout.
+  const commitSetList = async (
+    exerciseIndex: number,
+    nextSets: any[],
+    removedSets: any[],
+    extra: Record<string, unknown> = {},
+  ) => {
+    if (!session) return null
     const workoutId = session.workoutId
-    const historyReps = getCachedHistoryReps(exercise.name)
-
-    const newExercises = exercises.map((ex: any, idx: number) => {
-      if (idx !== exerciseIndex) return ex
-
-      const newSets = ex.sets.map((set: any, setIdx: number) => {
-        const newWeight = typeof set.weight === "number" ? set.weight + 5 : 5
-        const newReps = repRange.low
-
-        const newSet = { ...set, weight: newWeight, reps: newReps, completed: false }
-
-        const flagsResult = getSetFlags({
-          reps: newSet.reps,
-          weight: newSet.weight,
-          targetReps: ex.targetReps,
-          historyReps,
-        })
-
-        const updatedSet = {
-          ...newSet,
-          isOutlier: flagsResult.flags.includes("rep_outlier"),
-          validationFlags: flagsResult.flags,
-          isIncomplete: flagsResult.isIncomplete,
-        }
-
-        if (workoutId) {
-          void persistSetDraft(workoutId, ex, updatedSet, setIdx)
-        }
-        if (session?.remoteSessionId) {
-          void upsertSet({
-            sessionId: session.remoteSessionId,
-            setId: updatedSet.id,
-            exerciseId: ex.id,
-            setIndex: setIdx,
-            reps: updatedSet.reps,
-            weight: updatedSet.weight,
-            completed: updatedSet.completed,
-            validationFlags: updatedSet.validationFlags,
-          })
-        }
-
-        return updatedSet
-      })
-
-      return { ...ex, sets: newSets, completed: false }
+    const newExercises = exercises.map((exercise: any, idx: number) => {
+      if (idx !== exerciseIndex) return exercise
+      return {
+        ...exercise,
+        ...extra,
+        sets: nextSets,
+        // An emptied exercise is finishable but not "completed": nothing was
+        // done, so it earns no rating prompt.
+        completed:
+          nextSets.length > 0 && nextSets.every((set: any) => set.completed && !isSetIncomplete(set)),
+      }
     })
+    const exercise = newExercises[exerciseIndex]
+    if (workoutId) {
+      removedSets.forEach((set: any) => {
+        if (set?.id) void deleteSetDraft(workoutId, set.id)
+      })
+      void syncExerciseDraft(workoutId, exercise, nextSets)
+    }
+    if (session.remoteSessionId) {
+      nextSets.forEach((set: any, idx: number) => {
+        void upsertSet({
+          sessionId: session.remoteSessionId!,
+          setId: set.id,
+          exerciseId: exercise.id,
+          setIndex: idx,
+          reps: set.reps,
+          weight: set.weight,
+          completed: set.completed,
+          validationFlags: set.validationFlags,
+        })
+      })
+    }
 
     exercisesRef.current = newExercises
     setExercises(newExercises)
-
-    const updatedSession: WorkoutSession = {
-      ...session,
-      exercises: newExercises,
-    }
-
+    const updatedSession: WorkoutSession = { ...session, exercises: newExercises }
     sessionRef.current = updatedSession
     setSession(updatedSession)
     await saveSession(updatedSession)
     signalAutoSaved()
+    return newExercises
+  }
 
-    toast.success("+5 lbs applied", { duration: 2000 })
+  // Drop every unlogged set so the exercise is finishable as it stands. The
+  // dropped sets are kept on the exercise for UNDO and never reach the record.
+  const endExerciseHere = async (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const kept = exercise.sets.filter((set: any) => set.completed)
+    const dropped = exercise.sets.filter((set: any) => !set.completed)
+    if (dropped.length === 0) return
+    haptic("tap")
+    const newExercises = await commitSetList(exerciseIndex, kept, dropped, {
+      trimmedSets: [...(Array.isArray(exercise.trimmedSets) ? exercise.trimmedSets : []), ...dropped],
+    })
+    if (!newExercises) return
+
+    toast(kept.length > 0 ? `Ended after set ${kept.length}` : `Skipped ${getExerciseLabel(exercise.name)}`, {
+      duration: 5000,
+      action: { label: "Undo", onClick: () => void restoreTrimmedSets(exerciseIndex) },
+    })
+
+    // Same hand-off as logging the last set: on to the next exercise that
+    // still has work, and no rest dock counting down to nothing.
+    const finishable = newExercises.every((ex: any) => canExerciseBeFinished(ex))
+    if (finishable && restState) await setRestStateAndPersist(null, newExercises)
+    if (!finishable && exerciseIndex === currentExerciseIndex) {
+      const nextIndex = newExercises.findIndex(
+        (ex: any, idx: number) => idx > exerciseIndex && !canExerciseBeFinished(ex),
+      )
+      if (nextIndex !== -1) await setExerciseIndex(nextIndex)
+    }
+  }
+
+  const restoreTrimmedSets = async (exerciseIndex: number) => {
+    const exercise = exercisesRef.current[exerciseIndex]
+    const trimmed = exercise?.trimmedSets
+    if (!Array.isArray(trimmed) || trimmed.length === 0) return
+    haptic("tap")
+    await commitSetList(exerciseIndex, [...exercise.sets, ...trimmed], [], { trimmedSets: undefined })
+  }
+
+  // One more set, prefilled from the row above it so the common case (same
+  // weight, see how many reps are left) is a single check away.
+  const addSet = async (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex]
+    if (!exercise) return
+    const last = exercise.sets[exercise.sets.length - 1]
+    const reps = last?.reps ?? null
+    const weight = last?.weight ?? null
+    const flagsResult = getSetFlags({
+      reps,
+      weight,
+      targetReps: exercise.targetReps,
+      historyReps: getCachedHistoryReps(exercise.name),
+    })
+    const newSet = {
+      id: generateSetId(),
+      reps,
+      weight,
+      completed: false,
+      isOutlier: flagsResult.flags.includes("rep_outlier"),
+      validationFlags: flagsResult.flags,
+      isIncomplete: flagsResult.isIncomplete,
+    }
+    haptic("tap")
+    await commitSetList(exerciseIndex, [...exercise.sets, newSet], [])
   }
 
   const updateExerciseMachineSetting = async (
@@ -3245,7 +3334,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     handleInputAutoSelect,
     completeSet,
     rateExercise,
-    handleApplyProgressiveOverload,
+    endExerciseHere,
+    restoreTrimmedSets,
+    addSet,
   })
   exercisePageHandlersRef.current = {
     updateExerciseMachineSetting,
@@ -3256,7 +3347,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     handleInputAutoSelect,
     completeSet,
     rateExercise,
-    handleApplyProgressiveOverload,
+    endExerciseHere,
+    restoreTrimmedSets,
+    addSet,
   }
   const stableUpdateMachineSetting = useCallback(
     (i: number, f: "seat", v: string) => exercisePageHandlersRef.current.updateExerciseMachineSetting(i, f, v),
@@ -3292,10 +3385,15 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     (i: number, r: ExerciseRating) => exercisePageHandlersRef.current.rateExercise(i, r),
     [],
   )
-  const stableApplyProgressiveOverload = useCallback(
-    (i: number) => exercisePageHandlersRef.current.handleApplyProgressiveOverload(i),
+  const stableEndExerciseHere = useCallback(
+    (i: number) => exercisePageHandlersRef.current.endExerciseHere(i),
     [],
   )
+  const stableRestoreTrimmedSets = useCallback(
+    (i: number) => exercisePageHandlersRef.current.restoreTrimmedSets(i),
+    [],
+  )
+  const stableAddSet = useCallback((i: number) => exercisePageHandlersRef.current.addSet(i), [])
   const registerWeightRef = useCallback((setId: string, node: HTMLInputElement | null) => {
     if (node) weightInputRefs.current.set(setId, node)
     else weightInputRefs.current.delete(setId)
@@ -3317,6 +3415,75 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // ignore focus errors
     }
   }, [])
+  // Keyboard accessory bar. The iOS number pad has no return key, so every
+  // Enter shortcut on the set row never exists on the phone: changing a number
+  // meant tap, type, tap away to drop the keyboard, hunt for the check. While
+  // a set field is focused the bar sits on the visual viewport's bottom edge —
+  // above the keypad — with the step the field wants, NEXT and LOG SET.
+  const editingSet = (() => {
+    if (!editingSetId || !editingField) return null
+    for (let exerciseIndex = 0; exerciseIndex < exercises.length; exerciseIndex += 1) {
+      const sets: any[] = exercises[exerciseIndex].sets ?? []
+      const setIndex = sets.findIndex((set: any) => set.id === editingSetId)
+      if (setIndex === -1) continue
+      const set = sets[setIndex]
+      const nextTarget: { setId: string; field: "reps" | "weight" } | null =
+        editingField === "weight"
+          ? { setId: set.id, field: "reps" }
+          : sets[setIndex + 1]?.id
+            ? { setId: sets[setIndex + 1].id, field: "weight" }
+            : null
+      return { exerciseIndex, setIndex, set, nextTarget }
+    }
+    return null
+  })()
+
+  const blurActiveInput = () => {
+    if (typeof document === "undefined") return
+    const active = document.activeElement as HTMLElement | null
+    if (active && typeof active.blur === "function") active.blur()
+    setFocusedInput(null)
+  }
+
+  const stepEditingField = (delta: number) => {
+    if (!editingSet || !editingField) return
+    const { exerciseIndex, setIndex, set } = editingSet
+    haptic("tap")
+    if (editingField === "weight") {
+      const base = typeof set.weight === "number" ? set.weight : 0
+      void updateSetDataForExercise(exerciseIndex, setIndex, "weight", Math.max(0, base + delta))
+      return
+    }
+    const base = typeof set.reps === "number" ? set.reps : 0
+    const next = Math.min(REP_MAX, Math.max(REP_MIN, base + delta))
+    setRepCapErrors((prev) => ({ ...prev, [set.id]: false }))
+    void updateSetDataForExercise(exerciseIndex, setIndex, "reps", next)
+  }
+
+  const advanceFromEditingField = () => {
+    if (!editingSet) return
+    if (editingSet.nextTarget) {
+      focusSetField(editingSet.nextTarget.setId, editingSet.nextTarget.field)
+      return
+    }
+    blurActiveInput()
+  }
+
+  const logEditingSet = () => {
+    if (!editingSet) return
+    const { exerciseIndex, setIndex, set } = editingSet
+    if (set.completed) {
+      blurActiveInput()
+      return
+    }
+    if (isSetIncomplete(set) || repCapErrors[set.id]) {
+      setValidationTrigger(Date.now())
+      return
+    }
+    const isCurrent = exerciseIndex === currentExerciseIndex && setIndex === currentSetIndex
+    void completeSet(setIndex, { exerciseIndex, startRest: isCurrent })
+  }
+
   const openExercisePage = useCallback(
     (name: string) => {
       router.push(`/exercise/${encodeURIComponent(name)}?from=session`)
@@ -3330,7 +3497,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         className="min-h-screen"
         style={{
           background: "var(--background)",
-          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
@@ -4013,7 +4179,9 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               setValidationTrigger={setValidationTrigger}
               completeSet={stableCompleteSet}
               rateExercise={stableRateExercise}
-              handleApplyProgressiveOverload={stableApplyProgressiveOverload}
+              endExerciseHere={stableEndExerciseHere}
+              restoreTrimmedSets={stableRestoreTrimmedSets}
+              addSet={stableAddSet}
               setPlateDisplayMode={setPlateDisplayMode}
               setPlateStartingWeight={setPlateStartingWeight}
               onOpenExercise={openExercisePage}
@@ -4028,6 +4196,18 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           ))}
         </div>
       </div>
+
+      {editingSet && editingField ? (
+        <SetKeyboardBar
+          field={editingField}
+          isLogged={Boolean(editingSet.set.completed)}
+          canLog={!isSetIncomplete(editingSet.set) && !repCapErrors[editingSet.set.id]}
+          hasNext={editingSet.nextTarget !== null}
+          onStep={stepEditingField}
+          onNext={advanceFromEditingField}
+          onLog={logEditingSet}
+        />
+      ) : null}
 
       <style>{`
         input[type="number"]::-webkit-inner-spin-button,
@@ -4065,6 +4245,125 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         canSaveToRoutine={canSaveToRoutine}
         onApply={applyReorder}
       />
+    </div>
+  )
+}
+
+/**
+ * The keyboard accessory bar: glass strip on the visual viewport's bottom edge
+ * (above the on-screen keyboard) while a set field is focused. Its buttons
+ * cancel pointerdown so the field keeps focus and the keyboard stays up; the
+ * one that logs the set drops both on purpose.
+ */
+function SetKeyboardBar({
+  field,
+  isLogged,
+  canLog,
+  hasNext,
+  onStep,
+  onNext,
+  onLog,
+}: {
+  field: "reps" | "weight"
+  isLogged: boolean
+  canLog: boolean
+  hasNext: boolean
+  onStep: (delta: number) => void
+  onNext: () => void
+  onLog: () => void
+}) {
+  const [inset, setInset] = useState(0)
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    // The layout viewport does not shrink for the keyboard in a standalone
+    // web app, but the visual viewport does: its bottom edge is the keyboard.
+    const update = () =>
+      setInset(Math.max(0, window.innerHeight - (viewport.offsetTop + viewport.height)))
+    update()
+    viewport.addEventListener("resize", update)
+    viewport.addEventListener("scroll", update)
+    return () => {
+      viewport.removeEventListener("resize", update)
+      viewport.removeEventListener("scroll", update)
+    }
+  }, [])
+
+  const step = field === "weight" ? 5 : 1
+  const keepFocus = (event: React.PointerEvent) => event.preventDefault()
+
+  const button = (
+    label: string,
+    onClick: () => void,
+    options: { primary?: boolean; dim?: boolean; testId?: string } = {},
+  ) => (
+    <button
+      type="button"
+      onPointerDown={keepFocus}
+      onClick={onClick}
+      data-testid={options.testId}
+      className="flex items-center justify-center transition-opacity duration-150"
+      style={{
+        minWidth: options.primary ? "92px" : "56px",
+        height: "44px",
+        padding: "0 14px",
+        borderRadius: "999px",
+        border: "none",
+        background: options.primary ? "#fff" : "var(--ink-12)",
+        boxShadow: options.primary ? "none" : "inset 0 0 0 0.5px var(--ink-15)",
+        color: options.primary ? "#000" : "#fff",
+        fontFamily: options.primary ? "var(--font-label)" : undefined,
+        fontSize: options.primary ? "11px" : "15px",
+        fontWeight: 600,
+        letterSpacing: options.primary ? "0.12em" : "0",
+        fontVariantNumeric: "tabular-nums",
+        opacity: options.dim ? 0.5 : 1,
+        touchAction: "manipulation",
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div
+      role="toolbar"
+      aria-label={field === "weight" ? "Weight entry" : "Reps entry"}
+      data-testid="set-keyboard-bar"
+      className="ios-glass fixed z-[95] flex items-center"
+      style={{
+        left: 0,
+        right: 0,
+        bottom: inset,
+        gap: "8px",
+        padding: "6px 12px",
+        // With no keyboard (hardware keyboard, desktop) the bar sits on the
+        // home indicator instead, so it clears that.
+        paddingBottom: inset > 0 ? "6px" : "calc(6px + env(safe-area-inset-bottom, 0px))",
+        borderRadius: 0,
+      }}
+    >
+      {button(`−${step}`, () => onStep(-step), { testId: "kb-step-down" })}
+      {button(`+${step}`, () => onStep(step), { testId: "kb-step-up" })}
+      <span
+        style={{
+          flex: 1,
+          textAlign: "center",
+          fontFamily: "var(--font-label)",
+          fontSize: "9px",
+          fontWeight: 700,
+          letterSpacing: "0.18em",
+          color: "var(--ink-50)",
+        }}
+      >
+        {field === "weight" ? "LB" : "REPS"}
+      </span>
+      {hasNext ? button("NEXT", onNext, { testId: "kb-next" }) : null}
+      {isLogged
+        ? button("DONE", onLog, { primary: true, testId: "kb-log" })
+        : button("LOG SET", onLog, { primary: true, dim: !canLog, testId: "kb-log" })}
     </div>
   )
 }
