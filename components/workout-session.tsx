@@ -511,7 +511,7 @@ const ExercisePage = memo(function ExercisePage({
         >
           {exercise.sets.length} {plural(exercise.sets.length, "SET", "SETS")}
           {exercise.targetReps ? ` · TARGET ${exercise.targetReps} ${plural(Number(exercise.targetReps), "REP", "REPS")}` : ""}
-          {!isExerciseComplete && (
+          {!isExerciseComplete && exercise.sets.length > 0 && (
             <>
               {" · "}
               <span style={{ color: "var(--ink-50)", fontWeight: 600 }}>
@@ -1389,7 +1389,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
 
   useEffect(() => {
     const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
-    const update = () => {
+    const update = (isFlip: boolean) => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
         scrollSettleTimeoutRef.current = null
@@ -1407,14 +1407,19 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // to be read as a swipe. holdIndexWrites owns the only release timer, so
       // an alignment landing inside this window extends it rather than racing
       // it.
-      holdIndexWrites(700)
+      //
+      // Only on a real flip. Arming it on mount as well made the pager deaf
+      // to a swipe for its first 700ms (longer under React's dev double
+      // mount), and the initial alignment already holds for its own scroll.
+      if (isFlip) holdIndexWrites(700)
     }
-    update()
-    query.addEventListener("change", update)
-    window.addEventListener("orientationchange", update)
+    const onFlip = () => update(true)
+    update(false)
+    query.addEventListener("change", onFlip)
+    window.addEventListener("orientationchange", onFlip)
     return () => {
-      query.removeEventListener("change", update)
-      window.removeEventListener("orientationchange", update)
+      query.removeEventListener("change", onFlip)
+      window.removeEventListener("orientationchange", onFlip)
     }
   }, [holdIndexWrites])
 
@@ -2218,6 +2223,10 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       const width = container.offsetWidth
       // Mid-relayout the container can report 0; there is nothing to align to.
       if (!width) return
+      // A swipe in flight is not drift. A late layout change (fonts settling,
+      // a row growing) used to fire this mid-swipe and snap the pager back to
+      // the page the user was leaving; scrollend records where it lands.
+      if (userDrivenScrollRef.current) return
       const target = currentExerciseIndexRef.current * width
       if (width === pageWidthRef.current && Math.abs(container.scrollLeft - target) <= 1) return
       alignCarousel(currentExerciseIndexRef.current)
@@ -3406,6 +3415,75 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
       // ignore focus errors
     }
   }, [])
+  // Keyboard accessory bar. The iOS number pad has no return key, so every
+  // Enter shortcut on the set row never exists on the phone: changing a number
+  // meant tap, type, tap away to drop the keyboard, hunt for the check. While
+  // a set field is focused the bar sits on the visual viewport's bottom edge —
+  // above the keypad — with the step the field wants, NEXT and LOG SET.
+  const editingSet = (() => {
+    if (!editingSetId || !editingField) return null
+    for (let exerciseIndex = 0; exerciseIndex < exercises.length; exerciseIndex += 1) {
+      const sets: any[] = exercises[exerciseIndex].sets ?? []
+      const setIndex = sets.findIndex((set: any) => set.id === editingSetId)
+      if (setIndex === -1) continue
+      const set = sets[setIndex]
+      const nextTarget: { setId: string; field: "reps" | "weight" } | null =
+        editingField === "weight"
+          ? { setId: set.id, field: "reps" }
+          : sets[setIndex + 1]?.id
+            ? { setId: sets[setIndex + 1].id, field: "weight" }
+            : null
+      return { exerciseIndex, setIndex, set, nextTarget }
+    }
+    return null
+  })()
+
+  const blurActiveInput = () => {
+    if (typeof document === "undefined") return
+    const active = document.activeElement as HTMLElement | null
+    if (active && typeof active.blur === "function") active.blur()
+    setFocusedInput(null)
+  }
+
+  const stepEditingField = (delta: number) => {
+    if (!editingSet || !editingField) return
+    const { exerciseIndex, setIndex, set } = editingSet
+    haptic("tap")
+    if (editingField === "weight") {
+      const base = typeof set.weight === "number" ? set.weight : 0
+      void updateSetDataForExercise(exerciseIndex, setIndex, "weight", Math.max(0, base + delta))
+      return
+    }
+    const base = typeof set.reps === "number" ? set.reps : 0
+    const next = Math.min(REP_MAX, Math.max(REP_MIN, base + delta))
+    setRepCapErrors((prev) => ({ ...prev, [set.id]: false }))
+    void updateSetDataForExercise(exerciseIndex, setIndex, "reps", next)
+  }
+
+  const advanceFromEditingField = () => {
+    if (!editingSet) return
+    if (editingSet.nextTarget) {
+      focusSetField(editingSet.nextTarget.setId, editingSet.nextTarget.field)
+      return
+    }
+    blurActiveInput()
+  }
+
+  const logEditingSet = () => {
+    if (!editingSet) return
+    const { exerciseIndex, setIndex, set } = editingSet
+    if (set.completed) {
+      blurActiveInput()
+      return
+    }
+    if (isSetIncomplete(set) || repCapErrors[set.id]) {
+      setValidationTrigger(Date.now())
+      return
+    }
+    const isCurrent = exerciseIndex === currentExerciseIndex && setIndex === currentSetIndex
+    void completeSet(setIndex, { exerciseIndex, startRest: isCurrent })
+  }
+
   const openExercisePage = useCallback(
     (name: string) => {
       router.push(`/exercise/${encodeURIComponent(name)}?from=session`)
@@ -4119,6 +4197,18 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         </div>
       </div>
 
+      {editingSet && editingField ? (
+        <SetKeyboardBar
+          field={editingField}
+          isLogged={Boolean(editingSet.set.completed)}
+          canLog={!isSetIncomplete(editingSet.set) && !repCapErrors[editingSet.set.id]}
+          hasNext={editingSet.nextTarget !== null}
+          onStep={stepEditingField}
+          onNext={advanceFromEditingField}
+          onLog={logEditingSet}
+        />
+      ) : null}
+
       <style>{`
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button {
@@ -4155,6 +4245,125 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         canSaveToRoutine={canSaveToRoutine}
         onApply={applyReorder}
       />
+    </div>
+  )
+}
+
+/**
+ * The keyboard accessory bar: glass strip on the visual viewport's bottom edge
+ * (above the on-screen keyboard) while a set field is focused. Its buttons
+ * cancel pointerdown so the field keeps focus and the keyboard stays up; the
+ * one that logs the set drops both on purpose.
+ */
+function SetKeyboardBar({
+  field,
+  isLogged,
+  canLog,
+  hasNext,
+  onStep,
+  onNext,
+  onLog,
+}: {
+  field: "reps" | "weight"
+  isLogged: boolean
+  canLog: boolean
+  hasNext: boolean
+  onStep: (delta: number) => void
+  onNext: () => void
+  onLog: () => void
+}) {
+  const [inset, setInset] = useState(0)
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    // The layout viewport does not shrink for the keyboard in a standalone
+    // web app, but the visual viewport does: its bottom edge is the keyboard.
+    const update = () =>
+      setInset(Math.max(0, window.innerHeight - (viewport.offsetTop + viewport.height)))
+    update()
+    viewport.addEventListener("resize", update)
+    viewport.addEventListener("scroll", update)
+    return () => {
+      viewport.removeEventListener("resize", update)
+      viewport.removeEventListener("scroll", update)
+    }
+  }, [])
+
+  const step = field === "weight" ? 5 : 1
+  const keepFocus = (event: React.PointerEvent) => event.preventDefault()
+
+  const button = (
+    label: string,
+    onClick: () => void,
+    options: { primary?: boolean; dim?: boolean; testId?: string } = {},
+  ) => (
+    <button
+      type="button"
+      onPointerDown={keepFocus}
+      onClick={onClick}
+      data-testid={options.testId}
+      className="flex items-center justify-center transition-opacity duration-150"
+      style={{
+        minWidth: options.primary ? "92px" : "56px",
+        height: "44px",
+        padding: "0 14px",
+        borderRadius: "999px",
+        border: "none",
+        background: options.primary ? "#fff" : "var(--ink-12)",
+        boxShadow: options.primary ? "none" : "inset 0 0 0 0.5px var(--ink-15)",
+        color: options.primary ? "#000" : "#fff",
+        fontFamily: options.primary ? "var(--font-label)" : undefined,
+        fontSize: options.primary ? "11px" : "15px",
+        fontWeight: 600,
+        letterSpacing: options.primary ? "0.12em" : "0",
+        fontVariantNumeric: "tabular-nums",
+        opacity: options.dim ? 0.5 : 1,
+        touchAction: "manipulation",
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div
+      role="toolbar"
+      aria-label={field === "weight" ? "Weight entry" : "Reps entry"}
+      data-testid="set-keyboard-bar"
+      className="ios-glass fixed z-[95] flex items-center"
+      style={{
+        left: 0,
+        right: 0,
+        bottom: inset,
+        gap: "8px",
+        padding: "6px 12px",
+        // With no keyboard (hardware keyboard, desktop) the bar sits on the
+        // home indicator instead, so it clears that.
+        paddingBottom: inset > 0 ? "6px" : "calc(6px + env(safe-area-inset-bottom, 0px))",
+        borderRadius: 0,
+      }}
+    >
+      {button(`−${step}`, () => onStep(-step), { testId: "kb-step-down" })}
+      {button(`+${step}`, () => onStep(step), { testId: "kb-step-up" })}
+      <span
+        style={{
+          flex: 1,
+          textAlign: "center",
+          fontFamily: "var(--font-label)",
+          fontSize: "9px",
+          fontWeight: 700,
+          letterSpacing: "0.18em",
+          color: "var(--ink-50)",
+        }}
+      >
+        {field === "weight" ? "LB" : "REPS"}
+      </span>
+      {hasNext ? button("NEXT", onNext, { testId: "kb-next" }) : null}
+      {isLogged
+        ? button("DONE", onLog, { primary: true, testId: "kb-log" })
+        : button("LOG SET", onLog, { primary: true, dim: !canLog, testId: "kb-log" })}
     </div>
   )
 }

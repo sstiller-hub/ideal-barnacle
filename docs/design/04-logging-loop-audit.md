@@ -4,7 +4,7 @@
 **Lens:** speed (fewest actions per set), accuracy (the record says what happened), access (every control reachable with one thumb, a bar in the other hand, at arm's length), and the "feels native" delight the iOS pass started.
 **Method:** code read of `components/workout-session.tsx`, `app/page.tsx`, `app/workout/session/page.tsx`, `app/workout-summary/page.tsx`, `lib/session-feedback.ts`, `lib/set-validation.ts`; Playwright at iPhone 15 Pro size (393 × 852 standalone, 393 × 659 in a Safari tab) with seeded history, 19 screens captured; DOM sweep for sub-44pt targets and sub-11px text; pixel sampling of the device screenshot.
 
-Fixed in the same PR as this audit: **B1** (the status-bar smear) and **B2** (the zero-delta chip). Fixed in the follow-up (`fix/logging-loop-p0s`): **A1** and **A6** (END HERE / SKIP EXERCISE / UNDO / + SET under the set list), and **A2** (the overload rewrite is removed). Everything else is a recommendation, ranked.
+Fixed in the same PR as this audit: **B1** (the status-bar smear) and **B2** (the zero-delta chip). Fixed in the follow-up (`fix/logging-loop-p0s`): **A1** and **A6** (END HERE / SKIP EXERCISE / UNDO / + SET under the set list), and **A2** (the overload rewrite is removed). Fixed in `fix/keyboard-accessory-bar`: **C1 + C2** (the keyboard accessory bar). Everything else is a recommendation, ranked.
 
 ---
 
