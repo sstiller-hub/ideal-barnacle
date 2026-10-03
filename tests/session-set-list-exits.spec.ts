@@ -84,8 +84,10 @@ test("SKIP EXERCISE on everything makes the workout finishable without logging a
   await startSession(page)
 
   await pageOf(page, "Overhand Row").getByRole("button", { name: "SKIP EXERCISE" }).click()
-  await expect(pageOf(page, "Overhand Row").getByText("SKIPPED · 3 SETS DROPPED")).toBeVisible()
+  // Skipping hands off to the next exercise; the dropped-sets line lives on
+  // the page left behind and is covered by the END HERE test.
   await expect(page.getByText("EXERCISE 2 OF 2")).toBeVisible()
+  await expect(pageOf(page, "Overhand Row").locator('input[type="number"]')).toHaveCount(0)
 
   await pageOf(page, "Incline Dumbbell Bench").getByRole("button", { name: "SKIP EXERCISE" }).click()
 
@@ -113,9 +115,10 @@ test("+ SET appends a set prefilled from the row above and re-gates Finish", asy
 
   await expect(setInputs).toHaveCount(6)
   await setInputs.nth(4).fill("100")
-  // Dispatched rather than clicked: in dev the Next.js overlay badge sits on
-  // the bottom-left corner, exactly over this button, and intercepts pointers.
-  await row.getByRole("button", { name: "+ SET" }).dispatchEvent("click")
+  // Typing leaves the field focused, which keeps the keyboard bar up over the
+  // bottom of the list; a user would have dismissed the keyboard here.
+  await setInputs.nth(4).blur()
+  await row.getByRole("button", { name: "+ SET" }).click()
   await expect(setInputs).toHaveCount(8)
   await expect(row.getByText("SET 04")).toBeVisible()
   await expect(row.getByText("4 SETS · TARGET 8 REPS")).toBeVisible()
