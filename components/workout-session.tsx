@@ -3765,7 +3765,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
                   style={{
                     fontFamily: "var(--font-label)",
                     fontSize: "9px",
-                    fontWeight: 700,
+                    fontWeight: 600,
                     letterSpacing: "0.19em",
                     color: "var(--ink-50)",
                     lineHeight: 1,

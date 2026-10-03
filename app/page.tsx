@@ -337,25 +337,6 @@ export default function Home() {
   }, [router])
 
   useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow
-    const previousBodyOverscroll = document.body.style.overscrollBehavior
-    const previousHtmlOverflow = document.documentElement.style.overflow
-    const previousHtmlOverscroll = document.documentElement.style.overscrollBehavior
-
-    document.body.style.overflow = "hidden"
-    document.body.style.overscrollBehavior = "none"
-    document.documentElement.style.overflow = "hidden"
-    document.documentElement.style.overscrollBehavior = "none"
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow
-      document.body.style.overscrollBehavior = previousBodyOverscroll
-      document.documentElement.style.overflow = previousHtmlOverflow
-      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll
-    }
-  }, [])
-
-  useEffect(() => {
     const handleUpdate = () => {
       setPrExcludedNames(getPrExcludedExercises())
     }
@@ -1566,6 +1547,34 @@ export default function Home() {
     return null
   })()
 
+  // The action sits in the page flow, right under the day's numbers. It used
+  // to be pinned above the tab bar on its own black ground, which ate the
+  // bottom of the screen and swallowed the swipes that should scroll the page.
+  const dayAction =
+    pinnedAction && !showWorkoutPicker ? (
+      <button
+        type="button"
+        onClick={pinnedAction.onClick}
+        className="w-full flex items-center justify-center transition-opacity duration-base"
+        data-testid="home-day-action"
+        style={{
+          height: "52px",
+          margin: "4px 0 22px",
+          borderRadius: "var(--radius-xs)",
+          background: pinnedAction.filled ? "#fff" : "transparent",
+          border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
+          color: pinnedAction.filled ? "#000" : "var(--ink-90)",
+          fontFamily: "var(--font-label)",
+          fontSize: "13px",
+          fontWeight: 600,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
+        {pinnedAction.label}
+      </button>
+    ) : null
+
   // A cold start that is being redirected back into the active workout paints
   // the session screen next; showing the home screen for those few frames would
   // be the same jarring "replaced my place" flash the redirect exists to fix.
@@ -1600,10 +1609,7 @@ export default function Home() {
           minHeight: "var(--app-vh)",
           // The calendar carries the top safe-area inset itself, so adding it
           // here as well left a dead band above the month header.
-          paddingBottom: pinnedAction
-            ? // Clears the pinned stack: tab bar (116) + gap (12) + button (56) + fade (24) + 4
-              "calc(env(safe-area-inset-bottom, 0px) + 212px)"
-            : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
           background: "var(--background)",
           boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
@@ -1976,6 +1982,8 @@ export default function Home() {
                 )
               })()}
 
+              {dayAction}
+
               {displayExercises && displayExercises.length > 0 && (
                 <div style={{ marginBottom: "14px" }}>
                   {displayExercises.map((exercise: any, index: number) => (
@@ -1990,8 +1998,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* The day's action is pinned above the tab bar now, so it stays
-                  reachable however far the ledger rows run. */}
             </>
           )}
 
@@ -2048,6 +2054,8 @@ export default function Home() {
               )}
             </div>
           )}
+
+          {actualState === "rest" && dayAction}
 
           {actualState === "rest" && nextWorkout && (() => {
             const exercises = nextWorkout.routine.exercises ?? []
@@ -2116,8 +2124,10 @@ export default function Home() {
                 })()}
               </div>
 
-              {/* Only the first few rows show by default, so the pinned action
-                  stays visible; the rest are one scroll away. */}
+              {dayAction}
+
+              {/* Only the first few rows show by default; the rest are one
+                  tap away. */}
               <div style={{ marginBottom: "14px" }}>
                 {(showAllExercises ? displayExercises : displayExercises.slice(0, DAY_PANEL_ROW_LIMIT)).map(
                   (exercise: any, index: number) => {
@@ -2490,50 +2500,6 @@ export default function Home() {
         }
         `}</style>
       </main>
-
-      {/* The day's one action, pinned clear of the glass tab bar. It is hidden
-          while the routine menu is open — the scrim covers it anyway. */}
-      {!showWorkoutPicker && pinnedAction && (
-        <div
-          className="fixed z-[80]"
-          style={{
-            left: 0,
-            right: 0,
-            // The ground runs all the way to the bottom edge, behind the tab
-            // bar. Stopping it above the tab bar left a strip where rows
-            // scrolled through between the button and the bar.
-            bottom: 0,
-            padding: "0 20px",
-            // Fades into the page black itself (a hardcoded #0D0D0F read as a
-            // grey box over the pure-black page). Pixel stops keep the fade
-            // 24px tall however tall the ground is.
-            background: "linear-gradient(to bottom, transparent 0px, var(--background) 24px)",
-            paddingTop: "24px",
-            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 128px)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={pinnedAction.onClick}
-            className="w-full flex items-center justify-center transition-opacity duration-base"
-            data-testid="home-pinned-action"
-            style={{
-              height: "56px",
-              borderRadius: "var(--radius-xs)",
-              background: pinnedAction.filled ? "#fff" : "var(--background)",
-              border: pinnedAction.filled ? "none" : "1px solid var(--ink-15)",
-              color: pinnedAction.filled ? "#000" : "var(--ink-90)",
-              fontFamily: "var(--font-label)",
-              fontSize: "13px",
-              fontWeight: 700,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-            }}
-          >
-            {pinnedAction.label}
-          </button>
-        </div>
-      )}
 
       <IosTabBar active="home" />
     </>
