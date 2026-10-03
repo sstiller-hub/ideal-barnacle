@@ -406,7 +406,17 @@ const ExercisePage = memo(function ExercisePage({
         width: "100%",
         flexShrink: 0,
         paddingBottom: "120px",
+        // Each page scrolls its own set column; the pager only scrolls across.
+        // overflow-x must be pinned: overflow-y alone computes overflow-x to
+        // auto, and a page that can scroll sideways (by even a pixel) captures
+        // the horizontal swipe meant for the pager.
+        height: "100%",
+        overflowY: "auto",
+        overflowX: "hidden",
+        overscrollBehaviorY: "contain",
+        WebkitOverflowScrolling: "touch",
       }}
+      data-testid="exercise-page"
     >
       <div style={{ marginBottom: isCompactSets ? "10px" : "18px" }}>
         <div className="flex items-center justify-between gap-3 mb-2">
@@ -2275,11 +2285,31 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     container.addEventListener("touchstart", mark, { passive: true })
     container.addEventListener("wheel", mark, { passive: true })
     container.addEventListener("keydown", mark)
+    // Each page scrolls its own set column, and that gesture reaches the pager
+    // as input too. When a page's vertical scroll settles with the pager still
+    // parked on the current exercise, the gesture was not a swipe: release the
+    // mark, or the next layout drift would be read as the user's choice.
+    // (Scroll events do not bubble, so this listens in the capture phase.)
+    let settle: ReturnType<typeof setTimeout> | null = null
+    const onPageScroll = (event: Event) => {
+      if (event.target === container) return
+      if (settle) clearTimeout(settle)
+      settle = setTimeout(() => {
+        settle = null
+        const pageWidth = container.offsetWidth
+        if (!pageWidth) return
+        const parked = currentExerciseIndexRef.current * pageWidth
+        if (Math.abs(container.scrollLeft - parked) <= 2) userDrivenScrollRef.current = false
+      }, 150)
+    }
+    container.addEventListener("scroll", onPageScroll, { capture: true, passive: true })
     return () => {
       container.removeEventListener("pointerdown", mark)
       container.removeEventListener("touchstart", mark)
       container.removeEventListener("wheel", mark)
       container.removeEventListener("keydown", mark)
+      container.removeEventListener("scroll", onPageScroll, { capture: true })
+      if (settle) clearTimeout(settle)
     }
   }, [isHydrated])
 
@@ -4273,6 +4303,16 @@ function SetKeyboardBar({
   onLog: () => void
 }) {
   const [inset, setInset] = useState(0)
+  // iOS floats its own ▲ ▼ ✓ form-assistant pill over the page just above
+  // the keyboard — roughly 20–60pt up from the keyboard's top edge, outside
+  // what the visual viewport reports. A bar parked on the viewport's bottom
+  // edge ends up underneath it, half covered and half untappable, so on iOS
+  // the bar lifts clear of it while a keyboard is up.
+  const isIOS =
+    typeof navigator !== "undefined" &&
+    (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+  const assistantClearance = inset > 0 && isIOS ? 64 : 0
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -4334,15 +4374,17 @@ function SetKeyboardBar({
       data-testid="set-keyboard-bar"
       className="ios-glass fixed z-[95] flex items-center"
       style={{
-        left: 0,
-        right: 0,
-        bottom: inset,
+        // Lifted clear of the iOS pill it floats as a toolbar; on the edge it
+        // runs edge to edge like a keyboard row.
+        left: assistantClearance ? 12 : 0,
+        right: assistantClearance ? 12 : 0,
+        bottom: inset + assistantClearance,
         gap: "8px",
         padding: "6px 12px",
         // With no keyboard (hardware keyboard, desktop) the bar sits on the
         // home indicator instead, so it clears that.
         paddingBottom: inset > 0 ? "6px" : "calc(6px + env(safe-area-inset-bottom, 0px))",
-        borderRadius: 0,
+        borderRadius: assistantClearance ? 20 : 0,
       }}
     >
       {button(`−${step}`, () => onStep(-step), { testId: "kb-step-down" })}
