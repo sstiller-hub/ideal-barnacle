@@ -406,7 +406,17 @@ const ExercisePage = memo(function ExercisePage({
         width: "100%",
         flexShrink: 0,
         paddingBottom: "120px",
+        // Each page scrolls its own set column; the pager only scrolls across.
+        // overflow-x must be pinned: overflow-y alone computes overflow-x to
+        // auto, and a page that can scroll sideways (by even a pixel) captures
+        // the horizontal swipe meant for the pager.
+        height: "100%",
+        overflowY: "auto",
+        overflowX: "hidden",
+        overscrollBehaviorY: "contain",
+        WebkitOverflowScrolling: "touch",
       }}
+      data-testid="exercise-page"
     >
       <div style={{ marginBottom: isCompactSets ? "10px" : "18px" }}>
         <div className="flex items-center justify-between gap-3 mb-2">
@@ -2275,11 +2285,31 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     container.addEventListener("touchstart", mark, { passive: true })
     container.addEventListener("wheel", mark, { passive: true })
     container.addEventListener("keydown", mark)
+    // Each page scrolls its own set column, and that gesture reaches the pager
+    // as input too. When a page's vertical scroll settles with the pager still
+    // parked on the current exercise, the gesture was not a swipe: release the
+    // mark, or the next layout drift would be read as the user's choice.
+    // (Scroll events do not bubble, so this listens in the capture phase.)
+    let settle: ReturnType<typeof setTimeout> | null = null
+    const onPageScroll = (event: Event) => {
+      if (event.target === container) return
+      if (settle) clearTimeout(settle)
+      settle = setTimeout(() => {
+        settle = null
+        const pageWidth = container.offsetWidth
+        if (!pageWidth) return
+        const parked = currentExerciseIndexRef.current * pageWidth
+        if (Math.abs(container.scrollLeft - parked) <= 2) userDrivenScrollRef.current = false
+      }, 150)
+    }
+    container.addEventListener("scroll", onPageScroll, { capture: true, passive: true })
     return () => {
       container.removeEventListener("pointerdown", mark)
       container.removeEventListener("touchstart", mark)
       container.removeEventListener("wheel", mark)
       container.removeEventListener("keydown", mark)
+      container.removeEventListener("scroll", onPageScroll, { capture: true })
+      if (settle) clearTimeout(settle)
     }
   }, [isHydrated])
 
