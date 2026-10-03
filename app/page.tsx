@@ -1575,7 +1575,6 @@ export default function Home() {
         className="min-h-screen"
         style={{
           background: "var(--background)",
-          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
@@ -1605,7 +1604,6 @@ export default function Home() {
               "calc(env(safe-area-inset-bottom, 0px) + 212px)"
             : "calc(env(safe-area-inset-bottom, 0px) + var(--ios-tabbar-clearance))",
           background: "var(--background)",
-          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       >
         {devModeEnabled && (
@@ -1906,13 +1904,18 @@ export default function Home() {
             {actualState === "completed" && workoutForDate && completedComparison ? (
               <DeltaChip
                 tone={completedComparison.delta > 0 ? "good" : "neutral"}
-                arrow={completedComparison.delta > 0 ? "up" : "down"}
+                // No arrow on an exact match: "↓ 0 0%" read as a drop.
+                arrow={
+                  completedComparison.delta > 0 ? "up" : completedComparison.delta < 0 ? "down" : undefined
+                }
                 value={
                   completedComparison.delta > 0
                     ? `+${formatK(completedComparison.delta)}`
-                    : formatK(completedComparison.delta)
+                    : completedComparison.delta < 0
+                      ? formatK(completedComparison.delta)
+                      : "MATCHED"
                 }
-                pct={`${Math.abs(completedComparison.percent).toFixed(0)}%`}
+                pct={completedComparison.delta !== 0 ? `${Math.abs(completedComparison.percent).toFixed(0)}%` : undefined}
                 context={`VS LAST ${deriveWorkoutType(workoutForDate.name).toUpperCase()} · ${getRelativeDateAbbrev(completedComparison.prevDate)}`}
               />
             ) : (actualState === "scheduled" || actualState === "activeSession") && lastSameWorkout ? (

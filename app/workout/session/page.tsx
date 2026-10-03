@@ -138,7 +138,6 @@ export default function WorkoutSessionPage() {
           className="min-h-screen"
           style={{
             background: "var(--background)",
-            boxShadow: "inset 0 0 200px var(--ink-02)",
           }}
         />
         <AlertDialog open={conflictOpen} onOpenChange={setConflictOpen}>
@@ -222,7 +221,6 @@ export default function WorkoutSessionPage() {
         className="min-h-screen"
         style={{
           background: "var(--background)",
-          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )

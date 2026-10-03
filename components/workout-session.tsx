@@ -3330,7 +3330,6 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
         className="min-h-screen"
         style={{
           background: "var(--background)",
-          boxShadow: "inset 0 0 200px var(--ink-02)",
         }}
       />
     )
