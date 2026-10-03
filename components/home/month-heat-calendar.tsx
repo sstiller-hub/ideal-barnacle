@@ -86,7 +86,7 @@ export function MonthHeatCalendar({
           style={{
             fontFamily: "var(--font-label)",
             fontSize: "10px",
-            fontWeight: 700,
+            fontWeight: 600,
             letterSpacing: "0.2em",
             color: "var(--ink-70)",
           }}
@@ -117,7 +117,7 @@ export function MonthHeatCalendar({
             style={{
               fontFamily: "var(--font-label)",
               fontSize: "9px",
-              fontWeight: 700,
+              fontWeight: 600,
               color: "var(--ink-50)",
               textAlign: "center",
               marginBottom: "2px",
