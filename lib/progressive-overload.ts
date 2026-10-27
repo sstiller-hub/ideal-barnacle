@@ -82,6 +82,11 @@ function topWorkingSet(sets: StallSetInput[]): TopSet | null {
   return best
 }
 
+/** Epley estimated one-rep max. */
+function e1rm(weight: number, reps: number): number {
+  return weight * (1 + reps / 30)
+}
+
 type SessionPoint = {
   performedAt: string
   timestamp: number
@@ -200,7 +205,10 @@ export function detectProgressStall(
   // because load went up.
   const regressionValue = metric === "load" ? latest.weight : latest.reps
   const regressionBest = metric === "load" ? bestWeight : bestReps
-  const isRegression = regressionValue < regressionBest * (1 - config.regressionThreshold)
+  // Trading load for reps (140 × 15 after 155 × 12) isn't a decline either:
+  // only call it a regression when estimated strength dropped too.
+  const strengthHeld = metric === "load" && e1rm(latest.weight, latest.reps) >= e1rm(bestWeight, bestReps) * (1 - config.regressionThreshold)
+  const isRegression = regressionValue < regressionBest * (1 - config.regressionThreshold) && !strengthHeld
 
   return {
     flag: isRegression ? "REGRESSION" : "STALE",
@@ -244,21 +252,27 @@ export function buildStallAlertContent(
   const best = formatTopSet(result.bestWeight, result.bestReps, result.metric)
   const latest = formatTopSet(result.latestWeight, result.latestReps, result.metric)
 
+  const since = formatDate(result.bestAt)
+
   if (result.flag === "REGRESSION") {
     return {
       flag: result.flag,
       tier: result.tier,
-      message: `${exerciseName} working weight is down: latest ${latest} vs your best ${best} on ${formatDate(result.bestAt)}.`,
-      action: "Drop back to your best working weight and rebuild reps before adding load.",
+      message: `Top set slipped to ${latest}, down from ${best} on ${since}.`,
+      action: `Next time: go back to ${best} before adding more weight.`,
       context: buildContext(exerciseId, result),
     }
   }
 
+  const nextTarget = formatTopSet(result.bestWeight, result.bestReps + 1, result.metric)
   return {
     flag: result.flag,
     tier: result.tier,
-    message: `No progression on ${exerciseName} in your last ${result.stalledSessions} ${plural(result.stalledSessions, "session", "sessions")} — still ${best} since ${formatDate(result.bestAt)}.`,
-    action: "Add a rep at this weight, or bump the load and drop reps — either one counts.",
+    message: `Stuck at ${best} for ${result.stalledSessions} ${plural(result.stalledSessions, "session", "sessions")} (since ${since}).`,
+    action:
+      result.metric === "reps"
+        ? `Next time: aim for ${nextTarget}.`
+        : `Next time: aim for ${nextTarget}, or add 5 lb and take fewer reps.`,
     context: buildContext(exerciseId, result),
   }
 }

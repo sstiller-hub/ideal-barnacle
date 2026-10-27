@@ -21,17 +21,21 @@ export interface WorkoutAlert {
 }
 
 /**
- * Fetch all unseen Tier 1 + 2 alerts for the current user.
+ * Fetch unseen Tier 1 + 2 alerts for the current user, optionally limited to
+ * the ones raised by a single workout.
  * Call on app open / home screen mount.
  */
-export async function fetchUnseenAlerts(): Promise<WorkoutAlert[]> {
+export async function fetchUnseenAlerts(workoutId?: string): Promise<WorkoutAlert[]> {
   if (!supabase) return []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("workout_alerts")
     .select("id, exercise_name, flag, tier, message, action, created_at, workout_id")
     .is("seen_at", null)
     .lte("tier", 2)
+  if (workoutId) query = query.eq("workout_id", workoutId)
+
+  const { data, error } = await query
     .order("tier", { ascending: true }) // Tier 1 first
     .order("created_at", { ascending: false }) // Newest first within tier
 
@@ -56,22 +60,24 @@ export async function markAlertsSeen(alertIds: string[]): Promise<void> {
 }
 
 /**
- * React hook — use in your home screen or workout summary screen.
+ * React hook — use in your home screen or workout summary screen. Pass a
+ * workoutId to show only that workout's alerts (the summary screen), so a leg
+ * day never lists a backlog of arm and shoulder flags from earlier sessions.
  *
  * Example usage:
  *   const { alerts, dismiss } = useWorkoutAlerts()
  *   if (alerts.length > 0) <WorkoutAlertsBanner alerts={alerts} onDismiss={dismiss} />
  */
-export function useWorkoutAlerts() {
+export function useWorkoutAlerts(workoutId?: string | null) {
   const [alerts, setAlerts] = useState<WorkoutAlert[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchUnseenAlerts().then((data) => {
+    fetchUnseenAlerts(workoutId ?? undefined).then((data) => {
       setAlerts(data)
       setLoading(false)
     })
-  }, [])
+  }, [workoutId])
 
   const dismiss = async (alertId?: string) => {
     if (!supabase) return
@@ -93,7 +99,7 @@ export const TIER_LABELS = {
 
 export const FLAG_LABELS = {
   BUMP_DUE: "Weight Bump Due",
-  REGRESSION: "Regression",
-  STALE: "No Progression",
+  REGRESSION: "Slipping",
+  STALE: "Stalled",
   BUMP_TOO_AGGRESSIVE: "Bump Too Heavy",
 } as const
