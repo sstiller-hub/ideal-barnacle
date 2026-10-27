@@ -90,7 +90,7 @@ export default function WorkoutSummaryPage() {
   const searchParams = useSearchParams()
   const workoutId = searchParams.get("workoutId") ?? searchParams.get("id")
 
-  const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts()
+  const { alerts: workoutAlerts, dismiss: dismissWorkoutAlert } = useWorkoutAlerts(workoutId)
   const [workout, setWorkout] = useState<WorkoutRow | null>(null)
   const [rawWorkout, setRawWorkout] = useState<CompletedWorkout | null>(null)
   const [exercises, setExercises] = useState<SummaryExercise[]>([])

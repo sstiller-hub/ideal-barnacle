@@ -104,6 +104,21 @@ test("stall with a clear drop in the latest session escalates to REGRESSION tier
   assert.equal(result.tier, 1)
 })
 
+test("a lighter top set for more reps at the same strength is STALE, not REGRESSION", () => {
+  // 140 × 15 after 155 × 12: the weight dropped but estimated strength held.
+  const sessions = [
+    session(0, [[12, 155]]),
+    session(3, [[12, 150]]),
+    session(6, [[13, 145]]),
+    session(9, [[14, 140]]),
+    session(12, [[15, 140]]),
+  ]
+  const result = detectProgressStall(sessions)
+  assert.ok(result)
+  assert.equal(result.flag, "STALE")
+  assert.equal(result.tier, 2)
+})
+
 test("fewer than threshold+1 sessions is not enough history to judge", () => {
   const sessions = [
     session(0, [[8, 120]]),
@@ -271,9 +286,9 @@ test("buildStallAlertContent produces a message, action, and context payload", (
   const content = buildStallAlertContent("upper1-lat-pd", "Lat Pulldown", result)
   assert.equal(content.flag, "STALE")
   assert.equal(content.tier, 2)
-  assert.match(content.message, /Lat Pulldown/)
+  assert.match(content.message, /120 lb × 8/)
   assert.match(content.message, /4 sessions/)
-  assert.ok(content.action.length > 0)
+  assert.match(content.action, /120 lb × 9/)
   assert.equal(content.context.exercise_id, "upper1-lat-pd")
   assert.equal(content.context.source, "progressive_overload_v2")
   assert.equal(content.context.stalled_sessions, 4)

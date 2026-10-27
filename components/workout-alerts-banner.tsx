@@ -1,6 +1,6 @@
 "use client"
 
-import { type WorkoutAlert, TIER_LABELS } from "@/hooks/useWorkoutAlerts"
+import { type WorkoutAlert, FLAG_LABELS, TIER_LABELS } from "@/hooks/useWorkoutAlerts"
 
 interface WorkoutAlertsBannerProps {
   alerts: WorkoutAlert[]
@@ -28,8 +28,13 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span style={{ fontSize: "10px", lineHeight: 1 }}>{tier.emoji}</span>
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span
+                    className="truncate"
+                    style={{ fontSize: "13px", fontWeight: 600, lineHeight: "1.3", color: "var(--foreground)" }}
+                  >
+                    {alert.exercise_name}
+                  </span>
                   <span
                     className="font-label"
                     style={{
@@ -38,20 +43,10 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                       letterSpacing: "0.14em",
                       color: isUrgent ? tier.color : "var(--warn-ink)",
                       textTransform: "uppercase" as const,
+                      flexShrink: 0,
                     }}
                   >
-                    {tier.label}
-                  </span>
-                  <span
-                    className="font-label"
-                    style={{
-                      fontSize: "8px",
-                      fontWeight: 400,
-                      letterSpacing: "0.05em",
-                      color: "var(--ink-50)",
-                    }}
-                  >
-                    · {alert.exercise_name}
+                    {FLAG_LABELS[alert.flag] ?? tier.label}
                   </span>
                 </div>
                 <div
@@ -60,6 +55,11 @@ export default function WorkoutAlertsBanner({ alerts, onDismiss, className = "px
                 >
                   {alert.message}
                 </div>
+                {alert.action && (
+                  <div style={{ fontSize: "12px", fontWeight: 500, lineHeight: "1.4", marginTop: "4px", color: "var(--foreground)" }}>
+                    {alert.action}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => onDismiss(alert.id)}
