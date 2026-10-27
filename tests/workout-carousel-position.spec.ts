@@ -98,7 +98,7 @@ const storedIndex = (page: any) =>
 test.describe("Active workout: the carousel keeps its place", () => {
   test("on load", async ({ page }) => {
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
     expect(await visiblePage(page)).toBe(2)
@@ -108,7 +108,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("through a rotation round trip", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
@@ -125,7 +125,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("through backgrounding and returning", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
@@ -149,7 +149,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("when the browser restores scroll to 0 on return", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
@@ -172,7 +172,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("a relayout landing late in a rotation is not read as a swipe", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
@@ -198,7 +198,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("an offset between two pages is never persisted as an exercise", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 
@@ -219,7 +219,7 @@ test.describe("Active workout: the carousel keeps its place", () => {
   test("a real swipe still moves the exercise, and survives a rotation", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await page.waitForTimeout(800)
 

@@ -73,10 +73,16 @@ export async function POST(request: Request) {
       ratingByExerciseId.set(exercise.exercise_id, exercise.rating ?? null)
     })
 
+    // Drafts started before gyms existed carry no gym; a Cape exercise name
+    // still marks the session as BodyStrong.
+    const gym =
+      workout.gym ?? (sets.some((set) => set.exercise_name.trim().endsWith(" [Cape]")) ? "bodystrong" : "sowa")
+
     const workoutRow = {
       id: workout.workout_id,
       user_id: userId,
       name: workout.routine_name ?? "Workout",
+      gym,
       performed_at: performedAt,
       started_at: workout.started_at,
       completed_at: workout.completed_at ?? null,

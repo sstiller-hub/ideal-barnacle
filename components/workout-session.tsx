@@ -30,6 +30,7 @@ import {
 import { getOrCreateActiveSession, upsertSet } from "@/lib/supabase-session-sync"
 import { supabase } from "@/lib/supabase"
 import { isWarmupExercise } from "@/lib/exercise-heuristics"
+import { capeNoteForExercise, fetchCapeContext, type CapeContext, type Gym } from "@/lib/gym"
 import {
   getCurrentInProgressSession,
   deleteSession,
@@ -1235,8 +1236,31 @@ function QuietAction({ label, onClick }: { label: string; onClick: () => void })
   )
 }
 
-export default function WorkoutSessionComponent({ routine, isDeload = false }: { routine: WorkoutRoutine; isDeload?: boolean }) {
+export default function WorkoutSessionComponent({
+  routine,
+  isDeload = false,
+  gym = "sowa",
+}: {
+  routine: WorkoutRoutine
+  isDeload?: boolean
+  gym?: Gym
+}) {
   const router = useRouter()
+  // At the Cape, each machine exercise carries a card naming the Cape machine
+  // and its calibration state. Those cards are local (id "gym:…"), so
+  // dismissing one only hides it for this session.
+  const [capeContext, setCapeContext] = useState<CapeContext | null>(null)
+  const [dismissedGymNotes, setDismissedGymNotes] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    if (gym !== "bodystrong") return
+    let cancelled = false
+    void fetchCapeContext().then((context) => {
+      if (!cancelled) setCapeContext(context)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [gym])
   // Coach notes for this session. Queried once at workout start and matched to
   // exercises by lower(trim(name)); scope="global" notes belong to the
   // pre-workout screen and are deliberately not surfaced in here.
@@ -1245,6 +1269,26 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
     workoutNotes: coachWorkoutNotes,
     dismiss: dismissCoachNote,
   } = useCoachNotes({ workoutName: routine.name })
+  const notesForExerciseAtGym = useCallback(
+    (exerciseName: string) => {
+      const notes = notesForExercise(exerciseName)
+      if (!capeContext) return notes
+      const capeNote = capeNoteForExercise(exerciseName, capeContext)
+      if (!capeNote || dismissedGymNotes.has(capeNote.id)) return notes
+      return [capeNote, ...notes]
+    },
+    [notesForExercise, capeContext, dismissedGymNotes]
+  )
+  const dismissNoteAtGym = useCallback(
+    async (noteId: string): Promise<boolean> => {
+      if (noteId.startsWith("gym:")) {
+        setDismissedGymNotes((prev) => new Set(prev).add(noteId))
+        return true
+      }
+      return dismissCoachNote(noteId)
+    },
+    [dismissCoachNote]
+  )
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [exercises, setExercises] = useState<any[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
@@ -1825,11 +1869,13 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           started_at: session.startedAt,
           routine_id: routine.id,
           routine_name: routine.name,
+          gym,
         })
       } else {
         await updateWorkoutDraft(workoutId, {
           routine_id: routine.id,
           routine_name: routine.name,
+          gym,
         })
       }
 
@@ -3184,6 +3230,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
             started_at: session.startedAt,
             routine_id: routine.id,
             routine_name: routine.name,
+            gym,
           })
         }
         const exerciseRatings: Record<string, ExerciseRating> = {}
@@ -3195,6 +3242,7 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
           completed_at: completedAt,
           routine_id: routine.id,
           routine_name: routine.name,
+          gym,
           exercise_ratings: exerciseRatings,
         })
         await markWorkoutPending(completedWorkoutId)
@@ -4215,8 +4263,8 @@ export default function WorkoutSessionComponent({ routine, isDeload = false }: {
               setPlateDisplayMode={setPlateDisplayMode}
               setPlateStartingWeight={setPlateStartingWeight}
               onOpenExercise={openExercisePage}
-              coachNotes={notesForExercise(exercise.name)}
-              onDismissCoachNote={dismissCoachNote}
+              coachNotes={notesForExerciseAtGym(exercise.name)}
+              onDismissCoachNote={dismissNoteAtGym}
               registerWeightRef={registerWeightRef}
               registerRepsRef={registerRepsRef}
               focusSetField={focusSetField}

@@ -7,6 +7,7 @@ import { useDeloadWeek } from "@/hooks/useDeloadWeek"
 import { GROWTH_V2_ROUTINES } from "@/lib/growth-v2-plan"
 import { getRoutineById, type WorkoutRoutine } from "@/lib/routine-storage"
 import { rememberActiveWorkoutRoute } from "@/lib/active-workout-route"
+import { buildCapeRoutine, detectSessionGym, fetchCapeContext, GYM_LABELS, type Gym } from "@/lib/gym"
 import {
   deleteSession,
   deleteSetsForSession,
@@ -28,10 +29,18 @@ export default function WorkoutSessionPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const routineId = searchParams.get("routineId")
+  // ?gym=sowa|bodystrong picks the gym up front and skips the question.
+  const gymParam = searchParams.get("gym")
+  const presetGym: Gym | null = gymParam === "sowa" || gymParam === "bodystrong" ? gymParam : null
   const { isDeload } = useDeloadWeek()
   const [routine, setRoutine] = useState<WorkoutRoutine | null>(null)
   const [activeSession, setActiveSession] = useState<AutosaveWorkoutSession | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
+  // A new workout asks where you are before it builds its sets; a resumed one
+  // already knows from the exercise names it was started with.
+  const [gym, setGym] = useState<Gym | null>(null)
+  const [needsGymChoice, setNeedsGymChoice] = useState(false)
+  const [sessionRoutine, setSessionRoutine] = useState<WorkoutRoutine | null>(null)
 
   const resolveRoutine = useMemo(() => {
     return (id: string | null) => {
@@ -84,6 +93,8 @@ export default function WorkoutSessionPage() {
     const current = getCurrentInProgressSession()
 
     if (!routineId) {
+      setGym(detectSessionGym(current?.exercises as Array<{ name?: string }>))
+      setNeedsGymChoice(false)
       setRoutine(toRoutineFromSession(current))
       return
     }
@@ -97,16 +108,50 @@ export default function WorkoutSessionPage() {
 
     const resolved = resolveRoutine(routineId)
     if (resolved) {
+      const resuming = current?.routineId === routineId
+      if (resuming) {
+        setGym(detectSessionGym(current?.exercises as Array<{ name?: string }>))
+        setNeedsGymChoice(false)
+      } else {
+        setGym(presetGym)
+        setNeedsGymChoice(presetGym === null)
+      }
       setRoutine(resolved)
       return
     }
 
+    setGym(detectSessionGym(current?.exercises as Array<{ name?: string }>))
+    setNeedsGymChoice(false)
     setRoutine(toRoutineFromSession(current))
-  }, [routineId, resolveRoutine, toRoutineFromSession])
+  }, [routineId, presetGym, resolveRoutine, toRoutineFromSession])
 
   // Leave a breadcrumb while the session screen is open. If the app is evicted
   // from memory and relaunched at the manifest's start_url ("/"), the home
   // screen uses this to send the user back into the workout they were in.
+  // Cape sessions run on the Cape version of the routine: machine exercises
+  // take their Cape names (and calibrated starting weights).
+  useEffect(() => {
+    if (!routine) {
+      setSessionRoutine(null)
+      return
+    }
+    if (gym === null) {
+      setSessionRoutine(needsGymChoice ? null : routine)
+      return
+    }
+    if (gym === "sowa") {
+      setSessionRoutine(routine)
+      return
+    }
+    let cancelled = false
+    void fetchCapeContext().then((context) => {
+      if (!cancelled) setSessionRoutine(buildCapeRoutine(routine, context))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [routine, gym, needsGymChoice])
+
   useEffect(() => {
     if (!routine) return
     rememberActiveWorkoutRoute(
@@ -128,7 +173,14 @@ export default function WorkoutSessionPage() {
     saveCurrentSessionId(null)
     setActiveSession(null)
     setConflictOpen(false)
+    setGym(presetGym)
+    setNeedsGymChoice(presetGym === null)
     setRoutine(resolveRoutine(routineId))
+  }
+
+  const chooseGym = (choice: Gym) => {
+    setGym(choice)
+    setNeedsGymChoice(false)
   }
 
   if (conflictOpen) {
@@ -226,5 +278,64 @@ export default function WorkoutSessionPage() {
     )
   }
 
-  return <WorkoutSession routine={routine} isDeload={isDeload} />
+  if (needsGymChoice && gym === null) {
+    return <GymChoice routineName={routine.name} onChoose={chooseGym} />
+  }
+
+  if (!sessionRoutine) {
+    return (
+      <div
+        className="min-h-screen"
+        style={{
+          background: "var(--background)",
+        }}
+      />
+    )
+  }
+
+  return <WorkoutSession routine={sessionRoutine} isDeload={isDeload} gym={gym ?? "sowa"} />
+}
+
+function GymChoice({ routineName, onChoose }: { routineName: string; onChoose: (gym: Gym) => void }) {
+  const options: Gym[] = ["sowa", "bodystrong"]
+  return (
+    <div
+      className="min-h-screen flex flex-col justify-end"
+      style={{
+        background: "var(--background)",
+        padding: "24px 16px calc(32px + env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="text-ink-50" style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        {routineName}
+      </div>
+      <div className="text-white" style={{ fontSize: "22px", fontWeight: 500, letterSpacing: "-0.01em", margin: "6px 0 20px" }}>
+        Where are you training?
+      </div>
+      <div className="flex flex-col gap-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChoose(option)}
+            className="w-full text-left"
+            style={{
+              background: option === "sowa" ? "var(--ink-08)" : "var(--ink-04)",
+              border: `1px solid ${option === "sowa" ? "var(--ink-15)" : "var(--ink-08)"}`,
+              borderRadius: "var(--radius-xs)",
+              padding: "16px",
+              minHeight: "56px",
+            }}
+          >
+            <span className="text-ink-90" style={{ fontSize: "15px", fontWeight: 500 }}>
+              {GYM_LABELS[option].name}
+            </span>
+            <span className="text-ink-50" style={{ fontSize: "12px", marginLeft: "8px" }}>
+              {GYM_LABELS[option].place}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }

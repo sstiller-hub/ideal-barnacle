@@ -189,7 +189,7 @@ test("Home shows resume for active session started yesterday", async ({ page }) 
 
 test("completed set persists after reload", async ({ page }) => {
   await seedBaseStorage(page)
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   const repsInput = page.locator('input[type="number"]').nth(1)
@@ -220,7 +220,7 @@ test("completed set persists after reload", async ({ page }) => {
 
 test("shows PR chip in active workout set row", async ({ page }) => {
   await seedBaseStorage(page, { history: buildHistory(100, 8) })
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   const repsInput = page.locator('input[type="number"]').nth(1)
@@ -232,7 +232,7 @@ test("shows PR chip in active workout set row", async ({ page }) => {
 
 test("shows RECOVERY chip when below last performance", async ({ page }) => {
   await seedBaseStorage(page, { history: buildHistory(100, 8) })
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type=\"number\"]').nth(0)
   const repsInput = page.locator('input[type=\"number\"]').nth(1)
@@ -247,7 +247,7 @@ test("shows RECOVERY chip when below last performance", async ({ page }) => {
 // completed set's input must match the still-active set's input exactly.
 test("completed set keeps fixed geometry (no size morph)", async ({ page }) => {
   await seedBaseStorage(page)
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const set1Weight = page.locator('input[type="number"]').nth(0)
   const set1Reps = page.locator('input[type="number"]').nth(1)
@@ -270,7 +270,7 @@ test("completed set keeps fixed geometry (no size morph)", async ({ page }) => {
 
 test("plate toggle is single button and flips label", async ({ page }) => {
   await seedBaseStorage(page)
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   await weightInput.fill("135")
@@ -311,7 +311,7 @@ test("checking a set clears selection and does not auto-focus the next weight", 
     ],
   }
   await seedBaseStorage(page, { session })
-  await page.goto("/workout/session?routineId=" + routine.id)
+  await page.goto("/workout/session?routineId=" + routine.id + "&gym=sowa")
 
   // Focus set 1's weight so a text box is selected / keyboard is up.
   const set1Weight = page.locator('input[type="number"]').nth(0)
@@ -367,7 +367,7 @@ test("resumes active session when routine is missing from library", async ({ pag
     localStorage.setItem("__resume_missing_routine_seeded", "true")
   })
 
-  await page.goto("/workout/session?routineId=legacy-routine-id")
+  await page.goto("/workout/session?routineId=legacy-routine-id&gym=sowa")
   await expect(page.getByText("LEGACY ROW")).toBeVisible()
 })
 

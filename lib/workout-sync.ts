@@ -41,6 +41,7 @@ async function postCommit(draft: ActiveWorkoutDraft, token: string) {
         completed_at: draft.completed_at ?? null,
         routine_id: draft.routine_id ?? null,
         routine_name: draft.routine_name ?? null,
+        gym: draft.gym,
         updated_at_client: draft.updated_at_client,
         schema_version: draft.schema_version,
       },

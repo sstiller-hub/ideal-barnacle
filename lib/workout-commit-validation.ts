@@ -13,6 +13,7 @@ export const workoutCommitSchema = z.object({
     completed_at: z.string().datetime({ offset: true }).nullable().optional(),
     routine_id: z.string().optional().nullable(),
     routine_name: z.string().optional().nullable(),
+    gym: z.enum(["sowa", "bodystrong"]).optional(),
     updated_at_client: z.number().int(),
     schema_version: z.number().int(),
   }),

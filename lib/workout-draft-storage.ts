@@ -22,6 +22,8 @@ export interface ActiveWorkoutDraft {
   user_id: string
   routine_id?: string | null
   routine_name?: string | null
+  /** Where the workout happened; absent on drafts made before gyms existed. */
+  gym?: "sowa" | "bodystrong"
   started_at: string
   completed_at?: string | null
   updated_at_client: number
@@ -67,6 +69,7 @@ export async function createWorkoutDraft(payload: {
   started_at: string
   routine_id?: string | null
   routine_name?: string | null
+  gym?: "sowa" | "bodystrong"
 }): Promise<ActiveWorkoutDraft | null> {
   const db = await getDb()
   if (!db) return null
@@ -79,6 +82,7 @@ export async function createWorkoutDraft(payload: {
     user_id: payload.user_id,
     routine_id: payload.routine_id ?? null,
     routine_name: payload.routine_name ?? null,
+    gym: payload.gym ?? "sowa",
     started_at: payload.started_at,
     completed_at: null,
     updated_at_client: nowClient(),

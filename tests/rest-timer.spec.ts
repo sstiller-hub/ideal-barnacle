@@ -25,7 +25,7 @@ test("starts rest timer after completing a set", async ({ page }) => {
     localStorage.setItem("__rest_timer_seeded", "true")
   }, routine)
 
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   const repsInput = page.locator('input[type="number"]').nth(1)
@@ -55,7 +55,7 @@ test("rest timer persists after reload", async ({ page }) => {
     localStorage.setItem("__rest_timer_seeded", "true")
   }, routine)
 
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   const repsInput = page.locator('input[type="number"]').nth(1)
@@ -101,7 +101,7 @@ test("rest timer restarts when a set is unchecked and checked again", async ({ p
     localStorage.setItem("__rest_timer_seeded", "true")
   }, routine)
 
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
 
   const weightInput = page.locator('input[type="number"]').nth(0)
   const repsInput = page.locator('input[type="number"]').nth(1)
