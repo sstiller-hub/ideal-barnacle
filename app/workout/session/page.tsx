@@ -173,8 +173,8 @@ export default function WorkoutSessionPage() {
     saveCurrentSessionId(null)
     setActiveSession(null)
     setConflictOpen(false)
-    setGym(null)
-    setNeedsGymChoice(true)
+    setGym(presetGym)
+    setNeedsGymChoice(presetGym === null)
     setRoutine(resolveRoutine(routineId))
   }
 
