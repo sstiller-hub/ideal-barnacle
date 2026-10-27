@@ -469,7 +469,7 @@ test.describe("Session completion — timing saved correctly", () => {
       },
     )
 
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("SQUAT")).toBeVisible()
 
     // Click the FINISH button (no confirmation dialog — it calls finishWorkout() directly)

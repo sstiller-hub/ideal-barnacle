@@ -98,7 +98,7 @@ const seedOnce = (page: any) =>
 test.describe("Active workout: cold-start restore", () => {
   test("the session screen records the route it should be restored to", async ({ page }) => {
     await seedOnce(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     await expect
@@ -108,7 +108,7 @@ test.describe("Active workout: cold-start restore", () => {
 
   test("relaunching at / goes back into the active workout, on the same exercise", async ({ page }) => {
     await seedOnce(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), ROUTE_KEY)).not.toBeNull()
 
@@ -122,7 +122,7 @@ test.describe("Active workout: cold-start restore", () => {
 
   test("relaunching at / stays on home after the user exited the session", async ({ page }) => {
     await seedOnce(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     // Leaving via the back button means home is where the user actually is.
@@ -137,7 +137,7 @@ test.describe("Active workout: cold-start restore", () => {
 
   test("relaunching at / stays on home when the workout is no longer in progress", async ({ page }) => {
     await seedOnce(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), ROUTE_KEY)).not.toBeNull()
 
@@ -156,7 +156,7 @@ test.describe("Active workout: cold-start restore", () => {
     // Four full document loads; the dev server compiles each route on demand.
     test.slow()
     await seedOnce(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     await page.goto("/")

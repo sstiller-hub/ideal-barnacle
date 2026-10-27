@@ -98,7 +98,7 @@ test.describe("Active workout: device rotation", () => {
   test("rotating does not tear down and rebuild the workout screen", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     // Tag the live DOM node. A remount replaces the element, taking the tag with
@@ -124,7 +124,7 @@ test.describe("Active workout: device rotation", () => {
   test("rotating keeps the field the user was typing in focused", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     const weightInput = page.locator("input[type='number']").first()
@@ -144,7 +144,7 @@ test.describe("Active workout: device rotation", () => {
   test("rotating keeps the user on the same exercise", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
     expect(await readExerciseIndex(page)).toBe(2)
 
@@ -163,7 +163,7 @@ test.describe("Active workout: device rotation", () => {
   test("rotating repeatedly never moves the active exercise", async ({ page }) => {
     test.slow()
     await seed(page)
-    await page.goto(`/workout/session?routineId=${routine.id}`)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
 
     for (let i = 0; i < 3; i += 1) {

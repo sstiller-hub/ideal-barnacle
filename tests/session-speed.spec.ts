@@ -21,7 +21,7 @@ async function startSession(page: import("@playwright/test").Page) {
     localStorage.removeItem("workoutSets")
     localStorage.removeItem("currentSessionId")
   }, routine)
-  await page.goto(`/workout/session?routineId=${routine.id}`)
+  await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
   await expect(page.getByText("Overhand Row").first()).toBeVisible()
 }
 

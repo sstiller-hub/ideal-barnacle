@@ -29,6 +29,9 @@ export default function WorkoutSessionPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const routineId = searchParams.get("routineId")
+  // ?gym=sowa|bodystrong picks the gym up front and skips the question.
+  const gymParam = searchParams.get("gym")
+  const presetGym: Gym | null = gymParam === "sowa" || gymParam === "bodystrong" ? gymParam : null
   const { isDeload } = useDeloadWeek()
   const [routine, setRoutine] = useState<WorkoutRoutine | null>(null)
   const [activeSession, setActiveSession] = useState<AutosaveWorkoutSession | null>(null)
@@ -110,8 +113,8 @@ export default function WorkoutSessionPage() {
         setGym(detectSessionGym(current?.exercises as Array<{ name?: string }>))
         setNeedsGymChoice(false)
       } else {
-        setGym(null)
-        setNeedsGymChoice(true)
+        setGym(presetGym)
+        setNeedsGymChoice(presetGym === null)
       }
       setRoutine(resolved)
       return
@@ -120,7 +123,7 @@ export default function WorkoutSessionPage() {
     setGym(detectSessionGym(current?.exercises as Array<{ name?: string }>))
     setNeedsGymChoice(false)
     setRoutine(toRoutineFromSession(current))
-  }, [routineId, resolveRoutine, toRoutineFromSession])
+  }, [routineId, presetGym, resolveRoutine, toRoutineFromSession])
 
   // Leave a breadcrumb while the session screen is open. If the app is evicted
   // from memory and relaunched at the manifest's start_url ("/"), the home

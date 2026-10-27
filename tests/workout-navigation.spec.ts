@@ -159,7 +159,7 @@ const seedStorage = (
 test.describe("Active session: exit button", () => {
   test("exit button navigates to home", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     const exitBtn = page.getByRole("button", { name: "Exit workout" }).first()
@@ -170,7 +170,7 @@ test.describe("Active session: exit button", () => {
 
   test("exit button pauses an in_progress session in storage", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     const exitBtn = page.getByRole("button", { name: "Exit workout" }).first()
@@ -188,7 +188,7 @@ test.describe("Active session: exit button", () => {
 
   test("home shows resume button after exiting mid-workout", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     // Exit via the back button (client-side nav to "/")
@@ -205,7 +205,7 @@ test.describe("Active session: exit button", () => {
 test.describe("Active session: FINISH button", () => {
   test("FINISH is disabled when no sets are completed", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     // There are two FINISH buttons (header + bottom nav); both should be disabled
@@ -215,7 +215,7 @@ test.describe("Active session: FINISH button", () => {
 
   test("FINISH is enabled when all sets are done with valid data", async ({ page }) => {
     await seedStorage(page, { session: completeSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press")).toBeVisible()
 
     const finishBtn = page.getByRole("button", { name: "FINISH" }).first()
@@ -224,7 +224,7 @@ test.describe("Active session: FINISH button", () => {
 
   test("FINISH navigates to workout summary after completing all sets", async ({ page }) => {
     await seedStorage(page, { session: completeSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
 
     const finishBtn = page.getByRole("button", { name: "FINISH" }).first()
     await expect(finishBtn).toBeEnabled({ timeout: 10000 })
@@ -239,7 +239,7 @@ test.describe("Active session: FINISH button", () => {
 test.describe("Active session: exercise navigation", () => {
   test("clicking a rail segment updates the session's current exercise index", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     // Click the 3rd exercise's progress-rail segment (index 2)
@@ -258,7 +258,7 @@ test.describe("Active session: exercise navigation", () => {
   test("rail shows one segment per exercise", async ({ page }) => {
     // completeSession has all exercises done; uiExerciseIndex starts at 2
     await seedStorage(page, { session: completeSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Overhead Press")).toBeVisible()
 
     // One rail segment button per exercise (aria-label "Exercise N of M: …")
@@ -273,14 +273,14 @@ test.describe("Session conflict dialog (from session page)", () => {
   test("shows conflict dialog when routineId differs from the active session", async ({ page }) => {
     // Active session is for routineA; navigate to routineB
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineB.id}`)
+    await page.goto(`/workout/session?routineId=${routineB.id}&gym=sowa`)
 
     await expect(page.getByText("Active Workout Detected")).toBeVisible()
   })
 
   test("Resume Existing redirects URL to the active session's routine", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineB.id}`)
+    await page.goto(`/workout/session?routineId=${routineB.id}&gym=sowa`)
 
     await expect(page.getByText("Active Workout Detected")).toBeVisible()
     await page.getByRole("button", { name: "Resume Existing" }).click()
@@ -290,7 +290,7 @@ test.describe("Session conflict dialog (from session page)", () => {
 
   test("Discard & Start New removes the old session and loads the new routine", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineB.id}`)
+    await page.goto(`/workout/session?routineId=${routineB.id}&gym=sowa`)
 
     await expect(page.getByText("Active Workout Detected")).toBeVisible()
     await page.getByRole("button", { name: "Discard & Start New" }).click()
@@ -311,7 +311,7 @@ test.describe("Session conflict dialog (from session page)", () => {
 
   test("Cancel closes the conflict dialog without changing the URL", async ({ page }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineB.id}`)
+    await page.goto(`/workout/session?routineId=${routineB.id}&gym=sowa`)
 
     await expect(page.getByText("Active Workout Detected")).toBeVisible()
     await page.getByRole("button", { name: "Cancel" }).click()
@@ -393,7 +393,7 @@ test.describe("Session page: direct URL edge cases", () => {
     page,
   }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
 
     await expect(page.getByText("Bench Press")).toBeVisible()
     await expect(page.getByText("Active Workout Detected")).not.toBeVisible()
@@ -419,7 +419,7 @@ test.describe("Active session: exercise detail navigation", () => {
     page,
   }) => {
     await seedStorage(page, { session: partialSession })
-    await page.goto(`/workout/session?routineId=${routineA.id}`)
+    await page.goto(`/workout/session?routineId=${routineA.id}&gym=sowa`)
     await expect(page.getByText("Bench Press")).toBeVisible()
 
     // Click the large exercise name heading (Bebas Neue h1 in the exercise card)
