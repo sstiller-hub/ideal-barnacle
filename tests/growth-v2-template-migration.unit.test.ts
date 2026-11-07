@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
+  addSaturdayCableCrunch,
   applyGrowthV2TemplateOps,
   dropRetiredCoreExercises,
   isRetiredCoreExercise,
@@ -266,5 +267,38 @@ test("dropping is idempotent and leaves untouched routines identical", () => {
   assert.equal(
     first.routines.find((routine) => routine.id === "growth-v2-shoulders-arms"),
     untouched
+  )
+})
+
+test("Saturday gets three sets of Cable Crunch after the Bayesian curl", () => {
+  const routinesIn = storedRoutines()
+  const saturday = routinesIn.find((routine) => routine.id === "growth-v2-shoulders-arms")!
+  saturday.exercises = [
+    ...saturday.exercises,
+    { id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" },
+  ]
+  // Same order as the runner: the drop first, so it cannot strip the new slot.
+  const dropped = dropRetiredCoreExercises(routinesIn)
+  const { routines, changed } = addSaturdayCableCrunch(dropped.routines)
+  assert.equal(changed, true)
+
+  const sa = ids(routines, "growth-v2-shoulders-arms")
+  assert.equal(sa[sa.length - 1], "sa-cable-crunch")
+  assert.equal(sa[sa.indexOf("sa-bayesian") + 1], "sa-cable-crunch")
+  const crunch = slot(routines, "growth-v2-shoulders-arms", "sa-cable-crunch")
+  assert.equal(crunch.name, "Cable Crunch")
+  assert.equal(crunch.targetSets, 3)
+
+  // Saturday only: the other days stay crunch-free.
+  assert.deepEqual(ids(routines, "growth-v2-upper-1"), ["upper1-chest-press", "upper1-delts"])
+})
+
+test("adding the Saturday crunch is idempotent", () => {
+  const first = addSaturdayCableCrunch(storedRoutines())
+  const second = addSaturdayCableCrunch(first.routines)
+  assert.equal(second.changed, false)
+  assert.equal(
+    ids(second.routines, "growth-v2-shoulders-arms").filter((id) => id === "sa-cable-crunch").length,
+    1
   )
 })
