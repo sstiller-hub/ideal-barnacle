@@ -178,7 +178,7 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
     id: "growth-v2-shoulders-arms",
     name: "Shoulders & Arms – Joint-Smart",
     description: "Delt-driven + elbow-friendly triceps + biceps + controlled core.",
-    estimatedTime: "54 min",
+    estimatedTime: "58 min",
     category: "Growth v2",
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -207,6 +207,9 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetReps: "10-12",
       }),
       ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" }),
+      // Cable crunch was retired with the rest of direct core when it moved to
+      // Solidcore, then brought back on Saturday only.
+      ex({ id: "sa-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" }),
     ],
   },
 ]

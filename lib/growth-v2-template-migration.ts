@@ -18,6 +18,7 @@ import type { RoutineExercise, WorkoutRoutine } from "@/lib/routine-storage"
 
 const MIGRATION_KEY = "growth_v2_template_migration_v2"
 const CORE_DROP_KEY = "solidcore_core_drop_v1"
+const SATURDAY_CRUNCH_KEY = "saturday_cable_crunch_v1"
 const ROUTINES_KEY = "workout_routines_v2"
 
 /**
@@ -26,6 +27,10 @@ const ROUTINES_KEY = "workout_routines_v2"
  * notes use — because the stored snapshots spell them several ways and some
  * carry a "(superset)" qualifier that names the pairing, not a different
  * movement.
+ *
+ * Cable Crunch later came back on Saturday (Shoulders & Arms) only. It stays
+ * on this list so it is still dropped from every other routine; the Saturday
+ * slot is re-inserted by a separately stamped pass that runs after the drop.
  *
  * This only stops them being *seeded*. Historical workout_exercises and
  * workout_sets rows are untouched: the record of what was lifted is immutable.
@@ -109,6 +114,18 @@ const OPS: Array<{ routineId: string; routineName: string; ops: TemplateOp[] }> 
   },
 ]
 
+/**
+ * Shipped after the core drop, so it needs its own stamp and must run after the
+ * drop on installs that have neither: otherwise the drop would remove it again.
+ */
+const SATURDAY_CRUNCH_OPS: typeof OPS = [
+  {
+    routineId: "growth-v2-shoulders-arms",
+    routineName: "Shoulders & Arms – Joint-Smart",
+    ops: [{ kind: "insertAfter", afterId: "sa-bayesian", addId: "sa-cable-crunch" }],
+  },
+]
+
 /** Looks up a slot definition in the plan, preferring the routine that owns it. */
 function findPlanExercise(routineId: string, exerciseId: string): RoutineExercise | null {
   const owning = GROWTH_V2_ROUTINES.find((routine) => routine.id === routineId)
@@ -177,14 +194,17 @@ function applyOp(
 }
 
 /** Pure core, exported for tests. */
-export function applyGrowthV2TemplateOps(routines: WorkoutRoutine[]): {
+export function applyGrowthV2TemplateOps(
+  routines: WorkoutRoutine[],
+  opsList: typeof OPS = OPS
+): {
   routines: WorkoutRoutine[]
   changed: boolean
 } {
   let changed = false
 
   const next = routines.map((routine) => {
-    const target = OPS.find(
+    const target = opsList.find(
       (entry) => entry.routineId === routine.id || entry.routineName === routine.name
     )
     if (!target || !Array.isArray(routine.exercises)) return routine
@@ -205,6 +225,14 @@ export function applyGrowthV2TemplateOps(routines: WorkoutRoutine[]): {
   return { routines: next, changed }
 }
 
+/** Pure, exported for tests. Re-adds the Saturday-only Cable Crunch slot. */
+export function addSaturdayCableCrunch(routines: WorkoutRoutine[]): {
+  routines: WorkoutRoutine[]
+  changed: boolean
+} {
+  return applyGrowthV2TemplateOps(routines, SATURDAY_CRUNCH_OPS)
+}
+
 export function runGrowthV2TemplateMigration(): void {
   if (typeof window === "undefined") return
 
@@ -213,7 +241,8 @@ export function runGrowthV2TemplateMigration(): void {
   // without re-running ops that are done.
   const needsSlotOps = !localStorage.getItem(MIGRATION_KEY)
   const needsCoreDrop = !localStorage.getItem(CORE_DROP_KEY)
-  if (!needsSlotOps && !needsCoreDrop) return
+  const needsSaturdayCrunch = !localStorage.getItem(SATURDAY_CRUNCH_KEY)
+  if (!needsSlotOps && !needsCoreDrop && !needsSaturdayCrunch) return
 
   const raw = localStorage.getItem(ROUTINES_KEY)
   if (raw) {
@@ -235,6 +264,13 @@ export function runGrowthV2TemplateMigration(): void {
           changed = changed || result.changed
         }
 
+        // After the drop, which would otherwise strip it straight back out.
+        if (needsSaturdayCrunch) {
+          const result = addSaturdayCableCrunch(routines)
+          routines = result.routines
+          changed = changed || result.changed
+        }
+
         if (changed) localStorage.setItem(ROUTINES_KEY, JSON.stringify(routines))
       }
     } catch {
@@ -245,4 +281,5 @@ export function runGrowthV2TemplateMigration(): void {
   const stamp = new Date().toISOString()
   if (needsSlotOps) localStorage.setItem(MIGRATION_KEY, stamp)
   if (needsCoreDrop) localStorage.setItem(CORE_DROP_KEY, stamp)
+  if (needsSaturdayCrunch) localStorage.setItem(SATURDAY_CRUNCH_KEY, stamp)
 }
