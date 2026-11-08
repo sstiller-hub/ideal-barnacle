@@ -19,6 +19,7 @@ import type { RoutineExercise, WorkoutRoutine } from "@/lib/routine-storage"
 const MIGRATION_KEY = "growth_v2_template_migration_v2"
 const CORE_DROP_KEY = "solidcore_core_drop_v1"
 const SATURDAY_CRUNCH_KEY = "saturday_cable_crunch_v1"
+const OCT27_SWAPS_KEY = "oct27_exercise_swaps_v1"
 const ROUTINES_KEY = "workout_routines_v2"
 
 /**
@@ -126,6 +127,49 @@ const SATURDAY_CRUNCH_OPS: typeof OPS = [
   },
 ]
 
+/**
+ * Oct 27 check-in swaps. The coach notes shipped but the stored routines kept
+ * seeding the old exercises, so they were still being logged under old names.
+ * Runs after every other pass so the earlier ops (which reference sa-bayesian
+ * and the delts slots) never see a half-migrated routine.
+ */
+const OCT27_SWAP_OPS: typeof OPS = [
+  {
+    routineId: "growth-v2-upper-1",
+    routineName: "Upper 1 – Chest + Lats",
+    ops: [{ kind: "replace", removeId: "upper1-delts", addId: "sa-cable-lateral" }],
+  },
+  {
+    routineId: "growth-v2-upper-2",
+    routineName: "Upper 2 – Back Thickness + Chest",
+    ops: [
+      { kind: "replace", removeId: "upper2-tri-dip", addId: "upper2-overhead-tri" },
+      { kind: "remove", removeId: "upper2-rear-delt" },
+      { kind: "replace", removeId: "sa-bayesian", addId: "sa-curl-machine" },
+    ],
+  },
+  {
+    routineId: "growth-v2-shoulders-arms",
+    routineName: "Shoulders & Arms – Joint-Smart",
+    ops: [
+      { kind: "replace", removeId: "sa-delts", addId: "sa-cable-lateral" },
+      { kind: "replace", removeId: "sa-bayesian", addId: "sa-curl-machine" },
+    ],
+  },
+]
+
+/**
+ * Slots that have since been retired from GROWTH_V2_ROUTINES but are still
+ * referenced by the earlier, already-shipped passes. Keeping their definitions
+ * here means an install that runs every pass in one go still replays history
+ * faithfully before the Oct 27 swaps replace them.
+ */
+const RETIRED_SLOT_DEFINITIONS: Record<string, RoutineExercise> = {
+  "upper1-delts": { id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" },
+  "sa-delts": { id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" },
+  "sa-bayesian": { id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 2, targetReps: "8-12" },
+}
+
 /** Looks up a slot definition in the plan, preferring the routine that owns it. */
 function findPlanExercise(routineId: string, exerciseId: string): RoutineExercise | null {
   const owning = GROWTH_V2_ROUTINES.find((routine) => routine.id === routineId)
@@ -135,7 +179,7 @@ function findPlanExercise(routineId: string, exerciseId: string): RoutineExercis
     const match = routine.exercises.find((exercise) => exercise.id === exerciseId)
     if (match) return match
   }
-  return null
+  return RETIRED_SLOT_DEFINITIONS[exerciseId] ?? null
 }
 
 function applyOp(
@@ -233,6 +277,14 @@ export function addSaturdayCableCrunch(routines: WorkoutRoutine[]): {
   return applyGrowthV2TemplateOps(routines, SATURDAY_CRUNCH_OPS)
 }
 
+/** Pure, exported for tests. Applies the Oct 27 check-in exercise swaps. */
+export function applyOct27Swaps(routines: WorkoutRoutine[]): {
+  routines: WorkoutRoutine[]
+  changed: boolean
+} {
+  return applyGrowthV2TemplateOps(routines, OCT27_SWAP_OPS)
+}
+
 export function runGrowthV2TemplateMigration(): void {
   if (typeof window === "undefined") return
 
@@ -242,7 +294,8 @@ export function runGrowthV2TemplateMigration(): void {
   const needsSlotOps = !localStorage.getItem(MIGRATION_KEY)
   const needsCoreDrop = !localStorage.getItem(CORE_DROP_KEY)
   const needsSaturdayCrunch = !localStorage.getItem(SATURDAY_CRUNCH_KEY)
-  if (!needsSlotOps && !needsCoreDrop && !needsSaturdayCrunch) return
+  const needsOct27Swaps = !localStorage.getItem(OCT27_SWAPS_KEY)
+  if (!needsSlotOps && !needsCoreDrop && !needsSaturdayCrunch && !needsOct27Swaps) return
 
   const raw = localStorage.getItem(ROUTINES_KEY)
   if (raw) {
@@ -271,6 +324,12 @@ export function runGrowthV2TemplateMigration(): void {
           changed = changed || result.changed
         }
 
+        if (needsOct27Swaps) {
+          const result = applyOct27Swaps(routines)
+          routines = result.routines
+          changed = changed || result.changed
+        }
+
         if (changed) localStorage.setItem(ROUTINES_KEY, JSON.stringify(routines))
       }
     } catch {
@@ -282,4 +341,5 @@ export function runGrowthV2TemplateMigration(): void {
   if (needsSlotOps) localStorage.setItem(MIGRATION_KEY, stamp)
   if (needsCoreDrop) localStorage.setItem(CORE_DROP_KEY, stamp)
   if (needsSaturdayCrunch) localStorage.setItem(SATURDAY_CRUNCH_KEY, stamp)
+  if (needsOct27Swaps) localStorage.setItem(OCT27_SWAPS_KEY, stamp)
 }
