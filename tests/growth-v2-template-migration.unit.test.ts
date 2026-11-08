@@ -2,6 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {
   addSaturdayCableCrunch,
+  applyOct27Swaps,
   applyGrowthV2TemplateOps,
   dropRetiredCoreExercises,
   isRetiredCoreExercise,
@@ -301,4 +302,65 @@ test("adding the Saturday crunch is idempotent", () => {
     ids(second.routines, "growth-v2-shoulders-arms").filter((id) => id === "sa-cable-crunch").length,
     1
   )
+})
+
+test("Oct 27 swaps replace delts, dip, Bayesian and drop the rear delt cable fly in place", () => {
+  const stored: WorkoutRoutine[] = [
+    {
+      id: "growth-v2-upper-1",
+      name: "Upper 1 – Chest + Lats",
+      description: "",
+      estimatedTime: "",
+      category: "Growth v2",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      exercises: [
+        { id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" },
+        { id: "upper1-lat-pd", name: "Lat Pulldown", type: "strength", targetSets: 3, targetReps: "8-12" },
+      ],
+    },
+    {
+      id: "growth-v2-upper-2",
+      name: "Upper 2 – Back Thickness + Chest",
+      description: "",
+      estimatedTime: "",
+      category: "Growth v2",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      exercises: [
+        { id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 2, targetReps: "8-12" },
+        { id: "upper2-overhand-row", name: "Overhand Row", type: "strength", targetSets: 4, targetReps: "6-9" },
+        { id: "upper2-rear-delt", name: "Rear Delt Cable Fly", type: "strength", targetSets: 3, targetReps: "12-15" },
+        { id: "upper2-tri-dip", name: "Tricep Dip Machine", type: "strength", targetSets: 3, targetReps: "8-12" },
+      ],
+    },
+    {
+      id: "growth-v2-shoulders-arms",
+      name: "Shoulders & Arms – Joint-Smart",
+      description: "",
+      estimatedTime: "",
+      category: "Growth v2",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      exercises: [
+        { id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" },
+        { id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" },
+        { id: "sa-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" },
+      ],
+    },
+  ]
+
+  const { routines, changed } = applyOct27Swaps(stored)
+  assert.equal(changed, true)
+  const idsOf = (id: string) => routines.find((r) => r.id === id)!.exercises.map((e) => e.id)
+  assert.deepEqual(idsOf("growth-v2-upper-1"), ["sa-cable-lateral", "upper1-lat-pd"])
+  assert.deepEqual(idsOf("growth-v2-upper-2"), ["sa-curl-machine", "upper2-overhand-row", "upper2-overhead-tri"])
+  assert.deepEqual(idsOf("growth-v2-shoulders-arms"), ["sa-curl-machine", "sa-cable-lateral", "sa-cable-crunch"])
+
+  const sa = routines.find((r) => r.id === "growth-v2-shoulders-arms")!
+  assert.equal(sa.exercises[0].name, "Biceps Curl Machine")
+  assert.equal(sa.exercises[0].targetSets, 3)
+
+  // Idempotent.
+  assert.equal(applyOct27Swaps(routines).changed, false)
 })

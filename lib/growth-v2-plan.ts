@@ -84,7 +84,14 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "10-12",
       }),
-      ex({ id: "upper1-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" }),
+      ex({
+        id: "sa-cable-lateral",
+        name: "Single-Arm Cable Lateral Raise",
+        type: "strength",
+        targetSets: 3,
+        targetReps: "12-20",
+        notes: "Cable low, behind the body. Replaced the Technogym Delts Machine on Oct 27.",
+      }),
     ],
   },
   {
@@ -151,15 +158,14 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         notes: "Same machine as Overhand Row, vertical handles. Tracked separately.",
       }),
       ex({ id: "upper2-incline-db", name: "Incline Dumbbell Bench", type: "strength", targetSets: 4, targetReps: "6-9" }),
-      ex({ id: "upper2-rear-delt", name: "Rear Delt Cable Fly", type: "strength", targetSets: 3, targetReps: "12-15" }),
       ex({ id: "upper2-chest-fly", name: "Machine Chest Fly", type: "strength", targetSets: 3, targetReps: "10-15" }),
       ex({
-        id: "upper2-tri-dip",
-        name: "Tricep Dip Machine",
+        id: "upper2-overhead-tri",
+        name: "Overhead Cable Triceps Extension",
         type: "strength",
         targetSets: 3,
-        targetReps: "8-12",
-        notes: "Upright torso; stop before shoulder dominance.",
+        targetReps: "10-15",
+        notes: "Long-head stretch. Replaced the Tricep Dip Machine on Oct 27.",
       }),
       ex({
         id: "upper2-preacher-hammer",
@@ -171,7 +177,15 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
       // Same slot id as the Shoulders & Arms entry on purpose: server-side PRs,
       // stall alerts and the rating views all group by workout_exercises.exercise_id,
       // so sharing the id keeps one unified history across both days.
-      ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 2, targetReps: "8-12" }),
+      // sa-cable-lateral is shared between Upper 1 and Shoulders & Arms the same way.
+      ex({
+        id: "sa-curl-machine",
+        name: "Biceps Curl Machine",
+        type: "strength",
+        targetSets: 2,
+        targetReps: "8-12",
+        notes: "Replaced the Bayesian Cable Curl. Stay loaded in the long stretch.",
+      }),
     ],
   },
   {
@@ -198,7 +212,14 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "12-15",
       }),
-      ex({ id: "sa-delts", name: "Technogym Delts Machine", type: "strength", targetSets: 3, targetReps: "12-20" }),
+      ex({
+        id: "sa-cable-lateral",
+        name: "Single-Arm Cable Lateral Raise",
+        type: "strength",
+        targetSets: 3,
+        targetReps: "12-20",
+        notes: "Cable low, behind the body. Replaced the Technogym Delts Machine on Oct 27.",
+      }),
       ex({
         id: "sa-tri-machine",
         name: "Technogym Triceps Extension Machine",
@@ -206,7 +227,14 @@ export const GROWTH_V2_ROUTINES: WorkoutRoutine[] = [
         targetSets: 3,
         targetReps: "10-12",
       }),
-      ex({ id: "sa-bayesian", name: "Bayesian Cable Curl", type: "strength", targetSets: 3, targetReps: "8-12" }),
+      ex({
+        id: "sa-curl-machine",
+        name: "Biceps Curl Machine",
+        type: "strength",
+        targetSets: 3,
+        targetReps: "8-12",
+        notes: "Replaced the Bayesian Cable Curl. Stay loaded in the long stretch.",
+      }),
       // Cable crunch was retired with the rest of direct core when it moved to
       // Solidcore, then brought back on Saturday only.
       ex({ id: "sa-cable-crunch", name: "Cable Crunch", type: "other", targetSets: 3, targetReps: "12-15" }),
