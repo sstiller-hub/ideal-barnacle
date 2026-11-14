@@ -176,4 +176,23 @@ test.describe("Active workout: device rotation", () => {
     expect(await readExerciseIndex(page)).toBe(2)
     await expect(page.getByText("Overhead Press").first()).toBeVisible()
   })
+
+  // iPhone Duo: the unfolded inner display is nearly square, so held sideways
+  // it is only just "landscape". Rotating the app there would turn it on its
+  // side for no gain — it must render upright and keep the workout in place.
+  test("a near-square foldable screen held sideways is not rotated", async ({ page }) => {
+    test.slow()
+    await seed(page)
+    await page.goto(`/workout/session?routineId=${routine.id}&gym=sowa`)
+    await expect(page.getByText("Overhead Press").first()).toBeVisible()
+
+    await page.setViewportSize({ width: 840, height: 744 })
+    await expect(page.getByText("Overhead Press").first()).toBeVisible()
+    await expect(page.locator(".portrait-lock-rotated")).toHaveCount(0)
+    await expect.poll(() => readExerciseIndex(page)).toBe(2)
+
+    // A folded phone held sideways still gets the portrait lock.
+    await page.setViewportSize(LANDSCAPE)
+    await expect(page.locator(".portrait-lock-rotated")).toBeVisible()
+  })
 })

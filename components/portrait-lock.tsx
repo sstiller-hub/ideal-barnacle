@@ -2,7 +2,13 @@
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react"
 
-const LANDSCAPE_MOBILE_QUERY = "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)"
+// When to rotate the portrait layout: a touch phone held sideways. The
+// aspect-ratio floor keeps near-square screens out — the unfolded inner
+// display of a foldable (iPhone Duo) is only slightly wider than tall when
+// held sideways, so rotating it would turn the whole app on its side for no
+// gain. A regular phone held sideways is ~2:1, so 4:3 leaves plenty of margin.
+export const LANDSCAPE_MOBILE_QUERY =
+  "(orientation: landscape) and (max-width: 1024px) and (pointer: coarse) and (min-aspect-ratio: 4/3)"
 
 // Which way the device was turned. screen.orientation.angle reports how far the
 // content has been rotated away from the device's natural orientation, so we

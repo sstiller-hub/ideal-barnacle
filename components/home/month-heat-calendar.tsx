@@ -184,6 +184,11 @@ export function MonthHeatCalendar({
               style={{
                 position: "relative",
                 aspectRatio: "1",
+                // Square on a phone (~46pt). On a wide screen — the unfolded
+                // iPhone Duo — square cells grew to ~100pt and pushed today's
+                // workout below the fold; cap the height so they go wide
+                // instead and the month stays a compact band.
+                maxHeight: "60px",
                 width: "100%",
                 border: "none",
                 borderRadius: "var(--radius-flat)",
