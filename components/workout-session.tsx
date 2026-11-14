@@ -69,6 +69,7 @@ import {
   ThumbsUp,
 } from "lucide-react"
 import { ReorderExercisesSheet } from "@/components/reorder-exercises-sheet"
+import { LANDSCAPE_MOBILE_QUERY } from "@/components/portrait-lock"
 import { StatUnit } from "@/components/ledger/stat-unit"
 import { SessionClock } from "@/components/ledger/session-clock"
 import { DeltaChip } from "@/components/ledger/delta-chip"
@@ -1442,7 +1443,7 @@ export default function WorkoutSessionComponent({
   )
 
   useEffect(() => {
-    const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)")
+    const query = window.matchMedia(LANDSCAPE_MOBILE_QUERY)
     const update = (isFlip: boolean) => {
       if (scrollSettleTimeoutRef.current) {
         clearTimeout(scrollSettleTimeoutRef.current)
