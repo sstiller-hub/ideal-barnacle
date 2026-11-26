@@ -32,6 +32,8 @@ export interface ActiveWorkoutDraft {
   last_sync_error?: string | null
   sets: WorkoutSetDraft[]
   exercise_ratings?: Record<string, ExerciseRatingValue>
+  /** exercise_id -> equipment name confirmed from a photo. */
+  exercise_equipment?: Record<string, string>
 }
 
 const DB_NAME = "akt-workout-drafts"
@@ -101,6 +103,24 @@ export async function getWorkoutDraft(workoutId: string): Promise<ActiveWorkoutD
   if (!db) return null
   const draft = await db.get(WORKOUT_STORE, workoutId)
   return (draft as ActiveWorkoutDraft) || null
+}
+
+/**
+ * Per-exercise metadata for the commit payload: rating and equipment, keyed by
+ * exercise_id. Undefined when the draft carries neither.
+ */
+export function draftExerciseMeta(
+  draft: Pick<ActiveWorkoutDraft, "exercise_ratings" | "exercise_equipment">
+): Array<{ exercise_id: string; rating: ExerciseRatingValue; equipment?: string }> | undefined {
+  const ratings = draft.exercise_ratings ?? {}
+  const equipment = draft.exercise_equipment ?? {}
+  const ids = Array.from(new Set([...Object.keys(ratings), ...Object.keys(equipment)]))
+  if (ids.length === 0) return draft.exercise_ratings ? [] : undefined
+  return ids.map((exercise_id) => ({
+    exercise_id,
+    rating: ratings[exercise_id] ?? null,
+    ...(equipment[exercise_id] ? { equipment: equipment[exercise_id] } : {}),
+  }))
 }
 
 export async function updateWorkoutDraft(

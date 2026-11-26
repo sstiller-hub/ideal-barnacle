@@ -20,6 +20,8 @@ export type Exercise = {
   restTime: number
   completed: boolean
   rating?: ExerciseRating
+  /** Equipment the user confirmed from a photo, when one was set. */
+  equipmentName?: string
   sets: WorkoutSet[]
   previousPerformance?: {
     weight: number
