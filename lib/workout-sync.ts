@@ -9,6 +9,7 @@ import {
   markWorkoutSyncing,
   type ActiveWorkoutDraft,
   type SyncState,
+  draftExerciseMeta,
 } from "@/lib/workout-draft-storage"
 
 type SyncResult = {
@@ -46,12 +47,7 @@ async function postCommit(draft: ActiveWorkoutDraft, token: string) {
         schema_version: draft.schema_version,
       },
       sets: draft.sets,
-      exercises: draft.exercise_ratings
-        ? Object.entries(draft.exercise_ratings).map(([exercise_id, rating]) => ({
-            exercise_id,
-            rating,
-          }))
-        : undefined,
+      exercises: draftExerciseMeta(draft),
     }),
   })
 

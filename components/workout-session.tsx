@@ -60,6 +60,7 @@ import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } f
 import {
   ArrowLeft,
   AlertCircle,
+  Camera,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -76,6 +77,14 @@ import { DeltaChip } from "@/components/ledger/delta-chip"
 import { plural } from "@/lib/utils"
 import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
 import { CoachNoteList } from "@/components/coach-note-card"
+import { EquipmentSheet, type EquipmentSheetHandle } from "@/components/equipment-sheet"
+import { effectiveEquipment, type EquipmentScope, type ExerciseEquipment } from "@/lib/equipment"
+import {
+  getStickyEquipment,
+  loadRemoteEquipment,
+  saveRemoteEquipment,
+  setStickyEquipmentLocal,
+} from "@/lib/equipment-storage"
 import { useCoachNotes } from "@/hooks/useCoachNotes"
 import type { CoachNote } from "@/lib/coach-notes"
 
@@ -93,6 +102,10 @@ type Exercise = {
   machineSettings?: {
     seat?: string
   }
+  /** Sticky equipment, loaded from settings each session. */
+  equipment?: ExerciseEquipment
+  /** Today-only override; dies with the session. */
+  equipmentToday?: ExerciseEquipment
   sets: {
     id: string
     reps: number | null
@@ -320,6 +333,8 @@ type ExercisePageProps = {
   userId: string | null
   maxSetVolumeByExercise: Map<string, number>
   updateExerciseMachineSetting: (exerciseIndex: number, field: "seat", value: string) => void
+  onOpenEquipmentCamera: (exerciseIndex: number) => void
+  onOpenEquipmentManage: (exerciseIndex: number) => void
   handleTogglePlateCalc: () => void
   updateSetDataForExercise: (exerciseIndex: number, setIndex: number, field: "reps" | "weight", value: number | null) => void
   handleSetFieldFocus: (setId: string, field: "reps" | "weight") => void
@@ -366,6 +381,8 @@ const ExercisePage = memo(function ExercisePage({
   userId,
   maxSetVolumeByExercise,
   updateExerciseMachineSetting,
+  onOpenEquipmentCamera,
+  onOpenEquipmentManage,
   handleTogglePlateCalc,
   updateSetDataForExercise,
   handleSetFieldFocus,
@@ -400,6 +417,7 @@ const ExercisePage = memo(function ExercisePage({
   const completedCount = exercise.sets.filter((set: any) => set.completed).length
   const hasIncompleteSets = exercise.sets.some((set: any) => !set.completed)
   const trimmedCount = Array.isArray(exercise.trimmedSets) ? exercise.trimmedSets.length : 0
+  const activeEquipment = effectiveEquipment(exercise)
 
   return (
     <div
@@ -451,6 +469,18 @@ const ExercisePage = memo(function ExercisePage({
                   textAlign: "center",
                 }}
               />
+            )}
+            {exerciseIndex === currentExerciseIndex && (
+              <button
+                type="button"
+                onClick={() => onOpenEquipmentCamera(exerciseIndex)}
+                className="tap-target ios-chip transition-colors duration-150"
+                aria-label="Photograph equipment"
+                style={{ padding: "5px 10px", fontSize: "13px" }}
+                data-testid="equipment-camera-chip"
+              >
+                <Camera size={14} strokeWidth={1.75} aria-hidden />
+              </button>
             )}
             {/* Plates is a chip, not a bordered label button — it toggles a
                 panel, which is exactly what an iOS filter chip does. */}
@@ -533,6 +563,59 @@ const ExercisePage = memo(function ExercisePage({
           )}
         </div>
       </div>
+
+      {activeEquipment ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (exerciseIndex === currentExerciseIndex) onOpenEquipmentManage(exerciseIndex)
+          }}
+          className="flex items-center gap-2"
+          data-testid="exercise-equipment"
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            marginTop: isCompactSets ? "-4px" : "-10px",
+            marginBottom: isCompactSets ? "10px" : "16px",
+            maxWidth: "100%",
+            textAlign: "left",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-label)",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              color: "var(--ink-70)",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            ON {activeEquipment.equipment.name}
+          </span>
+          {activeEquipment.scope === "today" ? (
+            <span
+              style={{
+                fontFamily: "var(--font-label)",
+                fontSize: "8px",
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                color: "var(--ink-50)",
+                border: "1px solid var(--ink-12)",
+                borderRadius: "var(--radius-flat)",
+                padding: "1px 5px",
+                flexShrink: 0,
+              }}
+            >
+              TODAY
+            </span>
+          ) : null}
+        </button>
+      ) : null}
 
       {/* Coach notes for this exercise — the one inserted slot in the Cover
           Flow page. Above the set list, below the title block, so it is read
@@ -1362,6 +1445,8 @@ export default function WorkoutSessionComponent({
   const exercisesRef = useRef<any[]>([])
   const [uiExerciseIndex, setUiExerciseIndex] = useState(0)
   const [isReorderOpen, setIsReorderOpen] = useState(false)
+  const equipmentSheetRef = useRef<EquipmentSheetHandle>(null)
+  const [equipmentTargetIndex, setEquipmentTargetIndex] = useState<number | null>(null)
   const [isLandscapeMobile, setIsLandscapeMobile] = useState(false)
   const currentExerciseIndexRef = useRef(0)
   const historyRepsCacheRef = useRef<Map<string, number[]>>(new Map())
@@ -1712,6 +1797,7 @@ export default function WorkoutSessionComponent({
           restTime,
           completed: false,
           machineSettings: Object.keys(savedMachineSettings).length > 0 ? savedMachineSettings : undefined,
+          equipment: getStickyEquipment(exercise.name) ?? undefined,
           sets: isWarmup
             ? warmupSets
             : Array.from({ length: effectiveSets }, (_, setIndex) => {
@@ -1909,6 +1995,7 @@ export default function WorkoutSessionComponent({
     setUiExerciseIndex(currentExerciseIndex)
   }, [currentExerciseIndex])
   const currentExercise = exercises[currentExerciseIndex]
+  const equipmentTarget = equipmentTargetIndex !== null ? exercises[equipmentTargetIndex] ?? null : null
   const firstIncompleteIndex =
     currentExercise?.sets?.findIndex((set: any) => !set.completed) ?? -1
   const currentSetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex
@@ -2184,6 +2271,16 @@ export default function WorkoutSessionComponent({
             )
             saveMachineSettings(currentExercise.name, { seat: machineSeat })
           }
+        })
+        const equipmentExerciseName = currentExercise.name
+        void loadRemoteEquipment(userId, equipmentExerciseName).then((remote) => {
+          if (remote === undefined) return
+          setStickyEquipmentLocal(equipmentExerciseName, remote)
+          setExercises((prev: any[]) =>
+            prev.map((ex: any) =>
+              ex.name === equipmentExerciseName ? { ...ex, equipment: remote ?? undefined } : ex
+            )
+          )
         })
       }
     }
@@ -2793,6 +2890,62 @@ export default function WorkoutSessionComponent({
     signalAutoSaved()
   }
 
+  // Equipment from a photo. Sticky applies to every exercise with this name and
+  // future sessions; today-only touches this exercise in this session alone.
+  const applyExerciseEquipment = async (
+    exerciseIndex: number,
+    action:
+      | { type: "save"; equipment: ExerciseEquipment; scope: EquipmentScope }
+      | { type: "clearToday" }
+      | { type: "removeSticky" }
+  ) => {
+    if (!session) return
+    const target = exercises[exerciseIndex]
+    if (!target) return
+    const name = target.name
+
+    if (action.type === "save" && action.scope === "sticky") {
+      setStickyEquipmentLocal(name, action.equipment)
+      if (userId) {
+        void saveRemoteEquipment(userId, name, action.equipment).then((ok) => {
+          if (!ok) toast("Equipment saved on this phone only. Sync failed.")
+        })
+      }
+    } else if (action.type === "removeSticky") {
+      setStickyEquipmentLocal(name, null)
+      if (userId) void saveRemoteEquipment(userId, name, null)
+    }
+
+    const newExercises = exercises.map((exercise: any, idx: number) => {
+      if (action.type === "save" && action.scope === "today") {
+        return idx === exerciseIndex ? { ...exercise, equipmentToday: action.equipment } : exercise
+      }
+      if (action.type === "clearToday") {
+        if (idx !== exerciseIndex) return exercise
+        const { equipmentToday: _cleared, ...rest } = exercise
+        return rest
+      }
+      if (exercise.name !== name) return exercise
+      if (action.type === "removeSticky") {
+        const { equipment: _removed, ...rest } = exercise
+        return rest
+      }
+      // A new sticky photo replaces today's override on this exercise too:
+      // "until I send another picture".
+      const { equipmentToday: _replaced, ...rest } = exercise
+      return idx === exerciseIndex ? { ...rest, equipment: action.equipment } : { ...exercise, equipment: action.equipment }
+    })
+
+    haptic("tap")
+    exercisesRef.current = newExercises
+    setExercises(newExercises)
+    const updatedSession: WorkoutSession = { ...session, exercises: newExercises }
+    sessionRef.current = updatedSession
+    setSession(updatedSession)
+    await saveSession(updatedSession)
+    signalAutoSaved()
+  }
+
   const completeSet = async (
     setIndex: number,
     options?: {
@@ -3128,8 +3281,13 @@ export default function WorkoutSessionComponent({
         ? nonGhostSets.slice(0, -1)
         : nonGhostSets
       const allCompleted = trimmedSets.every((set: any) => set.completed && !isSetIncomplete(set))
+      // History keeps the equipment name only; photos stay out of the
+      // localStorage workout log.
+      const { equipment: _sticky, equipmentToday: _today, ...rest } = exercise
+      const equipmentName = effectiveEquipment(exercise)?.equipment.name
       return {
-        ...exercise,
+        ...rest,
+        ...(equipmentName ? { equipmentName } : {}),
         sets: trimmedSets,
         completed: allCompleted,
       }
@@ -3235,9 +3393,11 @@ export default function WorkoutSessionComponent({
           })
         }
         const exerciseRatings: Record<string, ExerciseRating> = {}
+        const exerciseEquipment: Record<string, string> = {}
         cleanedExercises.forEach((exercise: any) => {
           const exId = exercise?.id || exercise?.name
           if (exId) exerciseRatings[exId] = exercise.rating ?? null
+          if (exId && exercise.equipmentName) exerciseEquipment[exId] = exercise.equipmentName
         })
         await updateWorkoutDraft(completedWorkoutId, {
           completed_at: completedAt,
@@ -3245,6 +3405,7 @@ export default function WorkoutSessionComponent({
           routine_name: routine.name,
           gym,
           exercise_ratings: exerciseRatings,
+          ...(Object.keys(exerciseEquipment).length > 0 ? { exercise_equipment: exerciseEquipment } : {}),
         })
         await markWorkoutPending(completedWorkoutId)
         const allSetDrafts: WorkoutSetDraft[] = []
@@ -3438,6 +3599,16 @@ export default function WorkoutSessionComponent({
     () => exercisePageHandlersRef.current.handleTogglePlateCalc(),
     [],
   )
+  // Camera must open inside the tap: set the target, then click the input in
+  // the same call stack.
+  const openEquipmentCamera = useCallback((exerciseIndex: number) => {
+    setEquipmentTargetIndex(exerciseIndex)
+    equipmentSheetRef.current?.openCamera()
+  }, [])
+  const openEquipmentManage = useCallback((exerciseIndex: number) => {
+    setEquipmentTargetIndex(exerciseIndex)
+    equipmentSheetRef.current?.openManage()
+  }, [])
   const stableUpdateSetData = useCallback(
     (i: number, s: number, f: "reps" | "weight", v: number | null) =>
       exercisePageHandlersRef.current.updateSetDataForExercise(i, s, f, v),
@@ -4248,6 +4419,8 @@ export default function WorkoutSessionComponent({
               userId={userId}
               maxSetVolumeByExercise={maxSetVolumeByExercise}
               updateExerciseMachineSetting={stableUpdateMachineSetting}
+              onOpenEquipmentCamera={openEquipmentCamera}
+              onOpenEquipmentManage={openEquipmentManage}
               handleTogglePlateCalc={stableTogglePlateCalc}
               updateSetDataForExercise={stableUpdateSetData}
               handleSetFieldFocus={stableSetFieldFocus}
@@ -4316,6 +4489,21 @@ export default function WorkoutSessionComponent({
         }
       `}</style>
 
+      <EquipmentSheet
+        ref={equipmentSheetRef}
+        exerciseName={equipmentTarget?.name ?? null}
+        current={equipmentTarget ? effectiveEquipment(equipmentTarget) : null}
+        sticky={equipmentTarget?.equipment ?? null}
+        onSave={(equipment, scope) => {
+          if (equipmentTargetIndex !== null) void applyExerciseEquipment(equipmentTargetIndex, { type: "save", equipment, scope })
+        }}
+        onClearToday={() => {
+          if (equipmentTargetIndex !== null) void applyExerciseEquipment(equipmentTargetIndex, { type: "clearToday" })
+        }}
+        onRemoveSticky={() => {
+          if (equipmentTargetIndex !== null) void applyExerciseEquipment(equipmentTargetIndex, { type: "removeSticky" })
+        }}
+      />
       <ReorderExercisesSheet
         open={isReorderOpen}
         onOpenChange={setIsReorderOpen}

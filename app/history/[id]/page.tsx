@@ -217,6 +217,7 @@ export default function WorkoutDetailPage() {
                       <p style={{ fontSize: "13px", color: "var(--ink-50)", marginTop: "2px" }}>
                         {completedSets.length}/{sets.length} sets
                         {exercise.rating ? (exercise.rating === "thumbs_up" ? " · Felt good" : " · Felt rough") : ""}
+                        {exercise.equipmentName ? ` · ${exercise.equipmentName}` : ""}
                       </p>
                     </div>
                     <div className="text-right" style={{ flexShrink: 0 }}>

@@ -37,6 +37,7 @@ export const workoutCommitSchema = z.object({
       z.object({
         exercise_id: z.string().min(1),
         rating: z.enum(["thumbs_up", "thumbs_down"]).nullable().optional(),
+        equipment: z.string().trim().max(120).nullable().optional(),
       })
     )
     .optional(),

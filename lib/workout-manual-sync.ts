@@ -6,6 +6,7 @@ import {
   markWorkoutSynced,
   type ActiveWorkoutDraft,
   type WorkoutSetDraft,
+  draftExerciseMeta,
 } from "@/lib/workout-draft-storage"
 
 type ManualSyncStatus = "synced" | "skipped" | "conflict" | "error" | "dry_run"
@@ -167,19 +168,18 @@ function asPayloadFromDraft(draft: ActiveWorkoutDraft) {
       schema_version: draft.schema_version,
     },
     sets: draft.sets,
-    exercises: draft.exercise_ratings
-      ? Object.entries(draft.exercise_ratings).map(([exercise_id, rating]) => ({
-          exercise_id,
-          rating,
-        }))
-      : undefined,
+    exercises: draftExerciseMeta(draft),
   }
 }
 
 function asPayloadFromCompleted(
   workout: CompletedWorkout,
   map: ManualIdMap
-): { workout: any; sets: WorkoutSetDraft[]; exercises: Array<{ exercise_id: string; rating: ExerciseRating }> } {
+): {
+  workout: any
+  sets: WorkoutSetDraft[]
+  exercises: Array<{ exercise_id: string; rating: ExerciseRating; equipment?: string }>
+} {
   const resolvedWorkoutId = ensureWorkoutUuid(workout.id, map)
   const coerceToDatetime = (value: string): string => {
     if (!value) return value
@@ -198,10 +198,14 @@ function asPayloadFromCompleted(
   const updatedAtClient = Date.parse(completedAt) || Date.now()
 
   const sets: WorkoutSetDraft[] = []
-  const exercises: Array<{ exercise_id: string; rating: ExerciseRating }> = []
+  const exercises: Array<{ exercise_id: string; rating: ExerciseRating; equipment?: string }> = []
   workout.exercises.forEach((exercise) => {
     const exerciseId = exercise.id || exercise.name
-    exercises.push({ exercise_id: exerciseId, rating: exercise.rating ?? null })
+    exercises.push({
+      exercise_id: exerciseId,
+      rating: exercise.rating ?? null,
+      ...(exercise.equipmentName ? { equipment: exercise.equipmentName } : {}),
+    })
     exercise.sets.forEach((set, index) => {
       const setKey = `${exerciseId}::${index}`
       const setId = ensureSetUuid(resolvedWorkoutId, setKey, map)

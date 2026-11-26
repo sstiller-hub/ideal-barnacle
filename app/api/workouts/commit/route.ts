@@ -14,6 +14,7 @@ type WorkoutExerciseInsert = {
   updated_at: string
   rating: "thumbs_up" | "thumbs_down" | null
   rating_at: string | null
+  equipment?: string | null
 }
 
 export async function POST(request: Request) {
@@ -69,8 +70,10 @@ export async function POST(request: Request) {
     )
 
     const ratingByExerciseId = new Map<string, "thumbs_up" | "thumbs_down" | null>()
+    const equipmentByExerciseId = new Map<string, string>()
     ;(exercises ?? []).forEach((exercise) => {
       ratingByExerciseId.set(exercise.exercise_id, exercise.rating ?? null)
+      if (exercise.equipment) equipmentByExerciseId.set(exercise.exercise_id, exercise.equipment)
     })
 
     // Drafts started before gyms existed carry no gym; a Cape exercise name
@@ -131,15 +134,27 @@ export async function POST(request: Request) {
         updated_at: now,
         rating,
         rating_at: rating ? now : null,
+        // Only sent when set, so payloads without equipment never touch the
+        // column (and work before migration 018 is applied).
+        ...(equipmentByExerciseId.has(exerciseId) ? { equipment: equipmentByExerciseId.get(exerciseId) } : {}),
       })
     })
 
     let insertedExercises: Array<{ id: string; exercise_id: string }> = []
     if (exerciseRows.length > 0) {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("workout_exercises")
         .insert(exerciseRows)
         .select("id, exercise_id")
+      // Equipment is a nice-to-have; never let a missing column (migration 018
+      // not yet applied) fail the workout itself.
+      if (error && equipmentByExerciseId.size > 0 && /equipment/i.test(error.message)) {
+        console.warn("[commit] retrying without equipment:", error.message)
+        ;({ data, error } = await supabase
+          .from("workout_exercises")
+          .insert(exerciseRows.map(({ equipment: _equipment, ...row }) => row))
+          .select("id, exercise_id"))
+      }
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
