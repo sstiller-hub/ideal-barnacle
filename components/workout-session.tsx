@@ -76,6 +76,7 @@ import { DeltaChip } from "@/components/ledger/delta-chip"
 import { plural } from "@/lib/utils"
 import { haptic, playRestChime, primeRestChime } from "@/lib/session-feedback"
 import { CoachNoteList } from "@/components/coach-note-card"
+import { EquipmentChip } from "@/components/equipment-capture"
 import { useCoachNotes } from "@/hooks/useCoachNotes"
 import type { CoachNote } from "@/lib/coach-notes"
 
@@ -434,6 +435,7 @@ const ExercisePage = memo(function ExercisePage({
             EXERCISE {exerciseIndex + 1} OF {exercisesCount}
           </div>
           <div className="flex items-center gap-2">
+            {exerciseIndex === currentExerciseIndex && <EquipmentChip exerciseName={exercise.name} />}
             {exerciseIndex === currentExerciseIndex && isMachineExercise(exercise.name) && (
               <input
                 type="number"
