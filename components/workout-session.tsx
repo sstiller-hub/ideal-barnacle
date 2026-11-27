@@ -58,6 +58,14 @@ import { getMachineSettings, saveMachineSettings } from "@/lib/machine-settings-
 import { loadExerciseSettings, saveExerciseSettings } from "@/lib/supabase-exercise-settings"
 import { recordRestExtension, getRestExtensionTrend, type RestExtensionTrend } from "@/lib/rest-extension-storage"
 import {
+  buildTransitionSample,
+  loadPendingTransition,
+  loadTransitionSamples,
+  predictTransitionSeconds,
+  recordTransitionSample,
+  savePendingTransition,
+} from "@/lib/exercise-transition-storage"
+import {
   ArrowLeft,
   AlertCircle,
   Check,
@@ -1354,6 +1362,16 @@ export default function WorkoutSessionComponent({
   const focusIntentRef = useRef(false)
   const restNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restNotificationEndsAtRef = useRef<number | null>(null)
+  // Set while the running rest is the gap between two exercises and its length
+  // came from the user's learned transition times, so a skip to a different
+  // exercise mid-rest can re-target it. userDeltaSeconds keeps ±30 taps.
+  const transitionRestRef = useRef<{
+    from: string
+    planned: string
+    startedAtMs: number
+    candidatesKey: string
+    userDeltaSeconds: number
+  } | null>(null)
   const [plateDisplayMode, setPlateDisplayMode] = useState<"per-side" | "total">("per-side")
   const [plateStartingWeight, setPlateStartingWeight] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
@@ -1931,6 +1949,7 @@ export default function WorkoutSessionComponent({
     haptic("tap")
     void setRestStateAndPersist({ ...restState, remainingSeconds: next })
     scheduleRestNotification(next)
+    if (transitionRestRef.current) transitionRestRef.current.userDeltaSeconds += next - restRemainingSeconds
     if (deltaSeconds > 0) {
       recordRestExtension(session?.id ?? "unknown")
       setRestExtensionTrend(getRestExtensionTrend())
@@ -2100,6 +2119,35 @@ export default function WorkoutSessionComponent({
     }, 1000)
     return () => clearInterval(interval)
   }, [isResting])
+
+  // Skipping ahead mid-transition: if the user lands on an exercise other than
+  // the one that came next in order, the countdown becomes the average of the
+  // learned transitions toward both — the one actually after it and the one
+  // they skipped to — measured from when the last set was logged.
+  useEffect(() => {
+    if (!isResting) {
+      transitionRestRef.current = null
+      return
+    }
+    const transition = transitionRestRef.current
+    if (!transition || !restState) return
+    const currentKey = normalizeExerciseName(exercises[currentExerciseIndex]?.name ?? "")
+    if (!currentKey) return
+    const candidates =
+      currentKey === transition.planned || currentKey === transition.from
+        ? [transition.planned]
+        : [transition.planned, currentKey]
+    const candidatesKey = candidates.join("|")
+    if (candidatesKey === transition.candidatesKey) return
+    const predicted = predictTransitionSeconds(loadTransitionSamples(), transition.from, candidates)
+    if (predicted === null) return
+    transition.candidatesKey = candidatesKey
+    const elapsed = Math.floor((Date.now() - transition.startedAtMs) / 1000)
+    const remaining = Math.max(5, predicted + transition.userDeltaSeconds - elapsed)
+    void setRestStateAndPersist({ ...restState, remainingSeconds: remaining })
+    scheduleRestNotification(remaining)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isResting, currentExerciseIndex])
 
   useEffect(() => {
     if (isResting) {
@@ -2898,11 +2946,65 @@ export default function WorkoutSessionComponent({
     const workoutNowFinishable = newExercises.every((ex: any) => canExerciseBeFinished(ex))
     if (workoutNowFinishable) shouldStartRest = false
 
+    // Learn exercise-to-exercise transition times: the clock starts when an
+    // exercise's last set is checked off and stops when the first set of a
+    // different exercise is logged.
+    const loggedAt = Date.now()
+    const transitionWorkoutId = workoutId ?? session.id
+    const toggledExercise = newExercises[targetExerciseIndex]
+    const toggledKey = normalizeExerciseName(toggledExercise?.name ?? "")
+    const toggledNowCompleted = Boolean(toggledExercise?.sets?.[setIndex]?.completed)
+    let transitionRest: { from: string; planned: string } | null = null
+    const pendingTransition = loadPendingTransition()
+    if (pendingTransition && pendingTransition.workoutId === transitionWorkoutId) {
+      if (toggledNowCompleted && pendingTransition.from !== toggledKey) {
+        const sample = buildTransitionSample(pendingTransition, toggledKey, loggedAt)
+        if (sample) recordTransitionSample(sample)
+        savePendingTransition(null)
+      } else if (pendingTransition.from === toggledKey) {
+        // Another set (or an un-check) on the exercise just finished: it wasn't
+        // done after all. A fresh pending entry is written below if it is now.
+        savePendingTransition(null)
+      }
+    } else if (pendingTransition) {
+      savePendingTransition(null)
+    }
+    if (toggledNowCompleted && !workoutNowFinishable && canExerciseBeFinished(toggledExercise)) {
+      const plannedIndex = (() => {
+        const after = newExercises.findIndex(
+          (ex: any, idx: number) => idx > targetExerciseIndex && !canExerciseBeFinished(ex),
+        )
+        return after !== -1 ? after : newExercises.findIndex((ex: any) => !canExerciseBeFinished(ex))
+      })()
+      const plannedKey = plannedIndex !== -1 ? normalizeExerciseName(newExercises[plannedIndex]?.name ?? "") : ""
+      savePendingTransition({
+        workoutId: transitionWorkoutId,
+        from: toggledKey,
+        planned: plannedKey,
+        completedAt: loggedAt,
+      })
+      if (plannedKey) {
+        const predicted = predictTransitionSeconds(loadTransitionSamples(), toggledKey, [plannedKey])
+        if (predicted !== null && restSecondsToStart !== null) {
+          restSecondsToStart = predicted
+          transitionRest = { from: toggledKey, planned: plannedKey }
+        }
+      }
+    }
+
     if (shouldAutoRest && shouldStartRest) {
       const restSeconds =
         restSecondsToStart ??
         exercises[targetExerciseIndex]?.restTime ??
         extractRestSeconds(exercises[targetExerciseIndex]?.notes)
+      transitionRestRef.current = transitionRest
+        ? {
+            ...transitionRest,
+            startedAtMs: loggedAt,
+            candidatesKey: transitionRest.planned,
+            userDeltaSeconds: 0,
+          }
+        : null
       await setRestStateAndPersist({
         exerciseIndex: targetExerciseIndex,
         setIndex,
